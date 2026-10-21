@@ -31,6 +31,13 @@ struct RootView: View {
         .background(Theme.canvas)
         .foregroundStyle(Theme.ink)
         .animation(.easeOut(duration: 0.15), value: state.tab)
+        .overlay(alignment: .trailing) {
+            if state.assistantOpen {
+                AssistantPanel()
+                    .transition(.move(edge: .trailing))
+            }
+        }
+        .animation(.spring(response: 0.35, dampingFraction: 0.9), value: state.assistantOpen)
         .sheet(isPresented: $state.searchOpen) { SearchView() }
         .task {
             // Daily background refresh for reading sources and the inbox while Orbit is open.
@@ -62,6 +69,18 @@ private struct TopBar: View {
                 Spacer()
                 HStack(spacing: 10) {
                     UpdatePill()
+                    Button { state.assistantOpen.toggle() } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "sparkles")
+                            Text("Ask Claude")
+                        }
+                        .font(Theme.ui(13, weight: .semibold))
+                        .foregroundStyle(Theme.stickerInk)
+                        .padding(.horizontal, 14).frame(height: 42)
+                        .background(Capsule().fill(Theme.lime))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Ask Claude (⌘J)")
                     CircleIconButton(symbol: "magnifyingglass", size: 42) { state.searchOpen = true }
                         .help("Search (⌘K)")
                     CircleIconButton(symbol: "plus", size: 42) { CapturePanel.shared.show() }
@@ -74,7 +93,7 @@ private struct TopBar: View {
                     }
                     .buttonStyle(.plain)
                     .help("Settings")
-                    Avatar(name: userName, size: 42)
+                    ProfileMenu(name: userName)
                 }
             }
             NavDock()
@@ -138,20 +157,50 @@ private struct DockItem: View {
     }
 }
 
+/// Avatar in the top bar; click it to change your photo.
+private struct ProfileMenu: View {
+    let name: String
+    @ObservedObject private var profile = ProfileStore.shared
+
+    var body: some View {
+        Menu {
+            Button(profile.photo == nil ? "Add Profile Photo…" : "Change Profile Photo…") { profile.choosePhoto() }
+            if profile.photo != nil { Button("Remove Photo", role: .destructive) { profile.removePhoto() } }
+            Divider()
+            SettingsLink { Text("Settings…") }
+        } label: {
+            Avatar(name: name, size: 42)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Profile")
+    }
+}
+
 struct Avatar: View {
     let name: String
     var size: CGFloat = 44
+    @ObservedObject private var profile = ProfileStore.shared
 
     var initials: String {
         name.split(separator: " ").prefix(2).compactMap(\.first).map(String.init).joined().uppercased()
     }
 
     var body: some View {
-        Text(initials.isEmpty ? "Me" : initials)
-            .font(Theme.ui(size * 0.36, weight: .bold))
-            .foregroundStyle(Theme.stickerInk)
-            .frame(width: size, height: size)
-            .background(Circle().fill(LinearGradient(colors: [Theme.pink, Theme.purple],
-                                                     startPoint: .topLeading, endPoint: .bottomTrailing)))
+        Group {
+            if let photo = profile.photo {
+                Image(nsImage: photo).resizable().scaledToFill()
+            } else {
+                Text(initials.isEmpty ? "Me" : initials)
+                    .font(Theme.ui(size * 0.36, weight: .bold))
+                    .foregroundStyle(Theme.stickerInk)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(LinearGradient(colors: [Theme.pink, Theme.purple], startPoint: .topLeading, endPoint: .bottomTrailing))
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
     }
 }

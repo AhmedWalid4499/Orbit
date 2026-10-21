@@ -21,30 +21,42 @@ enum Snapshot {
             // ORBIT_SNAPSHOT_SIZE=1180x760 renders at another window size.
             let dims = (ProcessInfo.processInfo.environment["ORBIT_SNAPSHOT_SIZE"] ?? "1440x900").split(separator: "x").compactMap { Double($0) }
             let size = CGSize(width: dims.first ?? 1440, height: dims.last ?? 900)
-            for appearance in [NSAppearance.Name.aqua, .darkAqua] {
-                for tab in Tab.allCases {
-                    let state = AppState()
-                    state.tab = tab
-                    state.openTodayJournal = tab == .notes
-                    let view = RootView()
-                        .environmentObject(state)
-                        .environmentObject(apple)
-                        .modelContainer(container)
-                        .frame(width: size.width, height: size.height)
-                    let host = NSHostingView(rootView: view)
-                    host.appearance = NSAppearance(named: appearance)
-                    host.frame = NSRect(origin: .zero, size: size)
-                    let window = NSWindow(contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: false)
-                    window.contentView = host
-                    host.layoutSubtreeIfNeeded()
-                    RunLoop.main.run(until: .now + 0.4)
-                    guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { continue }
-                    host.cacheDisplay(in: host.bounds, to: rep)
-                    let suffix = appearance == .aqua ? "" : "-dark"
-                    try? rep.representation(using: .png, properties: [:])?
-                        .write(to: URL(fileURLWithPath: dir).appending(path: "\(tab.rawValue)\(suffix).png"))
-                }
+            @MainActor func render(_ name: String, tab: Tab, appearance: NSAppearance.Name, configure: @MainActor (AppState) -> Void = { _ in }) {
+                let state = AppState()
+                state.tab = tab
+                state.openTodayJournal = tab == .notes
+                configure(state)
+                let view = RootView()
+                    .environmentObject(state)
+                    .environmentObject(apple)
+                    .modelContainer(container)
+                    .frame(width: size.width, height: size.height)
+                let host = NSHostingView(rootView: view)
+                host.appearance = NSAppearance(named: appearance)
+                host.frame = NSRect(origin: .zero, size: size)
+                let window = NSWindow(contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+                window.contentView = host
+                host.layoutSubtreeIfNeeded()
+                RunLoop.main.run(until: .now + 0.4)
+                guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { return }
+                host.cacheDisplay(in: host.bounds, to: rep)
+                try? rep.representation(using: .png, properties: [:])?
+                    .write(to: URL(fileURLWithPath: dir).appending(path: "\(name)\(appearance == .aqua ? "" : "-dark").png"))
             }
+            for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+                for tab in Tab.allCases { render(tab.rawValue, tab: tab, appearance: appearance) }
+            }
+            // View modes kept in preferences: switch them for one shot each, then put them back.
+            func withDefault(_ key: String, _ value: Any, _ body: () -> Void) {
+                let previous = UserDefaults.standard.object(forKey: key)
+                UserDefaults.standard.set(value, forKey: key)
+                body()
+                UserDefaults.standard.set(previous, forKey: key)
+            }
+            withDefault("calendarMode", "month") { render("calendar-month", tab: .calendar, appearance: .aqua) }
+            withDefault("calendarMode", "day") { render("calendar-day", tab: .calendar, appearance: .aqua) }
+            withDefault("moneyMode", true) { render("money-calendar", tab: .money, appearance: .aqua) }
+            render("assistant", tab: .today, appearance: .aqua) { $0.assistantOpen = true }
             NSApp.terminate(nil)
         }
     }
@@ -73,9 +85,14 @@ enum Snapshot {
                                          ("Carrefour", -1250.0, "Food", 2, true, ""), ("Coffee", -95.0, "Food", 2, false, "")] {
             let x = Transaction(title: t, amount: a, category: c, date: .now.adding(days: -d))
             if mail { x.source = "gmail:ahmedwalid4499@gmail.com"; x.sourceID = "demo\(d)" }
-            if !orig.isEmpty { x.originalAmount = 12.99; x.originalCurrency = "USD" }
+            if !orig.isEmpty { x.originalAmount = 12.99; x.originalCurrency = "USD"; x.isRecurring = true }
             ctx.insert(x)
         }
+        for (i, (t, h, len)) in [("Team sync", 10, 60), ("Gym", 18, 90), ("Dinner with Sara", 20, 120), ("Dentist", 15, 45)].enumerated() {
+            let start = Calendar.current.date(bySettingHour: h, minute: 0, second: 0, of: Date.now.startOfWeek.adding(days: i + 1))!
+            ctx.insert(EventItem(title: t, start: start, end: start.adding(minutes: len), area: [.work, .health, .social, .health][i]))
+        }
+        ctx.insert(TaskItem(title: "Pay Electricity — 450 EGP", area: .money, due: Date.now.startOfDay.adding(days: 4), priority: 2))
         let j = Note(title: Date.now.formatted(date: .complete, time: .omitted), isJournal: true)
         j.mood = 4
         j.chat = JournalChat(system: "", turns: [

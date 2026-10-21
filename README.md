@@ -38,6 +38,14 @@ Paste an Anthropic API key into **Settings › AI** (⌘,). The key is stored in
 
 Both features use `claude-opus-5-5`, with server-side refusal fallback turned on. Each can be switched off in Settings › AI.
 
+## Ask Claude
+
+Click **Ask Claude** in the top bar, or press ⌘J, to open a chat panel. Claude can talk things through and also act in Orbit: create habits, tasks, events, notes and expenses, add recommended books to your reading list, and change your budget. Every action shows an **Undo** button.
+
+## Money
+
+Money has an **Overview** and a **Calendar**. The Calendar shows what you spent each day, plus bills and recurring payments that are coming due. The **Money coach** card gives savings tips based on your real spending, and **Discuss with Claude** opens a conversation about it.
+
 ## Reading
 
 The reading tab is where you track books: Reading, To read, Read and Didn't finish shelves, your own categories (each with a color and icon), a yearly goal, ratings, progress and notes. Use **Add book** to search Open Library. **Connect & import** brings in:

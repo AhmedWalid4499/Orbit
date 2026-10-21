@@ -386,13 +386,16 @@ enum KindleMac {
         let dbs = try findDatabases(in: dir, app: "Kindle") { _ in true }
         let titleCols = ["ZDISPLAYTITLE", "ZTITLE", "ZRAWTITLE", "ZSORTTITLE"]
         let authorCols = ["ZDISPLAYAUTHOR", "ZAUTHOR", "ZRAWAUTHOR", "ZAUTHORS", "ZSORTAUTHOR"]
+        var seenTables: [String] = []
 
         for url in dbs {
-            guard let db = try? SQLiteReader(copyOf: url) else { continue }
+            guard let db = try? SQLiteReader(copyOf: url) else { seenTables.append("\(url.lastPathComponent): unreadable"); continue }
             for table in db.tables() where table.hasPrefix("Z") {
                 let cols = db.columns(table)
-                guard let t = titleCols.first(where: cols.contains) else { continue }
-                let a = authorCols.first(where: cols.contains)
+                let titleLike = cols.filter { $0.contains("TITLE") }
+                if !titleLike.isEmpty { seenTables.append("\(url.lastPathComponent)/\(table): \(cols.filter { $0.contains("TITLE") || $0.contains("AUTHOR") }.joined(separator: ","))") }
+                guard let t = titleCols.first(where: cols.contains) ?? titleLike.first(where: { !$0.contains("SORT") }) ?? titleLike.first else { continue }
+                let a = authorCols.first(where: cols.contains) ?? cols.first { $0.contains("AUTHOR") }
                 let idCol = ["ZBOOKID", "ZASIN", "ZRAWBOOKID", "ZIDENTIFIER"].first(where: cols.contains)
                 let pctCol = cols.first { $0.contains("PERCENT") || $0 == "ZRAWREADINGPROGRESS" }
                 let select = [t, a, idCol, pctCol].compactMap { $0 }.joined(separator: ",")
@@ -411,7 +414,29 @@ enum KindleMac {
                 if !books.isEmpty { return books }
             }
         }
-        throw BookImportError.notFound("No books found in the Kindle app. Open Kindle for Mac, let your library sync, then try again.")
+        UserDefaults.standard.set("Kindle databases: \(dbs.map(\.lastPathComponent).joined(separator: ", "))\nTables: \(seenTables.joined(separator: " | "))",
+                                  forKey: "kindleDiagnostics")
+        throw BookImportError.notFound(dbs.isEmpty
+            ? "The Kindle app hasn't stored a library on this Mac yet. Open Kindle for Mac, sign in and let it sync, then try again."
+            : "Orbit could open Kindle's data but didn't recognise the book list. Use “Copy details” and send them to Claude so it can be fixed.")
+    }
+}
+
+enum LocalLibraries {
+    static let booksDir = URL.homeDirectory.appending(path: "Library/Containers/com.apple.iBooksX/Data/Documents")
+    static let kindleDir = URL.homeDirectory.appending(path: "Library/Containers/com.amazon.Lassen/Data/Library")
+
+    /// macOS only lets Orbit read the Books and Kindle libraries with Full Disk Access.
+    static var hasAccess: Bool {
+        for dir in [booksDir, kindleDir] where FileManager.default.fileExists(atPath: dir.path) {
+            return (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) != nil
+        }
+        return false
+    }
+    static var booksInstalled: Bool { FileManager.default.fileExists(atPath: booksDir.deletingLastPathComponent().path) }
+    static var kindleInstalled: Bool {
+        FileManager.default.fileExists(atPath: kindleDir.deletingLastPathComponent().path)
+            || FileManager.default.fileExists(atPath: "/Applications/Amazon Kindle.app") || FileManager.default.fileExists(atPath: "/Applications/Kindle.app")
     }
 }
 
@@ -436,11 +461,23 @@ final class ReadingSync: ObservableObject {
     @AppStorage("kindleLinked") var kindleLinked = false
 
     @Published private(set) var running = false
-    @Published private(set) var lastResults: [String: String] = [:]
+    /// Last outcome per source, kept across launches so you can see why something didn't work.
+    @Published private(set) var lastResults: [String: String] = (UserDefaults.standard.dictionary(forKey: "readingSyncResults") as? [String: String]) ?? [:] {
+        didSet { UserDefaults.standard.set(lastResults, forKey: "readingSyncResults") }
+    }
 
     var hasSources: Bool { Goodreads.userID(from: goodreadsUser) != nil || appleBooksLinked || kindleLinked }
 
     func syncIfDue(context: ModelContext) async {
+        // As soon as Full Disk Access is on, bring in Apple Books and Kindle without waiting for a click.
+        if LocalLibraries.hasAccess {
+            if !appleBooksLinked, LocalLibraries.booksInstalled {
+                importLocal("apple", source: "apple-books", category: "Apple Books", context: context, load: AppleBooks.load)
+            }
+            if !kindleLinked, LocalLibraries.kindleInstalled {
+                importLocal("kindle", source: "kindle", category: "Kindle", context: context, load: KindleMac.load)
+            }
+        }
         guard autoSync, hasSources, Date.now.timeIntervalSince1970 - lastSync > 20 * 3600 else { return }
         await syncAll(context: context)
     }

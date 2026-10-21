@@ -46,6 +46,14 @@ final class AppState: ObservableObject {
     @Published var searchOpen = false
     @Published var settingsOpen = false
     @Published var openTodayJournal = false
+    @Published var assistantOpen = false
+    /// A message to send as soon as the assistant opens (e.g. from "Discuss with Claude").
+    @Published var assistantSeed: String?
+
+    func openAssistant(with message: String? = nil) {
+        assistantSeed = message
+        assistantOpen = true
+    }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -109,6 +117,8 @@ struct OrbitApp: App {
                     .keyboardShortcut("n", modifiers: [.command, .shift])
                 Button("Search") { state.searchOpen = true }
                     .keyboardShortcut("k", modifiers: .command)
+                Button("Ask Claude") { state.assistantOpen.toggle() }
+                    .keyboardShortcut("j", modifiers: .command)
             }
             CommandMenu("Go") {
                 ForEach(Tab.allCases) { tab in

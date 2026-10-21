@@ -6,7 +6,10 @@ struct CalendarWeekView: View {
     @EnvironmentObject private var apple: AppleSync
     @Query(sort: \EventItem.start) private var events: [EventItem]
 
-    @State private var weekStart = Date.now.startOfWeek
+    enum Mode: String, CaseIterable { case day, week, month }
+    @AppStorage("calendarMode") private var mode: Mode = .week
+    /// The date being looked at; the visible day, week or month is derived from it.
+    @State private var anchor = Date.now
     @State private var newSlot: Date?
     @State private var selected: CalEntry?
 
@@ -14,27 +17,65 @@ struct CalendarWeekView: View {
     private let hourHeight: CGFloat = 76
     private let gutter: CGFloat = 64
 
-    private var days: [Date] { (0..<7).map { weekStart.adding(days: $0) } }
+    private var weekStart: Date { mode == .day ? anchor.startOfDay : anchor.startOfWeek }
+    private var days: [Date] { mode == .day ? [anchor.startOfDay] : (0..<7).map { weekStart.adding(days: $0) } }
+    /// Six full weeks covering the anchor's month.
+    private var monthDays: [Date] { (0..<42).map { anchor.startOfMonth.startOfWeek.adding(days: $0) } }
+
+    private var range: (start: Date, end: Date) {
+        switch mode {
+        case .day: (anchor.startOfDay, anchor.startOfDay.adding(days: 1))
+        case .week: (weekStart, weekStart.adding(days: 7))
+        case .month: (monthDays.first!, monthDays.last!.adding(days: 1))
+        }
+    }
 
     private var entries: [CalEntry] {
         _ = apple.revision
-        let end = weekStart.adding(days: 7)
-        let local = events.filter { $0.start < end && $0.end > weekStart }
-        return CalEntry.merge(local: local, apple: apple.events(from: weekStart, to: end))
+        let (start, end) = range
+        let local = events.filter { $0.start < end && $0.end > start }
+        return CalEntry.merge(local: local, apple: apple.events(from: start, to: end))
+    }
+
+    private func step(_ direction: Int) {
+        let cal = Calendar.current
+        withAnimation {
+            switch mode {
+            case .day: anchor = anchor.adding(days: direction)
+            case .week: anchor = anchor.adding(days: 7 * direction)
+            case .month: anchor = cal.date(byAdding: .month, value: direction, to: anchor)!
+            }
+        }
+    }
+
+    private var title: String {
+        switch mode {
+        case .day: anchor.formatted(.dateTime.weekday(.wide).day().month(.abbreviated))
+        case .week: weekStart.adding(days: 3).formatted(.dateTime.month(.abbreviated).year())
+        case .month: anchor.formatted(.dateTime.month(.wide).year())
+        }
     }
 
     var body: some View {
         VStack(spacing: 0) {
             toolbar.padding(.horizontal, 32).padding(.bottom, 8).fixedSize(horizontal: false, vertical: true)
-            Divider().overlay(Theme.line).padding(.leading, 32 + gutter).padding(.trailing, 32)
-            dayHeader.padding(.horizontal, 32).fixedSize(horizontal: false, vertical: true)
-            allDayRow.padding(.horizontal, 32).fixedSize(horizontal: false, vertical: true)
-            ScrollViewReader { proxy in
-                ScrollView {
-                    grid.padding(.horizontal, 32).padding(.top, 10).padding(.bottom, 24)
+            if mode == .month {
+                MonthGrid(days: monthDays, month: anchor, entries: entries) { day in
+                    anchor = day
+                    withAnimation { mode = .day }
                 }
-                .scrollIndicators(.never)
-                .onAppear { proxy.scrollTo(7, anchor: .top) }
+                .padding(.horizontal, 32).padding(.bottom, 22)
+            } else {
+                Divider().overlay(Theme.line).padding(.leading, 32 + gutter).padding(.trailing, 32)
+                dayHeader.padding(.horizontal, 32).fixedSize(horizontal: false, vertical: true)
+                allDayRow.padding(.horizontal, 32).fixedSize(horizontal: false, vertical: true)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        grid.padding(.horizontal, 32).padding(.top, 10).padding(.bottom, 24)
+                    }
+                    .scrollIndicators(.never)
+                    .onAppear { proxy.scrollTo(7, anchor: .top) }
+                }
             }
         }
         .padding(.top, 6)
@@ -46,12 +87,12 @@ struct CalendarWeekView: View {
         HStack(spacing: 12) {
             Menu {
                 ForEach(-3...3, id: \.self) { m in
-                    let date = Calendar.current.date(byAdding: .month, value: m, to: weekStart)!
-                    Button(date.formatted(.dateTime.month(.wide).year())) { weekStart = date.startOfMonth.startOfWeek }
+                    let date = Calendar.current.date(byAdding: .month, value: m, to: anchor)!
+                    Button(date.formatted(.dateTime.month(.wide).year())) { anchor = date.startOfMonth }
                 }
             } label: {
                 HStack(spacing: 10) {
-                    Text(weekStart.adding(days: 3).formatted(.dateTime.month(.abbreviated).year()))
+                    Text(title)
                         .font(Theme.display(36))
                     Image(systemName: "chevron.down").font(.system(size: 15, weight: .bold))
                 }
@@ -64,6 +105,19 @@ struct CalendarWeekView: View {
 
             Spacer()
 
+            HStack(spacing: 2) {
+                ForEach(Mode.allCases, id: \.self) { m in
+                    Button(m.rawValue.capitalized) { withAnimation(.snappy) { mode = m } }
+                        .buttonStyle(.plain)
+                        .font(Theme.ui(13, weight: .semibold))
+                        .foregroundStyle(mode == m ? Theme.onInverse : Theme.ink)
+                        .padding(.horizontal, 14).padding(.vertical, 8)
+                        .background(Capsule().fill(mode == m ? Theme.inverse : .clear))
+                }
+            }
+            .padding(3)
+            .background(Capsule().fill(Theme.card))
+
             if !apple.calendarEnabled {
                 Button {
                     Task { await apple.connectCalendar() }
@@ -72,14 +126,10 @@ struct CalendarWeekView: View {
                 }
                 .buttonStyle(SoftButtonStyle())
             }
-            Button("Today") { withAnimation { weekStart = Date.now.startOfWeek } }
+            Button("Today") { withAnimation { anchor = .now } }
                 .buttonStyle(SoftButtonStyle())
-            CircleIconButton(symbol: "arrow.left", filled: true, size: 46) {
-                withAnimation { weekStart = weekStart.adding(days: -7) }
-            }
-            CircleIconButton(symbol: "arrow.right", filled: true, size: 46) {
-                withAnimation { weekStart = weekStart.adding(days: 7) }
-            }
+            CircleIconButton(symbol: "arrow.left", filled: true, size: 46) { step(-1) }
+            CircleIconButton(symbol: "arrow.right", filled: true, size: 46) { step(1) }
         }
     }
 
@@ -444,5 +494,77 @@ struct FlowLayout: Layout {
             x += size.width + spacing
             rowH = max(rowH, size.height)
         }
+    }
+}
+
+// MARK: - Month view
+
+private struct MonthGrid: View {
+    let days: [Date]
+    let month: Date
+    let entries: [CalEntry]
+    let onOpenDay: (Date) -> Void
+
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 6) {
+                ForEach(days.prefix(7), id: \.self) { d in
+                    Text(d.formatted(.dateTime.weekday(.abbreviated))).font(Theme.ui(12, weight: .semibold))
+                        .foregroundStyle(Theme.inkSecondary).frame(maxWidth: .infinity)
+                }
+            }
+            GeometryReader { geo in
+                let rowHeight = (geo.size.height - 5 * 6) / 6
+                VStack(spacing: 6) {
+                    ForEach(0..<6, id: \.self) { row in
+                        HStack(spacing: 6) {
+                            ForEach(days[(row * 7)..<(row * 7 + 7)], id: \.self) { day in
+                                MonthCell(day: day, inMonth: Calendar.current.isDate(day, equalTo: month, toGranularity: .month),
+                                          entries: entries.filter { $0.start.isSameDay(as: day) || ($0.isAllDay && $0.start <= day && $0.end > day) },
+                                          height: rowHeight)
+                                    .onTapGesture { onOpenDay(day) }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct MonthCell: View {
+    let day: Date
+    let inMonth: Bool
+    let entries: [CalEntry]
+    let height: CGFloat
+    @State private var hovering = false
+
+    var body: some View {
+        let fit = max(0, Int((height - 34) / 20))
+        VStack(alignment: .leading, spacing: 3) {
+            Text(day.formatted(.dateTime.day()))
+                .font(Theme.display(16, weight: day.isToday ? .bold : .medium))
+                .padding(.horizontal, 7).padding(.vertical, 1)
+                .background(Capsule().fill(day.isToday ? Theme.lime : .clear))
+                .foregroundStyle(day.isToday ? Theme.stickerInk : Theme.ink)
+            ForEach(entries.prefix(fit)) { e in
+                HStack(spacing: 4) {
+                    Circle().fill(e.tint).frame(width: 6, height: 6)
+                    Text(e.isAllDay ? e.title : "\(Fmt.time(e.start)) \(e.title)").lineLimit(1)
+                }
+                .font(Theme.ui(10, weight: .medium))
+            }
+            if entries.count > fit {
+                Text("+\(entries.count - fit) more").font(Theme.ui(10, weight: .semibold)).foregroundStyle(Theme.inkMuted)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(6)
+        .frame(maxWidth: .infinity, minHeight: height, maxHeight: height, alignment: .topLeading)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(hovering ? Theme.cardHover : Theme.card))
+        .opacity(inMonth ? 1 : 0.4)
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+        .help("Open \(day.formatted(date: .complete, time: .omitted))")
     }
 }

@@ -10,6 +10,7 @@ struct MoneyView: View {
     @State private var month = Date.now.startOfMonth
     @State private var adding = false
     @State private var hoveredDay: Date?
+    @AppStorage("moneyMode") private var calendarMode = false
 
     private var monthEnd: Date { Calendar.current.date(byAdding: .month, value: 1, to: month)! }
     private var txns: [Transaction] { all.filter { $0.date >= month && $0.date < monthEnd } }
@@ -55,13 +56,18 @@ struct MoneyView: View {
                                 fill: LinearGradient(colors: [Theme.cyan, Theme.purple], startPoint: .topLeading, endPoint: .bottomTrailing),
                                 symbol: "arrow.down.left")
                 }
-                HStack(alignment: .top, spacing: 20) {
-                    chartCard
-                    categoryCard.frame(width: 340)
-                }
-                HStack(alignment: .top, spacing: 20) {
-                    transactionsCard
-                    recurringCard.frame(width: 340)
+                if calendarMode {
+                    MoneyCalendar(month: month, transactions: all)
+                } else {
+                    MoneyCoachCard()
+                    HStack(alignment: .top, spacing: 20) {
+                        chartCard
+                        categoryCard.frame(width: 340)
+                    }
+                    HStack(alignment: .top, spacing: 20) {
+                        transactionsCard
+                        recurringCard.frame(width: 340)
+                    }
                 }
             }
             .padding(.horizontal, 32)
@@ -75,6 +81,19 @@ struct MoneyView: View {
     private var header: some View {
         HStack(spacing: 12) {
             Text(month.formatted(.dateTime.month(.wide).year())).font(Theme.display(38))
+            HStack(spacing: 2) {
+                ForEach([("Overview", false), ("Calendar", true)], id: \.0) { label, isCal in
+                    Button(label) { withAnimation(.snappy) { calendarMode = isCal } }
+                        .buttonStyle(.plain)
+                        .font(Theme.ui(13, weight: .semibold))
+                        .foregroundStyle(calendarMode == isCal ? Theme.onInverse : Theme.ink)
+                        .padding(.horizontal, 14).padding(.vertical, 8)
+                        .background(Capsule().fill(calendarMode == isCal ? Theme.inverse : .clear))
+                }
+            }
+            .padding(3)
+            .background(Capsule().fill(Theme.card))
+            .padding(.leading, 8)
             Spacer()
             EmailExpensesChip()
             Button { adding = true } label: { Label("Add transaction", systemImage: "plus") }.buttonStyle(SoftButtonStyle())

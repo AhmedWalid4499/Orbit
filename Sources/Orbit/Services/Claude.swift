@@ -196,7 +196,34 @@ struct ClaudeClient {
     /// Returns the final content blocks, sanitised for replay after a mid-stream fallback.
     func stream(system: String, messages: [[String: Any]], effort: String, maxTokens: Int = 8000,
                 onText: @escaping @MainActor (String) -> Void) async throws -> Reply {
-        let body: [String: Any] = [
+        let turn = try await streamTurn(system: system, messages: messages, tools: nil, effort: effort, maxTokens: maxTokens, onText: onText)
+        guard !turn.text.isEmpty else { throw Failure.badResponse }
+        return Reply(text: turn.text, rawContent: (try? JSONSerialization.data(withJSONObject: turn.blocks)) ?? Data())
+    }
+
+    struct Turn {
+        /// All text the model wrote this turn.
+        let text: String
+        /// Content blocks to append to the conversation unchanged (thinking, text, tool_use…).
+        let blocks: [[String: Any]]
+        let stopReason: String?
+        /// Tool calls with their parsed input; `input` is nil if the JSON didn't parse.
+        var toolCalls: [(id: String, name: String, input: [String: Any]?)] {
+            blocks.compactMap { b in
+                guard b["type"] as? String == "tool_use", let id = b["id"] as? String, let name = b["name"] as? String else { return nil }
+                return (id, name, b["_invalid"] != nil ? nil : b["input"] as? [String: Any])
+            }
+        }
+        /// Blocks ready to send back in the next request (local bookkeeping keys removed).
+        var replayBlocks: [[String: Any]] {
+            blocks.map { b in var c = b; c["_invalid"] = nil; return c }
+        }
+    }
+
+    /// One streamed model turn, optionally with tools. Text deltas are reported through `onText`.
+    func streamTurn(system: String, messages: [[String: Any]], tools: [[String: Any]]?, effort: String, maxTokens: Int = 16000,
+                    onText: @escaping @MainActor (String) -> Void) async throws -> Turn {
+        var body: [String: Any] = [
             "model": Self.model,
             "max_tokens": maxTokens,
             "system": system,
@@ -205,6 +232,7 @@ struct ClaudeClient {
             "fallbacks": "default",
             "stream": true,
         ]
+        if let tools, !tools.isEmpty { body["tools"] = tools }
         var req = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!)
         req.httpMethod = "POST"
         req.timeoutInterval = 300
@@ -220,15 +248,19 @@ struct ClaudeClient {
         }
         guard let http = response as? HTTPURLResponse else { throw Failure.badResponse }
         guard http.statusCode == 200 else {
+            var raw = Data()
+            for try await byte in bytes { raw.append(byte); if raw.count > 4000 { break } }
+            let msg = (((try? JSONSerialization.jsonObject(with: raw)) as? [String: Any])?["error"] as? [String: Any])?["message"] as? String
             switch http.statusCode {
             case 401, 403: throw Failure.badKey
             case 429: throw Failure.rateLimited
             case 529: throw Failure.overloaded
-            default: throw Failure.server(http.statusCode, "Request failed")
+            default: throw Failure.server(http.statusCode, msg ?? "Request failed")
             }
         }
 
         var blocks: [Int: [String: Any]] = [:]
+        var partialJSON: [Int: String] = [:]
         var stopReason: String?
         func visibleText() -> String {
             blocks.keys.sorted().compactMap { i in blocks[i]?["type"] as? String == "text" ? blocks[i]?["text"] as? String : nil }.joined()
@@ -254,7 +286,18 @@ struct ClaudeClient {
                 case "signature_delta":
                     block["signature"] = delta["signature"]
                     blocks[i] = block
+                case "input_json_delta":
+                    partialJSON[i, default: ""] += delta["partial_json"] as? String ?? ""
                 default: break
+                }
+            case "content_block_stop":
+                // Tool inputs arrive as JSON fragments; parse once the block is complete.
+                if let i = event["index"] as? Int, var block = blocks[i], block["type"] as? String == "tool_use" {
+                    let json = partialJSON[i] ?? ""
+                    if json.isEmpty { block["input"] = [String: Any]() }
+                    else if let d = json.data(using: .utf8), let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any] { block["input"] = obj }
+                    else { block["input"] = [String: Any](); block["_invalid"] = true }
+                    blocks[i] = block
                 }
             case "message_delta":
                 if let d = event["delta"] as? [String: Any], let r = d["stop_reason"] as? String { stopReason = r }
@@ -275,8 +318,6 @@ struct ClaudeClient {
                 return i < boundary && t != "text" ? nil : b
             }
         }
-        let text = visibleText()
-        guard !text.isEmpty else { throw Failure.badResponse }
-        return Reply(text: text, rawContent: (try? JSONSerialization.data(withJSONObject: ordered)) ?? Data())
+        return Turn(text: visibleText(), blocks: ordered, stopReason: stopReason)
     }
 }

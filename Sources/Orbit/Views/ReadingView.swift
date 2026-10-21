@@ -714,28 +714,35 @@ struct ReadingSourcesSheet: View {
                     Button("Import library export (CSV)…") { importingCSV = true }.font(Theme.ui(11)).disabled(busy != nil)
                 }
 
-                source("Kindle", symbol: "flame.fill", color: Theme.cyan, key: "kindle", linked: sync.kindleLinked) {
-                    Text("Easiest way, no Mac permissions needed: link Kindle to Goodreads, since Amazon owns both. On goodreads.com go to Settings › Apps (Amazon / Kindle) and connect your Amazon account. Your Kindle books and reading progress then show up in Goodreads, and Orbit picks them up in the daily Goodreads sync.")
-                    HStack {
-                        Link("Open Goodreads app settings", destination: URL(string: "https://www.goodreads.com/user/edit?tab=apps")!)
-                        Spacer()
-                        Button("Or import from the Kindle app on this Mac") {
-                            _ = sync.importLocal("kindle", source: "kindle", category: "Kindle", context: context, load: KindleMac.load)
-                        }
-                        .disabled(busy != nil)
-                    }
-                    if case .some(let m) = sync.lastResults["kindle"], m.contains("Full Disk Access") { fullDiskAccessButton }
-                }
+                if !LocalLibraries.hasAccess { fullDiskAccessGuide }
 
                 source("Apple Books", symbol: "book.fill", color: Theme.orange, key: "apple", linked: sync.appleBooksLinked) {
-                    Text("Apple Books has no online account Orbit can read, so it reads the Books library on this Mac. macOS protects it: turn on Orbit once under Full Disk Access, then import. After that it refreshes daily without asking.")
+                    Text("Reads the Books library on this Mac: what you've finished and how far along you are. Refreshes every day by itself.")
                     HStack {
-                        fullDiskAccessButton
                         Spacer()
-                        Button("Import from Apple Books") {
+                        Button(sync.appleBooksLinked ? "Import again" : "Import from Apple Books") {
                             _ = sync.importLocal("apple", source: "apple-books", category: "Apple Books", context: context, load: AppleBooks.load)
                         }
-                        .disabled(busy != nil)
+                        .disabled(busy != nil || !LocalLibraries.hasAccess)
+                    }
+                }
+
+                source("Kindle", symbol: "flame.fill", color: Theme.cyan, key: "kindle", linked: sync.kindleLinked) {
+                    Text("Reads the library the Kindle app on this Mac has downloaded (Amazon doesn't let other apps sign in to your account). Open Kindle for Mac and sign in first so it syncs.")
+                    HStack {
+                        Link("Also link Kindle to Goodreads", destination: URL(string: "https://www.goodreads.com/user/edit?tab=apps")!)
+                            .help("Kindle reading progress then flows into Goodreads too")
+                        Spacer()
+                        if UserDefaults.standard.string(forKey: "kindleDiagnostics") != nil && !sync.kindleLinked {
+                            Button("Copy details") {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(UserDefaults.standard.string(forKey: "kindleDiagnostics") ?? "", forType: .string)
+                            }
+                        }
+                        Button(sync.kindleLinked ? "Import again" : "Import from Kindle") {
+                            _ = sync.importLocal("kindle", source: "kindle", category: "Kindle", context: context, load: KindleMac.load)
+                        }
+                        .disabled(busy != nil || !LocalLibraries.hasAccess)
                     }
                 }
 
@@ -761,9 +768,39 @@ struct ReadingSourcesSheet: View {
         }
     }
 
-    private var fullDiskAccessButton: some View {
-        Button("Open Full Disk Access settings") {
-            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
+    /// Orbit doesn't appear in the Full Disk Access list on its own, so walk through adding it.
+    private var fullDiskAccessGuide: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "lock.shield.fill").foregroundStyle(Theme.orange)
+                Text("One step to connect Apple Books and Kindle").font(Theme.ui(15, weight: .semibold))
+            }
+            Text("macOS keeps those libraries private until you let Orbit read them with Full Disk Access.")
+                .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
+            VStack(alignment: .leading, spacing: 6) {
+                step(1, "Click **Open Full Disk Access** below.")
+                step(2, "Click **+** under the list, then pick **Orbit** in Applications and click **Open**. (Or drag Orbit from the Finder window into the list.)")
+                step(3, "Make sure the switch next to Orbit is **on**.")
+                step(4, "Click **Relaunch Orbit**. Your Apple Books and Kindle books are imported right after.")
+            }
+            HStack(spacing: 8) {
+                Button("Open Full Disk Access") {
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
+                }
+                .buttonStyle(.borderedProminent)
+                Button("Show Orbit in Finder") { NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL]) }
+                Spacer()
+                Button("Relaunch Orbit") { Updater.relaunch() }
+            }
+        }
+        .padding(16)
+        .background(RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.orange, lineWidth: 1.5))
+    }
+
+    private func step(_ n: Int, _ text: LocalizedStringKey) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("\(n)").font(Theme.ui(11, weight: .bold)).frame(width: 20, height: 20).background(Circle().fill(Theme.card))
+            Text(text).font(Theme.ui(12)).fixedSize(horizontal: false, vertical: true)
         }
     }
 

@@ -155,6 +155,16 @@ final class Updater: ObservableObject {
         NSApp.terminate(nil)
     }
 
+    /// Quits and reopens Orbit (needed after granting Full Disk Access).
+    static func relaunch() {
+        let script = "while kill -0 \(ProcessInfo.processInfo.processIdentifier) 2>/dev/null; do sleep 0.2; done; open \"\(Bundle.main.bundleURL.path)\""
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/sh")
+        p.arguments = ["-c", script]
+        try? p.run()
+        NSApp.terminate(nil)
+    }
+
     private func run(_ tool: String, _ args: [String]) async throws {
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
             let p = Process()

@@ -57,5 +57,17 @@ scripts/make-dmg.sh
 api -X POST -H "Content-Type: application/x-apple-diskimage" --data-binary @build/Orbit.dmg \
   "https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=Orbit.dmg" >/dev/null
 
+# Windows: installer for new people (always Orbit-Setup.exe) plus latest.yml and the blockmap for the in-app updater.
+if scripts/build-windows.sh; then
+  for f in Orbit-Setup.exe Orbit-Setup.exe.blockmap latest.yml; do
+    case "$f" in *.exe) type=application/vnd.microsoft.portable-executable;; *.yml) type=text/yaml;; *) type=application/octet-stream;; esac
+    api -X POST -H "Content-Type: $type" --data-binary @"windows/dist/$f" \
+      "https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=$f" >/dev/null
+  done
+  echo "Windows: https://github.com/$REPO/releases/latest/download/Orbit-Setup.exe"
+else
+  echo "Skipped the Windows build (see message above); the Mac release is published."
+fi
+
 echo "Published Orbit $VERSION: https://github.com/$REPO/releases/tag/$TAG"
 echo "Installer: https://github.com/$REPO/releases/latest/download/Orbit.dmg"

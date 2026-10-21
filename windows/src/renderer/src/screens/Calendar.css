@@ -1,0 +1,49 @@
+.cal { height: 100%; display: flex; flex-direction: column; padding: 6px 32px 22px; }
+.cal-toolbar { display: flex; align-items: center; gap: 12px; padding-bottom: 8px; }
+.cal-title { display: inline-flex; align-items: center; gap: 10px; font-family: var(--display); font-weight: 700; font-size: 34px; letter-spacing: -0.02em; }
+.cal-menu { position: absolute; top: 48px; left: 0; z-index: 20; background: var(--canvas); border-radius: 14px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2); padding: 6px; min-width: 200px; }
+.cal-menu button { display: block; width: 100%; text-align: left; padding: 8px 12px; border-radius: 8px; font-size: 13px; }
+.cal-menu button:hover { background: var(--card); }
+
+.cal-head { display: flex; border-bottom: 1px solid var(--line); }
+.cal-headday { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 0; }
+.cal-headnum { font-family: var(--display); font-weight: 500; font-size: 36px; line-height: 1.1; padding: 0 10px; border-radius: 999px; }
+.cal-headnum.today { background: var(--lime); color: var(--sticker-ink); font-weight: 700; }
+.cal-tick { width: 1px; height: 14px; background: var(--ink2); margin-top: 2px; }
+
+.cal-allday { display: flex; padding: 6px 0; gap: 0; }
+.cal-allday .chip { font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 6px; margin: 0 4px 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.cal-scroll { flex: 1; min-height: 0; overflow-y: auto; padding-top: 10px; }
+.cal-grid { display: flex; position: relative; }
+.cal-gutter { width: 64px; flex: none; }
+.cal-hourlabel { font-size: 12px; color: var(--ink2); transform: translateY(-8px); }
+.cal-col { flex: 1; position: relative; }
+.cal-slot { position: relative; border-top: 1px solid var(--line); }
+.cal-slot .hatch { position: absolute; inset: 4px; border-radius: 12px; opacity: 0.55;
+  background: repeating-linear-gradient(-45deg, transparent 0 6px, color-mix(in srgb, var(--ink3) 30%, transparent) 6px 7px); }
+.cal-slot .add { position: absolute; inset: 4px; border-radius: 12px; border: 1.5px dashed var(--dashed);
+  background: color-mix(in srgb, var(--dashed) 10%, transparent); display: none; align-items: center; justify-content: center; color: var(--ink); }
+.cal-slot:hover .add, .cal-slot .add.show { display: flex; }
+
+.cal-event { position: absolute; border-radius: 14px; background: var(--card); border: 1.5px solid var(--canvas); padding: 8px 12px;
+  display: flex; flex-direction: column; gap: 4px; overflow: hidden; cursor: pointer; transition: box-shadow 0.15s; }
+.cal-event:hover { background: var(--card-hover); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08); }
+.cal-event .t { font-weight: 500; font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
+.cal-event .time { font-size: 11px; color: var(--ink2); }
+
+.cal-now { position: absolute; left: -4px; right: 0; height: 2px; background: var(--critical); pointer-events: none; z-index: 5; }
+.cal-now::before { content: ''; position: absolute; left: 0; top: -4px; width: 9px; height: 9px; border-radius: 50%; background: var(--critical); }
+
+.cal-month { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(7, 1fr); grid-template-rows: auto repeat(6, 1fr); gap: 6px; }
+.cal-month .wd { text-align: center; font-size: 12px; font-weight: 600; color: var(--ink2); }
+.cal-cell { background: var(--card); border-radius: 12px; padding: 6px; display: flex; flex-direction: column; gap: 3px; overflow: hidden; cursor: pointer; min-height: 0; }
+.cal-cell:hover { background: var(--card-hover); }
+.cal-cell.out { opacity: 0.4; }
+.cal-cell .num { font-family: var(--display); font-weight: 500; font-size: 15px; align-self: flex-start; padding: 0 7px; border-radius: 999px; }
+.cal-cell .num.today { background: var(--lime); color: var(--sticker-ink); font-weight: 700; }
+.cal-cell .ev { display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-cell .ev i { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+
+.cal-form label { font-size: 12px; color: var(--ink2); }
+.cal-form input[type='date'], .cal-form input[type='time'] { background: var(--card); border: none; border-radius: 10px; padding: 8px 10px; outline: none; }

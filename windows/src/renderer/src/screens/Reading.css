@@ -1,0 +1,43 @@
+.reading { display: flex; gap: 32px; height: 100%; padding: 6px 32px 0; }
+.reading-side { width: 240px; flex: none; overflow-y: auto; padding-bottom: 24px; }
+.reading-main { flex: 1; min-width: 0; overflow-y: auto; padding-bottom: 32px; display: flex; flex-direction: column; gap: 22px; }
+
+.rfilter { width: 100%; display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 999px; font-size: 14px; font-weight: 500; color: var(--ink); }
+.rfilter:hover { background: var(--card); }
+.rfilter.on { background: var(--inverse); color: var(--on-inverse); }
+.rfilter .ic { width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex: none; color: var(--sticker-ink); }
+.rfilter .count { font-size: 12px; font-weight: 600; opacity: 0.7; }
+.rside-label { font-size: 12px; font-weight: 600; color: var(--ink3); padding: 18px 12px 4px; display: flex; align-items: center; }
+
+.rstat { flex: 1; min-width: 0; border-radius: 18px; padding: 16px; color: var(--sticker-ink); }
+.rstat .v { font-family: var(--display); font-weight: 700; font-size: 26px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rstat .l { font-size: 12px; font-weight: 600; opacity: 0.8; }
+.ring-step { width: 22px; height: 22px; border-radius: 50%; background: rgba(255, 255, 255, 0.55); display: inline-flex; align-items: center; justify-content: center; color: var(--sticker-ink); }
+
+.libtab { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px 6px 6px; border-radius: 999px; background: var(--card); font-size: 13px; font-weight: 600; color: var(--ink); }
+.libtab.on { background: var(--inverse); color: var(--on-inverse); }
+.libtab .ic { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--sticker-ink); }
+.libtab .n { font-size: 11px; opacity: 0.6; }
+
+.cover { position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); width: 100%; height: 100%; }
+.cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.cover .ph { position: absolute; inset: 0; padding: 8px; color: var(--sticker-ink); display: flex; flex-direction: column; gap: 4px; }
+.cover .ph .t { font-family: var(--display); font-weight: 700; font-size: 13px; line-height: 1.15; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.cover .ph .a { font-size: 9px; font-weight: 500; opacity: 0.7; }
+
+.book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 24px 20px; }
+.book-tile { text-align: left; display: flex; flex-direction: column; gap: 6px; color: var(--ink); }
+.book-tile .cv { position: relative; aspect-ratio: 2 / 3; transition: transform 0.15s; }
+.book-tile:hover .cv { transform: scale(1.03); }
+.book-tile .badge { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--sticker-ink); }
+
+.shelf-card { display: flex; gap: 14px; padding: 14px; border-radius: 18px; background: var(--card); flex: none; text-align: left; color: var(--ink); }
+.pbar { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.pbar > div { height: 100%; border-radius: 999px; background: var(--ink); }
+
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; color: var(--sticker-ink); cursor: pointer; }
+.sortmenu { position: absolute; right: 0; top: 42px; background: var(--canvas); border-radius: 14px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2); padding: 6px; z-index: 20; min-width: 190px; }
+.sortmenu button { display: flex; width: 100%; padding: 7px 10px; border-radius: 8px; font-size: 13px; gap: 8px; align-items: center; }
+.sortmenu button:hover { background: var(--card); }
+.ol-result { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 12px; background: var(--card); }
+.ol-result img, .ol-result .noimg { width: 40px; height: 60px; border-radius: 4px; object-fit: cover; background: var(--card-hover); flex: none; }

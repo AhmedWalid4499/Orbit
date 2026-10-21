@@ -103,6 +103,13 @@ struct OrbitApp: App {
         if UserDefaults.standard.bool(forKey: "didSeedSampleData") || Keychain.apiKey != nil {
             UserDefaults.standard.set(true, forKey: "onboarded")
         }
+        // Store the currency and name explicitly (not just implied by this Mac's region), so they sync to other devices.
+        if UserDefaults.standard.string(forKey: "currencyCode") == nil {
+            UserDefaults.standard.set(Fmt.currencyCode, forKey: "currencyCode")
+        }
+        if UserDefaults.standard.string(forKey: "userName") == nil {
+            UserDefaults.standard.set(NSFullUserName(), forKey: "userName")
+        }
         let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self])
         let url = URL.applicationSupportDirectory.appending(path: "Orbit", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)

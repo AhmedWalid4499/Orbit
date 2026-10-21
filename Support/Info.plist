@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key><string>Orbit</string>
+    <key>CFBundleDisplayName</key><string>Orbit</string>
+    <key>CFBundleIdentifier</key><string>com.personal.orbit</string>
+    <key>CFBundleExecutable</key><string>Orbit</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleShortVersionString</key><string>0.1.0</string>
+    <key>CFBundleVersion</key><string>1</string>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
+    <key>LSMinimumSystemVersion</key><string>15.0</string>
+    <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
+    <key>NSHighResolutionCapable</key><true/>
+    <key>NSCalendarsFullAccessUsageDescription</key><string>Orbit shows your calendar events alongside your tasks and plans.</string>
+    <key>NSCalendarsUsageDescription</key><string>Orbit shows your calendar events alongside your tasks and plans.</string>
+    <key>NSRemindersFullAccessUsageDescription</key><string>Orbit shows and completes your Apple Reminders next to your tasks.</string>
+    <key>NSRemindersUsageDescription</key><string>Orbit shows and completes your Apple Reminders next to your tasks.</string>
+</dict>
+</plist>

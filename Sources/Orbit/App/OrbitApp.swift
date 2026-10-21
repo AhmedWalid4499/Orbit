@@ -55,6 +55,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.applicationIconImage = AppIcon.make()
         hotKey = HotKey { CapturePanel.shared.toggle() }
+        // Testing hook: ORBIT_AUTO_UPDATE=1 installs any newer release without clicking.
+        if ProcessInfo.processInfo.environment["ORBIT_AUTO_UPDATE"] != nil {
+            Task { @MainActor in
+                await Updater.shared.check(userInitiated: true)
+                if Updater.shared.available != nil { await Updater.shared.install() }
+            }
+        }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { true }

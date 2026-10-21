@@ -249,7 +249,7 @@ private struct JournalEditor: View {
             }
             ZStack(alignment: .topLeading) {
                 if note.body.isEmpty {
-                    Text("Write freely, or chat with Claude on the right and let it write the entry for you.")
+                    Text("Write freely, or chat with \(AssistantName.current) on the right and let it write the entry for you.")
                         .font(Theme.display(17, weight: .regular))
                         .foregroundStyle(Theme.inkMuted)
                         .padding(.top, 1).padding(.leading, 5)
@@ -274,7 +274,7 @@ private struct JournalEditor: View {
                 Image(systemName: "sparkles").foregroundStyle(Theme.stickerInk)
                     .frame(width: 28, height: 28).background(Circle().fill(Theme.lime))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Check-in with Claude").font(Theme.ui(14, weight: .semibold))
+                    Text("Check-in with \(AssistantName.current)").font(Theme.ui(14, weight: .semibold))
                     Text("Talk it through, then turn it into your entry").font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
                 }
                 Spacer()
@@ -298,7 +298,7 @@ private struct JournalEditor: View {
                                 VStack(spacing: 14) {
                                     Text(isToday ? "How was today?" : "Look back on this day")
                                         .font(Theme.display(22))
-                                    Text("Claude will ask about your mood and what you got up to, one question at a time.")
+                                    Text("\(AssistantName.current) will ask about your mood and what you got up to, one question at a time.")
                                         .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary).multilineTextAlignment(.center)
                                     Button { stream { try await JournalCompanion.start(note: note, context: context, apple: apple, onText: $0) } } label: {
                                         Label("Start check-in", systemImage: "bubble.left.and.text.bubble.right.fill")

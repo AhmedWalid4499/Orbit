@@ -161,15 +161,15 @@ struct MoneyCoachCard: View {
             } else if let e = coach.error {
                 Label(e, systemImage: "exclamationmark.triangle.fill").font(Theme.ui(12))
             } else if !coach.loading {
-                Text("Add a few expenses (or connect Gmail) and Claude will suggest where you can save.").font(Theme.ui(13)).opacity(0.8)
+                Text("Add a few expenses (or connect Gmail) and \(AssistantName.current) will suggest where you can save.").font(Theme.ui(13)).opacity(0.8)
             } else {
-                Text("Claude is looking at your spending…").font(Theme.display(18, weight: .regular))
+                Text("\(AssistantName.current) is looking at your spending…").font(Theme.display(18, weight: .regular))
             }
             if ai.hasKey {
                 Button {
                     state.openAssistant(with: "Let's talk about my spending. Where is my money going, and what should I change?")
                 } label: {
-                    Label("Discuss with Claude", systemImage: "bubble.left.and.text.bubble.right.fill")
+                    Label("Discuss with \(AssistantName.current)", systemImage: "bubble.left.and.text.bubble.right.fill")
                         .font(Theme.ui(13, weight: .semibold)).foregroundStyle(Theme.stickerInk)
                         .padding(.horizontal, 14).padding(.vertical, 8).background(Capsule().fill(Theme.lime))
                 }

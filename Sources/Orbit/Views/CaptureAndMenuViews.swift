@@ -33,9 +33,9 @@ struct QuickCaptureView: View {
                 if let saved {
                     Label(saved, systemImage: "checkmark.circle.fill").foregroundStyle(Theme.good).lineLimit(2)
                 } else if working {
-                    Text("Claude is sorting this…").foregroundStyle(Theme.inkSecondary)
+                    Text("\(AssistantName.current) is sorting this…").foregroundStyle(Theme.inkSecondary)
                 } else if text.isEmpty && ai.smartCaptureActive {
-                    Text("Type naturally — Claude sorts it into tasks, events, money and notes. Several at once works too.")
+                    Text("Type naturally — \(AssistantName.current) sorts it into tasks, events, money and notes. Several at once works too.")
                         .foregroundStyle(Theme.inkMuted)
                 } else if text.isEmpty {
                     Text("Task · Event (with a time) · $ expense · +income · note: · journal:")
@@ -100,7 +100,7 @@ struct MenuBarView: View {
     private var next: CalEntry? {
         let now = Date.now
         let local = events.filter { $0.end > now && $0.start < now.adding(days: 2) }
-        return CalEntry.merge(local: local, apple: apple.events(from: now, to: now.adding(days: 2))).first { $0.end > now }
+        return CalEntry.merge(local: local, apple: apple.events(from: now, to: now.adding(days: 2)), google: GoogleCalendarStore.shared.events(from: now, to: now.adding(days: 2))).first { $0.end > now }
     }
 
     private var dueToday: [TaskItem] {
@@ -247,6 +247,9 @@ struct SettingsView: View {
                 Picker("Currency", selection: $currency) {
                     ForEach(["USD", "EUR", "GBP", "EGP", "AED", "SAR", "JPY", "CAD", "AUD", "INR"], id: \.self) { Text($0) }
                 }
+                TextField("Weather city", text: Binding(get: { UserDefaults.standard.string(forKey: "weatherCity") ?? "" },
+                                                        set: { UserDefaults.standard.set($0, forKey: "weatherCity"); Task { await WeatherStore.shared.refresh() } }),
+                          prompt: Text(WeatherStore.defaultCity))
                 Section("Updates") { UpdatePanel() }
                 LabeledContent("Quick capture", value: "⌥Space (anywhere)")
                 LabeledContent("Search", value: "⌘K")
@@ -271,7 +274,7 @@ struct SettingsView: View {
                                   connect: { Task { await apple.connectReminders() } },
                                   disconnect: apple.disconnectReminders)
                 }
-                Section("Gmail") { GmailSettings() }
+                Section("Google: Gmail and Calendar") { GmailSettings() }
                 Section("GitHub") {
                     if gh.isConnected {
                         HStack(spacing: 12) {
@@ -417,11 +420,17 @@ private struct AISettings: View {
                 Text("Uses \(ClaudeClient.model). The key is stored in your macOS Keychain, never in a file.")
             }
 
+            Section("Your assistant") {
+                TextField("Name", text: Binding(get: { UserDefaults.standard.string(forKey: "assistantName") ?? "Ask" },
+                                                set: { UserDefaults.standard.set($0, forKey: "assistantName") }))
+                Text("What you call your AI around Orbit: the top-bar button, the journal and the morning brief. It's “Ask” unless you rename it.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("Features") {
                 Toggle(isOn: $ai.smartCaptureEnabled) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Smart capture")
-                        Text("⌥Space text is sorted by Claude, and one line can hold several items. Falls back to the offline parser if the API is unreachable.")
+                        Text("⌥Space text is sorted by \(AssistantName.current), and one line can hold several items. Falls back to the offline parser if the API is unreachable.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
@@ -444,6 +453,7 @@ private struct AISettings: View {
 
 private struct GmailSettings: View {
     @ObservedObject private var inbox = InboxStore.shared
+    @ObservedObject private var google = GoogleCalendarStore.shared
     @State private var clientID = GoogleAuth.clientID
     @State private var clientSecret = ""
     @State private var showSetup = !GoogleAuth.isConfigured
@@ -497,6 +507,35 @@ private struct GmailSettings: View {
                     }
                 }
                 .padding(.top, 4)
+            }
+            Toggle("Show Google Calendar events", isOn: Binding(
+                get: { GoogleCalendarStore.shared.enabled },
+                set: { GoogleCalendarStore.shared.enabled = $0; Task { await GoogleCalendarStore.shared.refresh() } }))
+                .font(.callout)
+            if !GoogleCalendarStore.shared.needsConsent.isEmpty {
+                ForEach(GoogleCalendarStore.shared.needsConsent.sorted(), id: \.self) { acct in
+                    HStack {
+                        Text("\(acct) needs to allow Calendar once.").font(.caption)
+                        Spacer()
+                        Button("Allow Calendar") { Task { await GoogleCalendarStore.shared.reconnect(acct) } }
+                    }
+                }
+            }
+            if GoogleCalendarStore.shared.apiDisabled {
+                HStack {
+                    Text("Turn on the Google Calendar API in your Google Cloud project.").font(.caption)
+                    Spacer()
+                    Button("Enable") { NSWorkspace.shared.open(GoogleCalendarStore.enableAPIURL) }
+                }
+            }
+            if !GoogleAuth.usingBuiltIn && GoogleAuth.isConfigured {
+                Toggle("Build my Google setup into copies of Orbit I share", isOn: Binding(
+                    get: { GoogleAuth.isShared }, set: { GoogleAuth.setShared($0) }))
+                    .font(.callout)
+                Text("People you give Orbit to can then just click “Add Gmail account”, with no Google Cloud setup. They'll see Google's “unverified app” notice, and Google allows up to 100 people.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else if GoogleAuth.usingBuiltIn {
+                Text("Using the Google connection built into this copy of Orbit.").font(.caption).foregroundStyle(.secondary)
             }
             Toggle("Add payments and receipts from email to Money", isOn: Binding(
                 get: { EmailExpenses.shared.enabled }, set: { EmailExpenses.shared.enabled = $0 }))

@@ -5,6 +5,8 @@ struct RootView: View {
     @EnvironmentObject private var state: AppState
     @Environment(\.modelContext) private var context
     @AppStorage("userName") private var userName = NSFullUserName()
+    @AppStorage("assistantName") private var assistantName = "Ask"
+    @AppStorage("onboarded") private var onboarded = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -22,6 +24,7 @@ struct RootView: View {
                 case .money: MoneyView()
                 case .notes: NotesView()
                 case .reading: ReadingView()
+                case .bucket: BucketListView()
                 case .github: GitHubView()
                 }
             }
@@ -39,12 +42,14 @@ struct RootView: View {
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.9), value: state.assistantOpen)
         .sheet(isPresented: $state.searchOpen) { SearchView() }
+        .sheet(isPresented: Binding(get: { !onboarded && !Snapshot.isActive }, set: { if !$0 { onboarded = true } })) { WelcomeView() }
         .task {
             // Daily background refresh for reading sources and the inbox while Orbit is open.
             while !Task.isCancelled {
                 await ReadingSync.shared.syncIfDue(context: context)
                 await InboxStore.shared.refreshIfDue(context: context)
                 await EmailExpenses.shared.syncIfDue(context: context)
+                await GoogleCalendarStore.shared.refreshIfDue()
                 await Updater.shared.checkIfDue()
                 try? await Task.sleep(for: .seconds(3600))
             }
@@ -54,6 +59,7 @@ struct RootView: View {
 
 private struct TopBar: View {
     @EnvironmentObject private var state: AppState
+    @AppStorage("assistantName") private var assistantName = "Ask"
     let userName: String
 
     var body: some View {
@@ -72,7 +78,7 @@ private struct TopBar: View {
                     Button { state.assistantOpen.toggle() } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "sparkles")
-                            Text("Ask Claude")
+                            Text(assistantName)
                         }
                         .font(Theme.ui(13, weight: .semibold))
                         .foregroundStyle(Theme.stickerInk)
@@ -80,7 +86,7 @@ private struct TopBar: View {
                         .background(Capsule().fill(Theme.lime))
                     }
                     .buttonStyle(.plain)
-                    .help("Ask Claude (⌘J)")
+                    .help("\(assistantName) (⌘J)")
                     CircleIconButton(symbol: "magnifyingglass", size: 42) { state.searchOpen = true }
                         .help("Search (⌘K)")
                     CircleIconButton(symbol: "plus", size: 42) { CapturePanel.shared.show() }

@@ -9,6 +9,7 @@ struct AssistantPanel: View {
     @ObservedObject private var store = AssistantStore.shared
     @ObservedObject private var ai = AIAssistant.shared
 
+    @AppStorage("assistantName") private var assistantName = "Ask"
     @State private var draft = ""
     @FocusState private var focused: Bool
 
@@ -27,7 +28,7 @@ struct AssistantPanel: View {
                 VStack(spacing: 12) {
                     Spacer()
                     Image(systemName: "sparkles").font(.system(size: 30))
-                    Text("Add your Anthropic API key to chat with Claude.").font(Theme.ui(13)).multilineTextAlignment(.center)
+                    Text("Add your Anthropic API key to chat with \(assistantName).").font(Theme.ui(13)).multilineTextAlignment(.center)
                     SettingsLink { Text("Open Settings") }.buttonStyle(SoftButtonStyle())
                     Spacer()
                 }
@@ -52,7 +53,7 @@ struct AssistantPanel: View {
             Image(systemName: "sparkles").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.stickerInk)
                 .frame(width: 32, height: 32).background(Circle().fill(Theme.lime))
             VStack(alignment: .leading, spacing: 1) {
-                Text("Ask Claude").font(Theme.display(20))
+                Text(assistantName).font(Theme.display(20))
                 Text("Talks things through and sets things up for you").font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
             }
             Spacer()
@@ -72,7 +73,7 @@ struct AssistantPanel: View {
                     if store.items.isEmpty && !store.busy {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("What's on your mind?").font(Theme.display(22))
-                            Text("Ask for advice, or just say what you want: Claude can add habits, tasks, events, notes, expenses and books for you.")
+                            Text("Ask for advice, or just say what you want: \(assistantName) can add habits, tasks, events, notes, expenses and books for you.")
                                 .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
                             ForEach(suggestions, id: \.self) { s in
                                 Button { send(s) } label: {
@@ -141,7 +142,7 @@ struct AssistantPanel: View {
 
     private var composer: some View {
         HStack(spacing: 8) {
-            TextField("Message Claude…", text: $draft, axis: .vertical)
+            TextField("Message \(assistantName)…", text: $draft, axis: .vertical)
                 .textFieldStyle(.plain).font(Theme.ui(14)).lineLimit(1...6)
                 .focused($focused)
                 .onSubmit { send(draft) }

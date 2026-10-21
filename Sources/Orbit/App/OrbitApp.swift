@@ -3,7 +3,7 @@ import SwiftData
 import AppKit
 
 enum Tab: String, CaseIterable, Identifiable {
-    case today, calendar, tasks, habits, money, notes, reading, github
+    case today, calendar, tasks, habits, bucket, money, notes, reading, github
     var id: String { rawValue }
 
     var title: String {
@@ -16,6 +16,8 @@ enum Tab: String, CaseIterable, Identifiable {
             return first.isEmpty ? "Reading" : "\(first)'s Reading"
         case .github:
             return "GitHub"
+        case .bucket:
+            return "Bucket list"
         default:
             return rawValue.capitalized
         }
@@ -30,12 +32,13 @@ enum Tab: String, CaseIterable, Identifiable {
         case .money: "creditcard.fill"
         case .notes: "book.pages.fill"
         case .reading: "books.vertical.fill"
+        case .bucket: "mountain.2.fill"
         case .github: "chevron.left.forwardslash.chevron.right"
         }
     }
 
     /// Nav groups: day, plan, life.
-    static let groups: [[Tab]] = [[.today], [.calendar, .tasks, .habits], [.money, .notes, .reading, .github]]
+    static let groups: [[Tab]] = [[.today], [.calendar, .tasks, .habits, .bucket], [.money, .notes, .reading, .github]]
 
     var shortcut: KeyEquivalent { KeyEquivalent(Character("\(Tab.allCases.firstIndex(of: self)! + 1)")) }
 }
@@ -85,7 +88,11 @@ struct OrbitApp: App {
 
     init() {
         Keychain.warmUp()
-        let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self])
+        // People who used Orbit before the welcome screen existed skip it.
+        if UserDefaults.standard.bool(forKey: "didSeedSampleData") || Keychain.apiKey != nil {
+            UserDefaults.standard.set(true, forKey: "onboarded")
+        }
+        let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self])
         let url = URL.applicationSupportDirectory.appending(path: "Orbit", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         let config = ModelConfiguration(schema: schema, url: url.appending(path: "Orbit.store"))
@@ -95,6 +102,7 @@ struct OrbitApp: App {
             fatalError("Could not open data store: \(error)")
         }
         CapturePanel.shared.container = container
+        BookLibrary.migrateLibrariesIfNeeded(context: container.mainContext)
     }
 
     var body: some Scene {

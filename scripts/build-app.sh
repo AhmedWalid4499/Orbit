@@ -17,6 +17,9 @@ VERSION="$(cat VERSION | tr -d '[:space:]')"
 BUILD="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" -c "Set :CFBundleVersion $BUILD" "$APP/Contents/Info.plist"
 [[ -f Support/AppIcon.icns ]] && cp Support/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+# If the owner chose (in Orbit › Settings) to share their Google setup, build it in so others can sign in without Google Cloud.
+SHARED_GOOGLE="$HOME/Library/Application Support/Orbit/shared-google-client.json"
+[[ -f "$SHARED_GOOGLE" ]] && cp "$SHARED_GOOGLE" "$APP/Contents/Resources/GoogleClient.json" && echo "Included shared Google sign-in"
 
 # Sign with a stable identity so macOS (Keychain, privacy permissions) treats every build as the same app.
 # Override with ORBIT_SIGN_IDENTITY; falls back to ad-hoc signing if no Apple Development certificate exists.

@@ -13,6 +13,8 @@ struct ReadingView: View {
     @AppStorage("readingGoal") private var yearlyGoal = 24
 
     @State private var filter: Filter = .all
+    /// nil = all libraries; otherwise "goodreads", "kindle", "apple-books" or "mine".
+    @State private var library: String?
     @State private var query = ""
     @State private var sort = "Recently added"
     @State private var adding = false
@@ -34,6 +36,11 @@ struct ReadingView: View {
         case .status(let s): list = list.filter { $0.status == s }
         case .category(let c): list = list.filter { $0.categories.contains(c) }
         }
+        switch library {
+        case nil: break
+        case "mine": list = list.filter { $0.sources.isEmpty ? !BookLibrary.importedSources.contains($0.source) : $0.sources.contains { !BookLibrary.importedSources.contains($0) } }
+        case let lib?: list = list.filter { $0.sources.contains(lib) || $0.source == lib }
+        }
         if !query.isEmpty {
             list = list.filter { $0.title.localizedCaseInsensitiveContains(query) || $0.author.localizedCaseInsensitiveContains(query) }
         }
@@ -54,7 +61,8 @@ struct ReadingView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     header
                     statRow
-                    if filter == .all && query.isEmpty && !reading.isEmpty { currentlyReading }
+                    libraryTabs
+                    if filter == .all && library == nil && query.isEmpty && !reading.isEmpty { currentlyReading }
                     shelf
                 }
                 .padding(.bottom, 32)
@@ -251,6 +259,42 @@ struct ReadingView: View {
                         }
                 }
             }
+        }
+    }
+
+    /// All · Goodreads · Kindle · Books · Added by me
+    private var libraryTabs: some View {
+        let tabs: [(String?, String, String, Color)] = [
+            (nil, "All", "books.vertical.fill", Theme.ink),
+            ("goodreads", "Goodreads", "g.circle.fill", Theme.peach),
+            ("kindle", "Kindle", "flame.fill", Theme.cyan),
+            ("apple-books", "Books", "book.fill", Theme.orange),
+            ("mine", "Added by me", "person.fill", Theme.mint),
+        ]
+        return HStack(spacing: 8) {
+            ForEach(tabs, id: \.1) { key, title, symbol, color in
+                let count = key == nil ? books.count : books.filter { b in
+                    key == "mine" ? !(b.sources.isEmpty ? [b.source] : b.sources).allSatisfy(BookLibrary.importedSources.contains)
+                                  : (b.sources.contains(key!) || b.source == key!)
+                }.count
+                if key == nil || count > 0 {
+                    Button { withAnimation(.snappy) { library = key } } label: {
+                        HStack(spacing: 7) {
+                            Image(systemName: symbol).font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(key == nil ? (library == nil ? Theme.onInverse : Theme.ink) : Theme.stickerInk)
+                                .frame(width: 22, height: 22)
+                                .background(Circle().fill(key == nil ? .clear : color))
+                            Text(title).font(Theme.ui(13, weight: .semibold))
+                            Text("\(count)").font(Theme.ui(11, weight: .semibold)).opacity(0.6)
+                        }
+                        .foregroundStyle(library == key ? Theme.onInverse : Theme.ink)
+                        .padding(.leading, 6).padding(.trailing, 12).padding(.vertical, 6)
+                        .background(Capsule().fill(library == key ? Theme.inverse : Theme.card))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            Spacer()
         }
     }
 

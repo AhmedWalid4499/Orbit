@@ -4,6 +4,7 @@ import SwiftData
 struct CalendarWeekView: View {
     @Environment(\.modelContext) private var context
     @EnvironmentObject private var apple: AppleSync
+    @ObservedObject private var google = GoogleCalendarStore.shared
     @Query(sort: \EventItem.start) private var events: [EventItem]
 
     enum Mode: String, CaseIterable { case day, week, month }
@@ -34,7 +35,7 @@ struct CalendarWeekView: View {
         _ = apple.revision
         let (start, end) = range
         let local = events.filter { $0.start < end && $0.end > start }
-        return CalEntry.merge(local: local, apple: apple.events(from: start, to: end))
+        return CalEntry.merge(local: local, apple: apple.events(from: start, to: end), google: GoogleCalendarStore.shared.events(from: start, to: end))
     }
 
     private func step(_ direction: Int) {
@@ -59,6 +60,7 @@ struct CalendarWeekView: View {
     var body: some View {
         VStack(spacing: 0) {
             toolbar.padding(.horizontal, 32).padding(.bottom, 8).fixedSize(horizontal: false, vertical: true)
+            GoogleCalendarBanner().padding(.horizontal, 32).padding(.bottom, 8)
             if mode == .month {
                 MonthGrid(days: monthDays, month: anchor, entries: entries) { day in
                     anchor = day
@@ -79,6 +81,7 @@ struct CalendarWeekView: View {
             }
         }
         .padding(.top, 6)
+        .task { await google.refreshIfDue() }
     }
 
     // MARK: Toolbar
@@ -331,7 +334,7 @@ private struct EventCard: View {
     let height: CGFloat
     @State private var hovering = false
 
-    private var isApple: Bool { if case .apple = entry.source { true } else { false } }
+    private var isApple: Bool { entry.calendarName != nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -345,7 +348,7 @@ private struct EventCard: View {
             Spacer(minLength: 0)
             if height > 92 {
                 if let area = entry.area { AreaPill(area: area, compact: true) }
-                else if case .apple(let cal) = entry.source {
+                else if let cal = entry.calendarName {
                     Text(cal).font(Theme.ui(11, weight: .medium)).foregroundStyle(Theme.inkSecondary)
                 }
             }
@@ -437,6 +440,8 @@ private struct EventDetailPopover: View {
             switch entry.source {
             case .apple(let cal):
                 Label("From \(cal) (Apple Calendar)", systemImage: "applelogo").foregroundStyle(Theme.inkSecondary)
+            case .google(let cal):
+                Label("From \(cal) (Google Calendar)", systemImage: "g.circle").foregroundStyle(Theme.inkSecondary)
             case .local(let id):
                 if let event = context.model(for: id) as? EventItem {
                     AreaPicker(selection: Binding(get: { event.area }, set: { event.area = $0 }))

@@ -10,17 +10,45 @@ import AppKit
 /// Signs in to Google accounts once and keeps a refresh token per account in the Keychain,
 /// so Orbit never has to ask again. Requires your own OAuth client (Desktop app) from Google Cloud.
 enum GoogleAuth {
-    static let scope = "https://www.googleapis.com/auth/gmail.readonly email"
+    static let scope = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly email"
 
+    /// Your own Google Cloud client if you set one up; otherwise the one built into this copy of Orbit
+    /// (so people you share Orbit with can just click "Add Gmail account").
     static var clientID: String {
-        get { UserDefaults.standard.string(forKey: "googleClientID") ?? "" }
+        get { (UserDefaults.standard.string(forKey: "googleClientID")).flatMap { $0.isEmpty ? nil : $0 } ?? bundled?.id ?? "" }
         set { UserDefaults.standard.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "googleClientID") }
     }
     static var clientSecret: String {
-        get { Keychain.read("google-client-secret") ?? "" }
+        get { (Keychain.read("google-client-secret")).flatMap { $0.isEmpty ? nil : $0 } ?? bundled?.secret ?? "" }
         set { Keychain.write(newValue.trimmingCharacters(in: .whitespacesAndNewlines), account: "google-client-secret") }
     }
     static var isConfigured: Bool { !clientID.isEmpty && !clientSecret.isEmpty }
+    static var usingBuiltIn: Bool { (UserDefaults.standard.string(forKey: "googleClientID") ?? "").isEmpty && bundled != nil }
+
+    /// GoogleClient.json inside the app, added by the build script when the owner chose to share their setup.
+    static let bundled: (id: String, secret: String)? = {
+        guard let url = Bundle.main.url(forResource: "GoogleClient", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: String],
+              let id = json["client_id"], let secret = json["client_secret"], !id.isEmpty, !secret.isEmpty else { return nil }
+        return (id, secret)
+    }()
+
+    /// Where the owner's choice to share their Google setup is stored for the build script (never committed to git).
+    static let shareFile = URL.applicationSupportDirectory.appending(path: "Orbit/shared-google-client.json")
+    static var isShared: Bool { FileManager.default.fileExists(atPath: shareFile.path) }
+
+    static func setShared(_ on: Bool) {
+        if on {
+            let json = ["client_id": clientID, "client_secret": clientSecret]
+            if let data = try? JSONSerialization.data(withJSONObject: json) {
+                try? data.write(to: shareFile, options: .atomic)
+                try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: shareFile.path)
+            }
+        } else {
+            try? FileManager.default.removeItem(at: shareFile)
+        }
+    }
 
     private static var accessTokens: [String: (token: String, expires: Date)] = [:]
 
@@ -44,6 +72,7 @@ enum GoogleAuth {
             .init(name: "code_challenge_method", value: "S256"),
             .init(name: "access_type", value: "offline"),
             .init(name: "prompt", value: "consent"),
+            .init(name: "include_granted_scopes", value: "true"),
         ] + (hint.map { [URLQueryItem(name: "login_hint", value: $0)] } ?? [])
         NSWorkspace.shared.open(comps.url!)
 

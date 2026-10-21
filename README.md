@@ -2,7 +2,13 @@
 
 A native macOS app for organizing your life: Today dashboard, calendar, tasks, habits, money and notes. Built with SwiftUI and SwiftData. Everything is stored locally on this Mac.
 
-## Run it
+## Install
+
+**[Download Orbit.dmg](https://github.com/AhmedWalid4499/Orbit/releases/latest/download/Orbit.dmg)**, open it, and drag Orbit into Applications.
+
+The first time you open it, macOS may say it can't check Orbit for malware, because Orbit isn't from the App Store. Go to **System Settings › Privacy & Security**, scroll down, and click **Open Anyway**. After that, Orbit updates itself.
+
+## Build from source
 
 ```bash
 ./scripts/build-app.sh

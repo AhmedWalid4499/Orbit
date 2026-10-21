@@ -139,7 +139,7 @@ final class AIAssistant: ObservableObject {
         lines.append("Now: \(now.formatted(.dateTime.weekday(.wide).day().month(.wide).year().hour().minute()))")
 
         let todays = CalEntry.merge(local: events.filter { $0.start >= today && $0.start < tomorrow },
-                                    apple: apple.events(from: today, to: tomorrow))
+                                    apple: apple.events(from: today, to: tomorrow), google: GoogleCalendarStore.shared.events(from: today, to: tomorrow))
         lines.append("\nToday's events:")
         lines += todays.isEmpty ? ["(none)"] : todays.map {
             "- \($0.isAllDay ? "all day" : "\(Fmt.time($0.start))-\(Fmt.time($0.end))") \($0.title)\($0.area.map { " [\($0.title)]" } ?? "")"

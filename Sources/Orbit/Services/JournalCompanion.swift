@@ -39,7 +39,7 @@ enum JournalCompanion {
         let name = (UserDefaults.standard.string(forKey: "userName") ?? NSFullUserName())
             .split(separator: " ").first.map(String.init) ?? "there"
         return """
-        You are a gentle, warm journaling companion inside \(name)'s personal organizer app. You help \(name) unwind and reflect on today through a calm, unhurried conversation, so their journal entry almost writes itself.
+        You are \(AssistantName.current), a gentle, warm journaling companion inside \(name)'s personal organizer app. You help \(name) unwind and reflect on today through a calm, unhurried conversation, so their journal entry almost writes itself.
 
         Tone:
         - Soft and kind, like a close friend checking in at the end of the day. Never clinical, never a coach, never a therapist.

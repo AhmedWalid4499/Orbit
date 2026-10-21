@@ -3,7 +3,7 @@ import SwiftData
 
 /// One entry on a calendar, either from Orbit or from Apple Calendar.
 struct CalEntry: Identifiable, Hashable {
-    enum Source: Hashable { case local(PersistentIdentifier), apple(calendar: String) }
+    enum Source: Hashable { case local(PersistentIdentifier), apple(calendar: String), google(calendar: String) }
     let id: String
     let title: String
     let start: Date
@@ -13,7 +13,16 @@ struct CalEntry: Identifiable, Hashable {
     let tint: Color
     let source: Source
 
-    static func merge(local: [EventItem], apple: [AppleEvent]) -> [CalEntry] {
+    /// Name of the Apple or Google calendar it came from (nil for Orbit's own events).
+    var calendarName: String? {
+        switch source {
+        case .apple(let c): c
+        case .google(let c): c
+        case .local: nil
+        }
+    }
+
+    static func merge(local: [EventItem], apple: [AppleEvent], google: [GoogleEvent] = []) -> [CalEntry] {
         let mine = local.map {
             CalEntry(id: "\($0.persistentModelID.hashValue)", title: $0.title, start: $0.start, end: $0.end,
                      isAllDay: false, area: $0.area, tint: $0.area.color, source: .local($0.persistentModelID))
@@ -22,7 +31,13 @@ struct CalEntry: Identifiable, Hashable {
             CalEntry(id: "apple-\($0.id)-\($0.start.timeIntervalSince1970)", title: $0.title, start: $0.start, end: $0.end,
                      isAllDay: $0.isAllDay, area: nil, tint: $0.color, source: .apple(calendar: $0.calendarName))
         }
-        return (mine + theirs).sorted { $0.start < $1.start }
+        // Skip Google events that macOS Calendar already shows (same title and start), e.g. if the account is also in Internet Accounts.
+        let appleKeys = Set(apple.map { "\($0.title.lowercased())|\(Int($0.start.timeIntervalSince1970))" })
+        let fromGoogle = google.filter { !appleKeys.contains("\($0.title.lowercased())|\(Int($0.start.timeIntervalSince1970))") }.map {
+            CalEntry(id: "google-\($0.id)-\($0.start.timeIntervalSince1970)", title: $0.title, start: $0.start, end: $0.end,
+                     isAllDay: $0.isAllDay, area: nil, tint: $0.color, source: .google(calendar: $0.calendarName))
+        }
+        return (mine + theirs + fromGoogle).sorted { $0.start < $1.start }
     }
 }
 
@@ -38,9 +53,11 @@ struct TodayView: View {
     @Query(sort: \Transaction.date, order: .reverse) private var transactions: [Transaction]
     @Query(sort: \Note.createdAt, order: .reverse) private var notes: [Note]
     @Query(sort: \Book.addedAt, order: .reverse) private var books: [Book]
+    @Query(filter: #Predicate<BucketItem> { !$0.isDone }) private var dreams: [BucketItem]
 
     @ObservedObject private var inbox = InboxStore.shared
     @ObservedObject private var gh = GitHubStore.shared
+    @ObservedObject private var google = GoogleCalendarStore.shared
     @ObservedObject private var ai = AIAssistant.shared
 
     @AppStorage("monthlyBudget") private var monthlyBudget = 2000.0
@@ -62,13 +79,13 @@ struct TodayView: View {
     private var todayEntries: [CalEntry] {
         _ = apple.revision
         let local = events.filter { $0.start.isSameDay(as: today) }
-        return CalEntry.merge(local: local, apple: apple.events(from: today, to: today.adding(days: 1)))
+        return CalEntry.merge(local: local, apple: apple.events(from: today, to: today.adding(days: 1)), google: GoogleCalendarStore.shared.events(from: today, to: today.adding(days: 1)))
     }
 
     private var tomorrowEntries: [CalEntry] {
         _ = apple.revision
         let t = today.adding(days: 1)
-        return CalEntry.merge(local: events.filter { $0.start.isSameDay(as: t) }, apple: apple.events(from: t, to: t.adding(days: 1)))
+        return CalEntry.merge(local: events.filter { $0.start.isSameDay(as: t) }, apple: apple.events(from: t, to: t.adding(days: 1)), google: GoogleCalendarStore.shared.events(from: t, to: t.adding(days: 1)))
     }
 
     private var spentThisMonth: Double {
@@ -98,8 +115,9 @@ struct TodayView: View {
                 }
                 .frame(maxWidth: .infinity)
                 VStack(spacing: 14) {
-                    tasksCard.frame(maxHeight: .infinity)
+                    tasksCard
                     habitsStrip
+                    lookingForwardCard.frame(maxHeight: .infinity)
                 }
                 .frame(maxWidth: .infinity)
                 VStack(spacing: 14) {
@@ -132,7 +150,8 @@ struct TodayView: View {
                 Text(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide))).font(Theme.display(32))
                 Text(headline).font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary).lineLimit(1)
             }
-            Spacer(minLength: 20)
+            Spacer(minLength: 16)
+            ClockWeather()
             VStack(alignment: .trailing, spacing: 4) {
                 HStack(spacing: 10) {
                     Image(systemName: capturing ? "hourglass" : (ai.smartCaptureActive ? "sparkles" : "plus"))
@@ -146,7 +165,7 @@ struct TodayView: View {
                     Text("↩").font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkMuted)
                 }
                 .padding(.horizontal, 16).padding(.vertical, 12)
-                .frame(width: 520)
+                .frame(minWidth: 280, maxWidth: 440)
                 .background(Capsule().fill(Theme.card))
                 if let captureResult {
                     Text(captureResult).font(Theme.ui(11, weight: .medium)).foregroundStyle(Theme.good).lineLimit(1)
@@ -256,6 +275,51 @@ struct TodayView: View {
                     }
                 }
                 .scrollIndicators(.never)
+                .frame(maxHeight: 190)
+                .fixedSize(horizontal: false, vertical: openToday.count + apple.reminders.count < 4)
+            }
+        }
+    }
+
+    /// Dated bucket-list items coming up, or a nudge to dream if there are none.
+    private var lookingForwardCard: some View {
+        let upcoming = dreams.filter { ($0.targetDate ?? .distantPast) >= today }.sorted { $0.targetDate! < $1.targetDate! }
+        let someday = dreams.filter { $0.targetDate == nil }.sorted { $0.excitement > $1.excitement }
+        return Card(padding: 14) {
+            VStack(alignment: .leading, spacing: 10) {
+                SectionHeader(title: "Looking forward to", trailing: "Bucket list") { state.tab = .bucket }
+                if dreams.isEmpty {
+                    EmptyHint(symbol: "mountain.2", text: "Add things you want to do in life to your bucket list.")
+                }
+                ScrollView {
+                    VStack(spacing: 8) {
+                        ForEach(upcoming.prefix(4)) { item in
+                            let days = Calendar.current.dateComponents([.day], from: today, to: item.targetDate!.startOfDay).day ?? 0
+                            HStack(spacing: 12) {
+                                Text(days == 0 ? "🎉" : "\(days)d").font(Theme.display(17)).frame(width: 46)
+                                    .padding(.vertical, 6).background(RoundedRectangle(cornerRadius: 10).fill(item.kind.color))
+                                    .foregroundStyle(Theme.stickerInk)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(item.title).font(Theme.ui(13, weight: .semibold)).lineLimit(1)
+                                    Text(item.targetDate!.formatted(.dateTime.weekday(.abbreviated).day().month())).font(Theme.ui(10)).foregroundStyle(Theme.inkMuted)
+                                }
+                                Spacer()
+                            }
+                        }
+                        ForEach(someday.prefix(max(0, 3 - upcoming.count))) { item in
+                            HStack(spacing: 12) {
+                                Image(systemName: item.kind.symbol).font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.stickerInk)
+                                    .frame(width: 46, height: 30).background(RoundedRectangle(cornerRadius: 10).fill(item.kind.color.opacity(0.7)))
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(item.title).font(Theme.ui(13, weight: .semibold)).lineLimit(1)
+                                    Text("Someday").font(Theme.ui(10)).foregroundStyle(Theme.inkMuted)
+                                }
+                                Spacer()
+                            }
+                        }
+                    }
+                }
+                .scrollIndicators(.never)
             }
         }
     }
@@ -311,7 +375,7 @@ struct TodayView: View {
                 }
                 if !inbox.isConnected {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Connect Gmail and Claude sums up both inboxes for you: what needs a reply, what matters, what can wait.")
+                        Text("Connect Gmail and \(AssistantName.current) sums up both inboxes for you: what needs a reply, what matters, what can wait.")
                             .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
                         SettingsLink { Text("Connect Gmail") }.buttonStyle(SoftButtonStyle())
                     }
@@ -460,7 +524,7 @@ private struct AgendaRow: View {
             RoundedRectangle(cornerRadius: 2).fill(entry.tint).frame(width: 4, height: 30)
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.title).font(Theme.ui(13, weight: .medium)).lineLimit(1)
-                if case .apple(let cal) = entry.source { Text(cal).font(Theme.ui(10)).foregroundStyle(Theme.inkMuted) }
+                if let cal = entry.calendarName { Text(cal).font(Theme.ui(10)).foregroundStyle(Theme.inkMuted) }
             }
             Spacer()
             if let area = entry.area { AreaPill(area: area, compact: true) }
@@ -666,7 +730,7 @@ private struct BriefCard: View {
             Image(systemName: "sparkles").font(.system(size: 18, weight: .semibold))
                 .frame(width: 40, height: 40).background(Circle().fill(Theme.lime)).foregroundStyle(Theme.stickerInk)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Get a morning brief from Claude").font(Theme.ui(15, weight: .semibold))
+                Text("Get a morning brief from \(AssistantName.current)").font(Theme.ui(15, weight: .semibold))
                 Text("Add your Anthropic API key in Settings › AI to turn on the daily brief and smart capture.")
                     .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
             }
@@ -701,7 +765,7 @@ private struct BriefCard: View {
             case .loading where !ai.hasTodaysBrief:
                 HStack(spacing: 10) {
                     ProgressView().controlSize(.small).tint(ink)
-                    Text("Claude is reading your day…").font(Theme.display(20, weight: .regular))
+                    Text("\(AssistantName.current) is reading your day…").font(Theme.display(20, weight: .regular))
                 }
                 .padding(.vertical, 6)
             case .failed(let message) where !ai.hasTodaysBrief:

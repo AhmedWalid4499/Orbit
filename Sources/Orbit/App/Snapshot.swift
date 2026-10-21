@@ -62,7 +62,7 @@ enum Snapshot {
     }
 
     private static func demoContainer() -> ModelContainer {
-        let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self])
+        let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self])
         let c = try! ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true))
         let ctx = c.mainContext
         let cats = [("Philosophy", 3, "brain.head.profile"), ("Favourites", 0, "heart.fill"), ("Business", 4, "briefcase.fill")]
@@ -76,7 +76,8 @@ enum Snapshot {
             ("The Alchemist", "Paulo Coelho", .read, 4, ["Favourites"], 1),
         ]
         for (t, a, st, r, cs, p) in books {
-            let b = Book(title: t, author: a, status: st)
+            let b = Book(title: t, author: a, status: st, source: ["kindle", "goodreads", "apple-books"][abs(t.count) % 3])
+            b.sources = [b.source]
             b.rating = r; b.categories = cs; b.progress = p; b.pageCount = 300
             if st == .read { b.finishedAt = .now.adding(days: -20) }
             ctx.insert(b)
@@ -93,6 +94,13 @@ enum Snapshot {
             ctx.insert(EventItem(title: t, start: start, end: start.adding(minutes: len), area: [.work, .health, .social, .health][i]))
         }
         ctx.insert(TaskItem(title: "Pay Electricity — 450 EGP", area: .money, due: Date.now.startOfDay.adding(days: 4), priority: 2))
+        ctx.insert(BucketItem(title: "See the northern lights in Norway", kind: .travel, notes: "Tromsø in February", targetDate: Date.now.startOfDay.adding(days: 23), excitement: 3))
+        ctx.insert(BucketItem(title: "Learn to surf", kind: .adventure, excitement: 2))
+        ctx.insert(BucketItem(title: "Read 50 books in a year", kind: .learn, excitement: 2))
+        ctx.insert(BucketItem(title: "Concert with friends", kind: .people, targetDate: Date.now.startOfDay.adding(days: 6), excitement: 3))
+        let done = BucketItem(title: "Climb Mount Sinai at sunrise", kind: .adventure, excitement: 3)
+        done.isDone = true; done.doneAt = .now.adding(days: -40)
+        ctx.insert(done)
         let j = Note(title: Date.now.formatted(date: .complete, time: .omitted), isJournal: true)
         j.mood = 4
         j.chat = JournalChat(system: "", turns: [

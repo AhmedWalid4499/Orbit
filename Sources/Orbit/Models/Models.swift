@@ -272,8 +272,10 @@ final class Book {
     var addedAt: Date = Date.now
     var startedAt: Date? = nil
     var finishedAt: Date? = nil
-    /// manual, openlibrary, goodreads, apple-books, kindle
+    /// manual, openlibrary, goodreads, apple-books, kindle (where the book first came from)
     var source: String = "manual"
+    /// Every library this book appears in (a Kindle book can also be on Goodreads).
+    var sources: [String] = []
     /// Stable key used to avoid duplicate imports.
     var externalID: String = ""
 
@@ -319,6 +321,53 @@ final class BookCategory {
         self.colorIndex = colorIndex
         self.symbol = symbol
         self.createdAt = .now
+    }
+}
+
+// MARK: - Bucket list
+
+enum BucketKind: String, CaseIterable, Identifiable {
+    case travel, experience, adventure, learn, create, people, other
+    var id: String { rawValue }
+    var title: String { self == .people ? "People" : rawValue.capitalized }
+    var symbol: String {
+        switch self {
+        case .travel: "airplane"
+        case .experience: "sparkles"
+        case .adventure: "mountain.2.fill"
+        case .learn: "graduationcap.fill"
+        case .create: "paintbrush.fill"
+        case .people: "person.2.fill"
+        case .other: "star.fill"
+        }
+    }
+}
+
+@Model
+final class BucketItem {
+    var title: String = ""
+    var notes: String = ""
+    var kindRaw: String = BucketKind.experience.rawValue
+    /// When you plan or hope to do it (optional). Items with a date show up under "Looking forward to".
+    var targetDate: Date? = nil
+    /// 1 = nice to do … 3 = can't wait
+    var excitement: Int = 2
+    var isDone: Bool = false
+    var doneAt: Date? = nil
+    var createdAt: Date = Date.now
+
+    init(title: String, kind: BucketKind = .experience, notes: String = "", targetDate: Date? = nil, excitement: Int = 2) {
+        self.title = title
+        self.kindRaw = kind.rawValue
+        self.notes = notes
+        self.targetDate = targetDate
+        self.excitement = excitement
+        self.createdAt = .now
+    }
+
+    var kind: BucketKind {
+        get { BucketKind(rawValue: kindRaw) ?? .other }
+        set { kindRaw = newValue.rawValue }
     }
 }
 

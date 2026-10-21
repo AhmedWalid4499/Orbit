@@ -82,7 +82,7 @@ final class AssistantStore: ObservableObject {
 
             let calls = turn.toolCalls
             guard turn.stopReason == "tool_use", !calls.isEmpty else {
-                if turn.stopReason == "max_tokens" { error = "Claude's reply was cut off. Ask it to continue." }
+                if turn.stopReason == "max_tokens" { error = "\(AssistantName.current)'s reply was cut off. Ask it to continue." }
                 return
             }
             var results: [[String: Any]] = []
@@ -164,18 +164,27 @@ final class AssistantStore: ObservableObject {
     static func systemPrompt(context: ModelContext, apple: AppleSync) -> String {
         let name = (UserDefaults.standard.string(forKey: "userName") ?? NSFullUserName()).split(separator: " ").first.map(String.init) ?? "the user"
         return """
-        You are Claude, \(name)'s personal assistant inside Orbit, their life-organizer app on the Mac. You can talk things through and you can act in the app with tools: create tasks, events, habits, notes and transactions, add books to their reading list, set the monthly budget, and look up their data.
+        You are \(AssistantName.current), \(name)'s personal assistant inside Orbit (you're built on Claude, by Anthropic), their life-organizer app on the Mac. You can talk things through and you can act in the app with tools: create tasks, events, habits, notes and transactions, add books to their reading list, set the monthly budget, and look up their data.
 
         How to work:
         - When \(name) wants something done, or clearly would benefit from it, just do it with the tools; no need to ask permission for creating things (each action shows an Undo button). Then say briefly what you did.
         - When they're talking about a struggle ("I can't read every day"), first acknowledge it, then suggest something small and realistic and set it up (e.g. a habit with a modest weekly target, maybe a reminder task), unless they only want to talk.
         - Book recommendations: suggest 3-5 real, well-known books with one line each on why, and add them to their To read list under a category that fits the topic (e.g. "Japanese culture"), unless they ask only for ideas. Check list_books first so you don't recommend books they already have.
+        - Bucket list: when they mention something they dream of doing someday (travel, experiences, skills), offer to add it, or add it if they ask.
         - Use get_overview or get_money_summary when you need their current data instead of guessing.
         - Dates: resolve "tomorrow", "next Friday" from the current date below. Use 24-hour times in tool inputs.
         - Style: warm, calm, concise. Short paragraphs; simple bullets with "•" when listing. Never more than one question at a time.
 
         Current date and time: \(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide).year().hour().minute())) (\(TimeZone.current.identifier)). Currency: \(Fmt.currencyCode).
         """
+    }
+}
+
+/// What the user calls their AI ("Ask" unless they rename it in Settings › AI).
+enum AssistantName {
+    static var current: String {
+        let n = (UserDefaults.standard.string(forKey: "assistantName") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return n.isEmpty ? "Ask" : n
     }
 }
 
@@ -234,6 +243,11 @@ enum AssistantTools {
                 ]],
             ]),
             tool("create_note", "Save a note.", ["title": ["type": "string"], "body": ["type": "string"]]),
+            tool("add_bucket_item", "Add something to the user's bucket list (things they want to do in life). target_date yyyy-MM-dd or empty.", [
+                "title": ["type": "string"], "kind": ["type": "string", "enum": BucketKind.allCases.map(\.rawValue)],
+                "notes": ["type": "string"], "target_date": ["type": "string"],
+                "excitement": ["type": "integer", "description": "1 nice to do, 2 really want to, 3 can't wait"],
+            ]),
             tool("add_transaction", "Log money spent or received. date yyyy-MM-dd.", [
                 "title": ["type": "string"], "amount": ["type": "number", "description": "positive number in the home currency"],
                 "kind": ["type": "string", "enum": ["expense", "income"]], "category": ["type": "string", "enum": MoneyCategory.all],
@@ -329,6 +343,14 @@ enum AssistantTools {
                            action: ChatItem(role: .action, text: "Added to reading list: \(names)", symbol: "books.vertical.fill",
                                             undo: added.isEmpty ? nil : .models(added.map(\.persistentModelID))))
 
+        case "add_bucket_item":
+            guard !str("title").isEmpty else { return Outcome(result: "title is required", isError: true) }
+            let b = BucketItem(title: str("title"), kind: BucketKind(rawValue: str("kind")) ?? .other, notes: str("notes"),
+                               targetDate: day.date(from: str("target_date")), excitement: max(1, min(3, Int(num("excitement")))))
+            context.insert(b)
+            return Outcome(result: "Added to bucket list.", action: ChatItem(role: .action, text: "Bucket list: “\(b.title)”",
+                                                                            symbol: "mountain.2.fill", undo: .models([b.persistentModelID])))
+
         case "create_note":
             let n = Note(title: str("title"), body: str("body"))
             context.insert(n)
@@ -366,6 +388,8 @@ enum AssistantTools {
         let reading = books.filter { $0.status == .reading }.map { "\($0.title) (\(Int($0.progress * 100))%)" }
         text += "\n\nReading: \(reading.isEmpty ? "nothing in progress" : reading.joined(separator: ", ")). "
         text += "To read: \(books.filter { $0.status == .toRead }.count). Read: \(books.filter { $0.status == .read }.count). "
+        let bucket = ((try? context.fetch(FetchDescriptor<BucketItem>())) ?? [])
+        text += "Bucket list: \(bucket.filter { !$0.isDone }.prefix(20).map(\.title).joined(separator: "; ")) (\(bucket.filter(\.isDone).count) done). "
         text += "Book categories: \(cats.isEmpty ? "none" : cats.joined(separator: ", ")). Yearly goal: \(UserDefaults.standard.integer(forKey: "readingGoal") == 0 ? 24 : UserDefaults.standard.integer(forKey: "readingGoal")) books."
         return text
     }

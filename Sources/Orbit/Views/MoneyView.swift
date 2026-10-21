@@ -370,7 +370,7 @@ private struct EmailExpensesChip: View {
             .popover(isPresented: $showing, arrowEdge: .bottom) {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Expenses from email").font(Theme.display(20))
-                    Text("Claude checks both inboxes every few hours: anything under a payments, receipts, bank or orders label, plus receipts, invoices and card-charge emails anywhere. Paid amounts are added here (converted to \(Fmt.currencyCode)); bills still due become tasks.")
+                    Text("\(AssistantName.current) checks both inboxes every few hours: anything under a payments, receipts, bank or orders label, plus receipts, invoices and card-charge emails anywhere. Paid amounts are added here (converted to \(Fmt.currencyCode)); bills still due become tasks.")
                         .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
                     if let s = importer.status { Text(s).font(Theme.ui(12, weight: .medium)) }
                     if importer.lastSync > 0 {

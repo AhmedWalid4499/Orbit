@@ -39,8 +39,14 @@ enum BookLibrary {
     struct Outcome { var added = 0; var updated = 0; var total: Int { added + updated } }
 
     /// Adds new books and enriches existing ones. Never downgrades a status you set by hand.
+    /// Libraries synced from outside. Their books never get categories automatically: you browse them by library instead.
+    static let importedSources: Set<String> = ["goodreads", "apple-books", "kindle"]
+
     @discardableResult
     static func merge(_ items: [ImportedBook], source: String, category: String?, context: ModelContext) -> Outcome {
+        let imported = importedSources.contains(source)
+        let category = imported ? nil : category
+        let items = imported ? items.map { var i = $0; i.categories = []; return i } : items
         let existing = (try? context.fetch(FetchDescriptor<Book>())) ?? []
         var byID = Dictionary(existing.filter { !$0.externalID.isEmpty }.map { ($0.externalID, $0) }, uniquingKeysWith: { a, _ in a })
         var byKey = Dictionary(existing.map { ($0.matchKey, $0) }, uniquingKeysWith: { a, _ in a })
@@ -65,6 +71,8 @@ enum BookLibrary {
                 byKey[key] = book
             }
             if !item.externalID.isEmpty, book.externalID.isEmpty { book.externalID = item.externalID; byID[item.externalID] = book }
+            if book.sources.isEmpty { book.sources = [book.source] }
+            if !book.sources.contains(source) { book.sources.append(source) }
             if book.rating == 0 { book.rating = item.rating }
             if book.isbn.isEmpty { book.isbn = item.isbn }
             if book.pageCount == 0 { book.pageCount = item.pages }
@@ -80,6 +88,21 @@ enum BookLibrary {
         }
         try? context.save()
         return outcome
+    }
+
+    /// One-time cleanup: imported books lose the categories imports gave them, and categories nobody uses any more are removed.
+    static func migrateLibrariesIfNeeded(context: ModelContext) {
+        let key = "booksLibrariesMigrated"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let books = (try? context.fetch(FetchDescriptor<Book>())) ?? []
+        for b in books {
+            if b.sources.isEmpty { b.sources = [b.source] }
+            if importedSources.contains(b.source) { b.categories = [] }
+        }
+        let used = Set(books.flatMap(\.categories))
+        for c in (try? context.fetch(FetchDescriptor<BookCategory>())) ?? [] where !used.contains(c.name) { context.delete(c) }
+        try? context.save()
+        UserDefaults.standard.set(true, forKey: key)
     }
 
     static func ensureCategory(_ name: String, context: ModelContext) {
@@ -418,7 +441,7 @@ enum KindleMac {
                                   forKey: "kindleDiagnostics")
         throw BookImportError.notFound(dbs.isEmpty
             ? "The Kindle app hasn't stored a library on this Mac yet. Open Kindle for Mac, sign in and let it sync, then try again."
-            : "Orbit could open Kindle's data but didn't recognise the book list. Use “Copy details” and send them to Claude so it can be fixed.")
+            : "Orbit could open Kindle's data but didn't recognise the book list. Use “Copy details” and share them so it can be fixed.")
     }
 }
 

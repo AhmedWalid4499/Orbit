@@ -161,6 +161,24 @@ enum SyncTest {
                 let tasksA = try a.fetch(FetchDescriptor<TaskItem>())
                 check("Edit reaches Mac A", tasksA.contains { $0.title == "Edited on Mac B" })
                 check("Deletion reaches Mac A", !(try a.fetch(FetchDescriptor<Book>())).contains { $0.title == deletedTitle })
+
+                // Key sync: A turns it on, B must give the same passphrase; the server never sees a key in the clear.
+                let hadKeySync = cloud.syncSecrets
+                defer { Keychain.delete("sync-passphrase"); cloud.syncSecrets = hadKeySync }
+                let errA = await cloud.setPassphrase("test-pass-123", context: a)
+                check("Keys upload, encrypted (\(errA ?? "ok"))", errA == nil && cloud.vaultState == .on)
+                var req = URLRequest(url: URL(string: "\(SupabaseConfig.url)/rest/v1/orbit_records?select=data,kind")!)
+                req.setValue("Bearer tok", forHTTPHeaderField: "Authorization")
+                let (raw, _) = try await URLSession.shared.data(for: req)
+                let stored = String(decoding: raw, as: UTF8.self)
+                let secrets = Keychain.syncable().values.filter { $0.count >= 8 }
+                check("Server holds no readable key (\(secrets.count) checked)", stored.contains("\"vault\"") && !secrets.contains { stored.contains($0) })
+                cloud.deviceTag = "-testB"
+                Keychain.delete("sync-passphrase")
+                let wrong = await cloud.setPassphrase("not-the-pass", context: b)
+                check("Wrong passphrase is refused", wrong != nil)
+                let right = await cloud.setPassphrase("test-pass-123", context: b)
+                check("Right passphrase unlocks on Mac B (\(right ?? "ok"))", right == nil && cloud.vaultState == .on)
             } catch {
                 results.append("FAIL  \(error.localizedDescription)")
             }

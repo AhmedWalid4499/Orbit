@@ -578,12 +578,27 @@ private struct AccountSettings: View {
                     }
                     Button("Sign Out", role: .destructive) { cloud.signOut() }
                 }
+                KeySyncSection()
                 Section {
-                    Text("Your tasks, calendar events you made in Orbit, habits, money, notes and journal, books and bucket list sync to your account every couple of minutes. Sign in with the same account on another Mac to get everything there. API keys and Google, GitHub and Apple connections stay on each Mac.")
+                    Text("Your tasks, calendar events you made in Orbit, habits, money, notes and journal, books and bucket list sync to your account every couple of minutes. Sign in with the same account on another device to get everything there.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             } else {
-                Section(creating ? "Create your Orbit account" : "Sign in to sync") {
+                Section {
+                    Button { google() } label: {
+                        HStack {
+                            Image(systemName: "g.circle.fill").font(.title2)
+                            Text("Continue with Google").fontWeight(.semibold)
+                            Spacer()
+                            if working { ProgressView().controlSize(.small) }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(working)
+                    Text("Use the same Google account on your Mac, your Windows PC and anywhere else Orbit runs, and you're always in the same Orbit account.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Section(creating ? "Or create an account with email" : "Or sign in with email") {
                     TextField("Email", text: $email).textContentType(.username)
                     SecureField("Password", text: $password).textContentType(creating ? .newPassword : .password)
                     if let message { Text(message).font(.caption).foregroundStyle(.secondary) }
@@ -616,6 +631,17 @@ private struct AccountSettings: View {
         .formStyle(.grouped)
     }
 
+    private func google() {
+        working = true
+        message = nil
+        Task {
+            defer { working = false }
+            do { try await cloud.signInWithGoogle(context: context) }
+            catch is CancellationError {}
+            catch { message = error.localizedDescription }
+        }
+    }
+
     private func submit() {
         working = true
         message = nil
@@ -637,6 +663,67 @@ private struct AccountSettings: View {
             } catch {
                 message = error.localizedDescription
             }
+        }
+    }
+}
+
+/// Sync API keys and connections between devices, end-to-end encrypted with a passphrase.
+private struct KeySyncSection: View {
+    @Environment(\.modelContext) private var context
+    @ObservedObject private var cloud = CloudSync.shared
+    @State private var pass = ""
+    @State private var confirm = ""
+    @State private var working = false
+    @State private var message: String?
+
+    var body: some View {
+        Section("API keys and connections") {
+            Toggle("Sync them to my other devices", isOn: Binding(
+                get: { cloud.syncSecrets },
+                set: { on in if on { cloud.syncSecrets = true; Task { await cloud.sync(context: context) } } else { cloud.turnOffKeySync() } }))
+            if cloud.syncSecrets {
+                switch cloud.vaultState {
+                case .on:
+                    Label("Synced and end-to-end encrypted", systemImage: "lock.shield.fill").foregroundStyle(Theme.good)
+                    Text("Includes your Anthropic key, GitHub token, Google sign-ins for Gmail and Calendar, and their settings. On a new device, sign in and enter your passphrase once.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Button("Forget passphrase on this Mac") { cloud.forgetPassphrase() }.buttonStyle(.link).font(.caption)
+                case .needsPassphrase:
+                    Text("Your keys are already synced from another device. Enter your sync passphrase to unlock them here.").font(.caption)
+                    SecureField("Sync passphrase", text: $pass)
+                    actionRow("Unlock") { pass }
+                case .needsNewPassphrase, .off:
+                    Text("Choose a sync passphrase. Your keys are encrypted with it on this Mac before they're uploaded, so nobody else, not even someone with database access, can read them. You'll type it once on each new device. It can't be recovered, so keep it somewhere safe.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    SecureField("New passphrase (at least 8 characters)", text: $pass)
+                    SecureField("Repeat passphrase", text: $confirm)
+                    actionRow("Turn on") { pass.count >= 8 && pass == confirm ? pass : nil }
+                case .error(let e):
+                    Label(e, systemImage: "exclamationmark.triangle.fill").foregroundStyle(Theme.orange).font(.caption)
+                    SecureField("Sync passphrase", text: $pass)
+                    actionRow("Try again") { pass }
+                }
+                if let message { Text(message).font(.caption).foregroundStyle(Theme.critical) }
+            }
+        }
+    }
+
+    private func actionRow(_ title: String, value: @escaping () -> String?) -> some View {
+        HStack {
+            Spacer()
+            if working { ProgressView().controlSize(.small) }
+            Button(title) {
+                guard let p = value(), !p.isEmpty else { message = "The passphrases need to match and be at least 8 characters."; return }
+                working = true
+                message = nil
+                Task {
+                    message = await cloud.setPassphrase(p, context: context)
+                    if message == nil { pass = ""; confirm = "" }
+                    working = false
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(working || pass.isEmpty)
         }
     }
 }

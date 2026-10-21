@@ -62,6 +62,8 @@ final class AIAssistant: ObservableObject {
         return ok
     }
 
+    func reloadKey() { hasKey = Keychain.apiKey != nil }
+
     func removeKey() {
         Keychain.delete()
         hasKey = false

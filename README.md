@@ -54,7 +54,9 @@ Money has an **Overview** and a **Calendar**. The Calendar shows what you spent 
 
 ## Sync and backup
 
-Sign in under **Settings › Account** to back up Orbit online and keep several Macs in sync. Data is stored in Supabase (Postgres), where each person can only access their own rows. The database setup is in `supabase/schema.sql`. API keys and the Google, GitHub and Apple connections stay on each Mac.
+Sign in under **Settings › Account** to back up Orbit online and keep several Macs in sync. Data is stored in Supabase (Postgres), where each person can only access their own rows. The database setup is in `supabase/schema.sql`. You can sign in with Google or with email. Use the same Google account everywhere and you're in the same Orbit account.
+
+Turn on **Sync API keys and connections** to bring your Anthropic key, GitHub token and Google sign-ins to your other devices. They're encrypted on the device with your sync passphrase (PBKDF2-SHA256 and AES-256-GCM, see `VaultCrypto.swift`), so the server only stores ciphertext. Apple connections stay on each Mac.
 
 ## Reading
 

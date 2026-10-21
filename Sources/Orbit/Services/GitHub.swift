@@ -68,6 +68,8 @@ final class GitHubStore: ObservableObject {
         hasToken = Keychain.read("github-token") != nil
     }
 
+    func reloadToken() { hasToken = Keychain.read("github-token") != nil }
+
     func disconnect() {
         Keychain.delete("github-token")
         hasToken = false

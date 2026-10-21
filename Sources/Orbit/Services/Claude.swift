@@ -78,6 +78,23 @@ enum Keychain {
         persist(dict)
     }
 
+    /// Items that never leave this Mac, even with key sync on.
+    static let deviceOnly: Set<String> = ["supabase-session", "sync-passphrase"]
+
+    /// Everything that can follow you to other devices (end-to-end encrypted by CloudSync).
+    static func syncable() -> [String: String] {
+        lock.lock(); defer { lock.unlock() }
+        return vault().filter { !deviceOnly.contains($0.key) }
+    }
+
+    static func merge(_ items: [String: String]) {
+        lock.lock(); defer { lock.unlock() }
+        var dict = vault()
+        for (k, v) in items where !deviceOnly.contains(k) && !v.isEmpty { dict[k] = v }
+        cache = dict
+        persist(dict)
+    }
+
     /// Loads the vault early so any one-time prompt happens at launch, not mid-task.
     static func warmUp() { _ = read("anthropic-api-key") }
 

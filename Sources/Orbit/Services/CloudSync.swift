@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import SwiftData
 import CryptoKit
+import AppKit
 
 // MARK: - Supabase project
 
@@ -61,6 +62,57 @@ enum CloudAuth {
         let json = try await auth("token?grant_type=password", body: ["email": email, "password": password])
         guard let s = parseSession(json) else { throw CloudError("Sign-in failed.") }
         session = s
+    }
+
+    // MARK: Sign in with Google (Supabase OAuth, PKCE)
+
+    static let callbackURL = "com.personal.orbit://auth-callback"
+    private static var pending: (verifier: String, continuation: CheckedContinuation<Void, Error>)?
+
+    /// Opens Google in the browser; Supabase sends the browser back to Orbit with a one-time code.
+    /// The same Google account signs in to the same Orbit account on any device, and is linked
+    /// automatically to an email/password account with the same address.
+    static func signInWithGoogle() async throws {
+        guard SupabaseConfig.isConfigured else { throw CloudError("Sync isn't set up in this copy of Orbit.") }
+        pending?.continuation.resume(throwing: CancellationError())
+        var bytes = [UInt8](repeating: 0, count: 48)
+        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        let verifier = Data(bytes).base64EncodedString().replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+        let challenge = Data(SHA256.hash(data: Data(verifier.utf8))).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+        var comps = URLComponents(string: "\(SupabaseConfig.url)/auth/v1/authorize")!
+        comps.queryItems = [.init(name: "provider", value: "google"), .init(name: "redirect_to", value: callbackURL),
+                            .init(name: "code_challenge", value: challenge), .init(name: "code_challenge_method", value: "s256")]
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            pending = (verifier, cont)
+            NSWorkspace.shared.open(comps.url!)
+        }
+    }
+
+    /// Called when the browser hands control back to Orbit.
+    static func handleCallback(_ url: URL) {
+        guard url.absoluteString.hasPrefix(callbackURL), let p = pending else { return }
+        pending = nil
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        let fragment = URLComponents(string: "x://x?" + (url.fragment ?? ""))?.queryItems ?? []
+        func value(_ k: String) -> String? { (items + fragment).first { $0.name == k }?.value }
+        if let code = value("code") {
+            Task {
+                do {
+                    let json = try await auth("token?grant_type=pkce", body: ["auth_code": code, "code_verifier": p.verifier])
+                    guard let s = parseSession(json) else { throw CloudError("Google sign-in didn't finish.") }
+                    session = s
+                    NSApp.activate(ignoringOtherApps: true)
+                    p.continuation.resume()
+                } catch {
+                    p.continuation.resume(throwing: error)
+                }
+            }
+        } else {
+            let message = value("error_description")?.replacingOccurrences(of: "+", with: " ") ?? "Google sign-in was cancelled."
+            p.continuation.resume(throwing: CloudError(message))
+        }
     }
 
     static func signOut() {
@@ -238,9 +290,15 @@ final class CloudSync: ObservableObject {
     @Published private(set) var lastSync: Date?
     @Published private(set) var status: String?
 
+    enum VaultState: Equatable { case off, needsNewPassphrase, needsPassphrase, on, error(String) }
+    @AppStorage("syncSecrets") var syncSecrets = false
+    @Published private(set) var vaultState: VaultState = .off
+    private var keyCache: (salt: Data, pass: String, key: SymmetricKey)?
+
     private struct State: Codable {
         var cursor = ""                              // last updated_at pulled from the server
         var known: [String: Known] = [:]             // id → what was last synced
+        var vaultMac: String?                        // fingerprint of the key vault when last synced
         struct Known: Codable { var kind: String; var hash: String }
     }
     private var state = State()
@@ -258,6 +316,13 @@ final class CloudSync: ObservableObject {
 
     func signIn(email: String, password: String, context: ModelContext) async throws {
         try await CloudAuth.signIn(email: email, password: password)
+        self.email = CloudAuth.session?.email
+        loadState()
+        await sync(context: context)
+    }
+
+    func signInWithGoogle(context: ModelContext) async throws {
+        try await CloudAuth.signInWithGoogle()
         self.email = CloudAuth.session?.email
         loadState()
         await sync(context: context)
@@ -296,6 +361,7 @@ final class CloudSync: ObservableObject {
             assignMissingIDs(context: context)
             let pulled = try await pull(context: context)
             let pushed = try await push(context: context, userID: session.userID)
+            do { try await syncVault(userID: session.userID) } catch { vaultState = .error(error.localizedDescription) }
             try? context.save()
             saveState()
             lastSync = .now
@@ -362,6 +428,7 @@ final class CloudSync: ObservableObject {
                 let data = row["data"] as? [String: Any] ?? [:]
                 if let ts = row["updated_at"] as? String { state.cursor = ts }
 
+                if kindName == "vault" { continue } // handled by syncVault
                 if kindName == "setting" {
                     guard let key = data["key"] as? String, syncedSettings.contains(key) else { continue }
                     if state.known[id]?.hash == fingerprint(data) { continue } // our own upload coming back
@@ -467,6 +534,118 @@ final class CloudSync: ObservableObject {
             throw CloudError("Sync error \(status)\(msg.map { ": \($0)" } ?? "")")
         }
         return data.isEmpty ? nil : try? JSONSerialization.jsonObject(with: data)
+    }
+
+    // MARK: API keys & connections (end-to-end encrypted)
+
+    private var vaultID: String { settingID("vault") }
+
+    /// Sets this device's sync passphrase and syncs keys right away. Returns an error message, if any.
+    func setPassphrase(_ passphrase: String, context: ModelContext) async -> String? {
+        Keychain.write(passphrase, account: "sync-passphrase")
+        syncSecrets = true
+        guard let session = CloudAuth.session else { return nil }
+        do { try await syncVault(userID: session.userID) } catch { vaultState = .error(error.localizedDescription) }
+        saveState()
+        if case .error(let message) = vaultState {
+            Keychain.delete("sync-passphrase")
+            return message
+        }
+        return nil
+    }
+
+    func forgetPassphrase() {
+        Keychain.delete("sync-passphrase")
+        keyCache = nil
+        vaultState = syncSecrets ? .needsPassphrase : .off
+    }
+
+    func turnOffKeySync() {
+        syncSecrets = false
+        vaultState = .off
+    }
+
+    private func key(_ pass: String, salt: Data) -> SymmetricKey {
+        if let c = keyCache, c.salt == salt, c.pass == pass { return c.key }
+        let k = VaultCrypto.deriveKey(passphrase: pass, salt: salt)
+        keyCache = (salt, pass, k)
+        return k
+    }
+
+    private func vaultPayload() -> [String: Any] {
+        var config: [String: Any] = [:]
+        for k in ["googleClientID", "githubUser"] { if let v = UserDefaults.standard.string(forKey: k), !v.isEmpty { config[k] = v } }
+        if let a = UserDefaults.standard.stringArray(forKey: "gmailAccounts"), !a.isEmpty { config["gmailAccounts"] = a }
+        return ["secrets": Keychain.syncable(), "config": config]
+    }
+
+    private func applyPayload(_ p: [String: Any]) {
+        Keychain.merge(p["secrets"] as? [String: String] ?? [:])
+        let config = p["config"] as? [String: Any] ?? [:]
+        for k in ["googleClientID", "githubUser"] { if let v = config[k] as? String, !v.isEmpty { UserDefaults.standard.set(v, forKey: k) } }
+        if let a = config["gmailAccounts"] as? [String] { UserDefaults.standard.set(a, forKey: "gmailAccounts") }
+        InboxStore.shared.reloadAccounts()
+        GitHubStore.shared.reloadToken()
+        AIAssistant.shared.reloadKey()
+    }
+
+    /// Union of both sides; where both have a value, `preferLocal` decides.
+    private func mergePayloads(remote: [String: Any], local: [String: Any], preferLocal: Bool) -> [String: Any] {
+        var secrets = remote["secrets"] as? [String: String] ?? [:]
+        for (k, v) in local["secrets"] as? [String: String] ?? [:] where preferLocal || secrets[k] == nil { secrets[k] = v }
+        var config = remote["config"] as? [String: Any] ?? [:]
+        let localConfig = local["config"] as? [String: Any] ?? [:]
+        for (k, v) in localConfig where k != "gmailAccounts" && (preferLocal || config[k] == nil) { config[k] = v }
+        let accounts = Set((config["gmailAccounts"] as? [String] ?? []) + (localConfig["gmailAccounts"] as? [String] ?? []))
+        if !accounts.isEmpty { config["gmailAccounts"] = accounts.sorted() }
+        return ["secrets": secrets, "config": config]
+    }
+
+    private func plain(_ p: [String: Any]) -> Data { (try? JSONSerialization.data(withJSONObject: p, options: [.sortedKeys])) ?? Data() }
+
+    private func syncVault(userID: String) async throws {
+        guard syncSecrets else { vaultState = .off; return }
+        var comps = URLComponents(string: "\(SupabaseConfig.url)/rest/v1/orbit_records")!
+        comps.queryItems = [.init(name: "id", value: "eq.\(vaultID)"), .init(name: "select", value: "data,deleted")]
+        let rows = try await rest(comps.url!, method: "GET") as? [[String: Any]] ?? []
+        let remote = rows.first.flatMap { J.bool($0["deleted"]) ? nil : $0["data"] as? [String: Any] }
+
+        guard let pass = Keychain.read("sync-passphrase"), !pass.isEmpty else {
+            vaultState = remote == nil ? .needsNewPassphrase : .needsPassphrase
+            return
+        }
+        let local = vaultPayload()
+        if let remote, let saltText = remote["salt"] as? String, let salt = Data(base64Encoded: saltText), let box = remote["box"] as? String {
+            let k = key(pass, salt: salt)
+            guard let remotePlain = VaultCrypto.open(box, key: k),
+                  let remotePayload = try JSONSerialization.jsonObject(with: remotePlain) as? [String: Any] else {
+                throw CloudError("That passphrase doesn't match the one you set on your other device.")
+            }
+            let localMac = VaultCrypto.mac(plain(local), key: k)
+            if localMac == remote["mac"] as? String { state.vaultMac = localMac; vaultState = .on; return }
+            let localChanged = state.vaultMac != nil && state.vaultMac != localMac
+            let merged = mergePayloads(remote: remotePayload, local: local, preferLocal: localChanged)
+            applyPayload(merged)
+            let mergedPlain = plain(merged)
+            if mergedPlain != remotePlain { try await uploadVault(mergedPlain, salt: salt, key: k, userID: userID) }
+            state.vaultMac = VaultCrypto.mac(mergedPlain, key: k)
+        } else {
+            let salt = VaultCrypto.newSalt()
+            let k = key(pass, salt: salt)
+            let data = plain(local)
+            try await uploadVault(data, salt: salt, key: k, userID: userID)
+            state.vaultMac = VaultCrypto.mac(data, key: k)
+        }
+        vaultState = .on
+    }
+
+    private func uploadVault(_ plaintext: Data, salt: Data, key: SymmetricKey, userID: String) async throws {
+        let data: [String: Any] = ["v": 1, "salt": salt.base64EncodedString(), "box": try VaultCrypto.seal(plaintext, key: key),
+                                   "mac": VaultCrypto.mac(plaintext, key: key)]
+        var comps = URLComponents(string: "\(SupabaseConfig.url)/rest/v1/orbit_records")!
+        comps.queryItems = [.init(name: "on_conflict", value: "user_id,id")]
+        _ = try await rest(comps.url!, method: "POST", body: [["id": vaultID, "user_id": userID, "kind": "vault", "data": data, "deleted": false]],
+                           prefer: "resolution=merge-duplicates,return=minimal")
     }
 
     // MARK: State

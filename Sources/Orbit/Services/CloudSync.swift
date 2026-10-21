@@ -1,0 +1,478 @@
+import Foundation
+import SwiftUI
+import SwiftData
+import CryptoKit
+
+// MARK: - Supabase project
+
+/// Project URL and publishable key, from Supabase.json inside the app (Support/Supabase.json in the repo).
+/// The publishable key is meant to ship in apps; Row Level Security keeps each person's rows private.
+enum SupabaseConfig {
+    private static let file: [String: String] = {
+        guard let url = Bundle.main.url(forResource: "Supabase", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: String] else { return [:] }
+        return json
+    }()
+    static var url: String { file["url"] ?? "" }
+    static var key: String { file["key"] ?? "" }
+    static var isConfigured: Bool { !url.isEmpty && !key.isEmpty }
+}
+
+struct CloudError: LocalizedError {
+    let message: String
+    init(_ m: String) { message = m }
+    var errorDescription: String? { message }
+}
+
+// MARK: - Account (Supabase Auth, email + password)
+
+struct CloudSession: Codable {
+    var accessToken: String
+    var refreshToken: String
+    var expiresAt: Date
+    var userID: String
+    var email: String
+}
+
+@MainActor
+enum CloudAuth {
+    static var session: CloudSession? {
+        get { Keychain.read("supabase-session").flatMap { try? JSONDecoder().decode(CloudSession.self, from: Data($0.utf8)) } }
+        set {
+            if let newValue, let data = try? JSONEncoder().encode(newValue), let s = String(data: data, encoding: .utf8) {
+                Keychain.write(s, account: "supabase-session")
+            } else {
+                Keychain.delete("supabase-session")
+            }
+        }
+    }
+
+    enum SignUpResult { case signedIn, checkEmail }
+
+    static func signUp(email: String, password: String) async throws -> SignUpResult {
+        let json = try await auth("signup", body: ["email": email, "password": password])
+        if let s = parseSession(json) { session = s; return .signedIn }
+        return .checkEmail // email confirmation is on: they confirm, then sign in
+    }
+
+    static func signIn(email: String, password: String) async throws {
+        let json = try await auth("token?grant_type=password", body: ["email": email, "password": password])
+        guard let s = parseSession(json) else { throw CloudError("Sign-in failed.") }
+        session = s
+    }
+
+    static func signOut() {
+        if let token = session?.accessToken {
+            var req = URLRequest(url: URL(string: "\(SupabaseConfig.url)/auth/v1/logout")!)
+            req.httpMethod = "POST"
+            req.setValue(SupabaseConfig.key, forHTTPHeaderField: "apikey")
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            URLSession.shared.dataTask(with: req).resume()
+        }
+        session = nil
+    }
+
+    static func resetPassword(email: String) async throws {
+        _ = try await auth("recover", body: ["email": email])
+    }
+
+    /// A valid access token, refreshing it when it's about to expire.
+    static func accessToken() async throws -> String {
+        guard var s = session else { throw CloudError("Not signed in.") }
+        if s.expiresAt.timeIntervalSinceNow > 60 { return s.accessToken }
+        let json = try await auth("token?grant_type=refresh_token", body: ["refresh_token": s.refreshToken])
+        guard let fresh = parseSession(json) else { session = nil; throw CloudError("Your Orbit sign-in expired. Sign in again in Settings › Account.") }
+        s = fresh
+        session = s
+        return s.accessToken
+    }
+
+    private static func auth(_ path: String, body: [String: String]) async throws -> [String: Any] {
+        guard SupabaseConfig.isConfigured else { throw CloudError("Sync isn't set up in this copy of Orbit.") }
+        var req = URLRequest(url: URL(string: "\(SupabaseConfig.url)/auth/v1/\(path)")!)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(SupabaseConfig.key, forHTTPHeaderField: "apikey")
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200..<300).contains(status) else {
+            let msg = json["msg"] as? String ?? json["error_description"] as? String ?? json["message"] as? String ?? "Error \(status)"
+            throw CloudError(msg)
+        }
+        return json
+    }
+
+    private static func parseSession(_ json: [String: Any]) -> CloudSession? {
+        guard let access = json["access_token"] as? String, let refresh = json["refresh_token"] as? String,
+              let user = json["user"] as? [String: Any], let id = user["id"] as? String else { return nil }
+        let expires = (json["expires_in"] as? Double) ?? 3600
+        return CloudSession(accessToken: access, refreshToken: refresh, expiresAt: .now.addingTimeInterval(expires),
+                            userID: id, email: user["email"] as? String ?? "")
+    }
+}
+
+// MARK: - What gets synced
+
+/// Turns each kind of item into JSON for the `orbit_records` table and back.
+@MainActor
+private struct SyncKind {
+    let kind: String
+    let fetch: (ModelContext) -> [any PersistentModel]
+    let uuid: (any PersistentModel) -> String
+    let encode: (any PersistentModel) -> [String: Any]
+    let apply: ([String: Any], any PersistentModel) -> Void
+    let make: (ModelContext) -> any PersistentModel
+}
+
+private enum J {
+    static let iso = ISO8601DateFormatter()
+    static func date(_ d: Date?) -> Any { d.map { iso.string(from: $0) } ?? NSNull() }
+    static func date(_ v: Any?) -> Date? { (v as? String).flatMap { iso.date(from: $0) } }
+    static func str(_ v: Any?) -> String { v as? String ?? "" }
+    static func num(_ v: Any?) -> Double { (v as? NSNumber)?.doubleValue ?? 0 }
+    static func int(_ v: Any?) -> Int { (v as? NSNumber)?.intValue ?? 0 }
+    static func bool(_ v: Any?) -> Bool { (v as? NSNumber)?.boolValue ?? false }
+    static func strings(_ v: Any?) -> [String] { v as? [String] ?? [] }
+}
+
+@MainActor
+private let syncKinds: [SyncKind] = [
+    SyncKind(kind: "task",
+             fetch: { (try? $0.fetch(FetchDescriptor<TaskItem>())) ?? [] }, uuid: { ($0 as! TaskItem).uuid },
+             encode: { m in let t = m as! TaskItem
+                 return ["title": t.title, "notes": t.notes, "area": t.areaRaw, "due": J.date(t.due), "priority": t.priority,
+                         "isDone": t.isDone, "completedAt": J.date(t.completedAt), "createdAt": J.date(t.createdAt), "repeat": t.recurrenceRaw] },
+             apply: { d, m in let t = m as! TaskItem
+                 t.title = J.str(d["title"]); t.notes = J.str(d["notes"]); t.areaRaw = J.str(d["area"]); t.due = J.date(d["due"])
+                 t.priority = J.int(d["priority"]); t.isDone = J.bool(d["isDone"]); t.completedAt = J.date(d["completedAt"])
+                 t.createdAt = J.date(d["createdAt"]) ?? t.createdAt; t.recurrenceRaw = J.str(d["repeat"]).isEmpty ? "none" : J.str(d["repeat"]) },
+             make: { let t = TaskItem(title: ""); $0.insert(t); return t }),
+    SyncKind(kind: "event",
+             fetch: { (try? $0.fetch(FetchDescriptor<EventItem>())) ?? [] }, uuid: { ($0 as! EventItem).uuid },
+             encode: { m in let e = m as! EventItem
+                 return ["title": e.title, "start": J.date(e.start), "end": J.date(e.end), "area": e.areaRaw, "location": e.location, "notes": e.notes] },
+             apply: { d, m in let e = m as! EventItem
+                 e.title = J.str(d["title"]); e.start = J.date(d["start"]) ?? e.start; e.end = J.date(d["end"]) ?? e.end
+                 e.areaRaw = J.str(d["area"]); e.location = J.str(d["location"]); e.notes = J.str(d["notes"]) },
+             make: { let e = EventItem(title: "", start: .now, end: .now); $0.insert(e); return e }),
+    SyncKind(kind: "habit",
+             fetch: { (try? $0.fetch(FetchDescriptor<Habit>())) ?? [] }, uuid: { ($0 as! Habit).uuid },
+             encode: { m in let h = m as! Habit
+                 return ["name": h.name, "symbol": h.symbol, "area": h.areaRaw, "targetPerWeek": h.targetPerWeek,
+                         "createdAt": J.date(h.createdAt), "doneDays": h.doneDays.sorted()] },
+             apply: { d, m in let h = m as! Habit
+                 h.name = J.str(d["name"]); h.symbol = J.str(d["symbol"]); h.areaRaw = J.str(d["area"])
+                 h.targetPerWeek = J.int(d["targetPerWeek"]); h.createdAt = J.date(d["createdAt"]) ?? h.createdAt; h.doneDays = J.strings(d["doneDays"]) },
+             make: { let h = Habit(name: ""); $0.insert(h); return h }),
+    SyncKind(kind: "transaction",
+             fetch: { (try? $0.fetch(FetchDescriptor<Transaction>())) ?? [] }, uuid: { ($0 as! Transaction).uuid },
+             encode: { m in let t = m as! Transaction
+                 return ["title": t.title, "amount": t.amount, "category": t.category, "date": J.date(t.date), "isRecurring": t.isRecurring,
+                         "source": t.source, "sourceID": t.sourceID, "originalAmount": t.originalAmount, "originalCurrency": t.originalCurrency] },
+             apply: { d, m in let t = m as! Transaction
+                 t.title = J.str(d["title"]); t.amount = J.num(d["amount"]); t.category = J.str(d["category"]); t.date = J.date(d["date"]) ?? t.date
+                 t.isRecurring = J.bool(d["isRecurring"]); t.source = J.str(d["source"]); t.sourceID = J.str(d["sourceID"])
+                 t.originalAmount = J.num(d["originalAmount"]); t.originalCurrency = J.str(d["originalCurrency"]) },
+             make: { let t = Transaction(title: "", amount: 0); $0.insert(t); return t }),
+    SyncKind(kind: "note",
+             fetch: { (try? $0.fetch(FetchDescriptor<Note>())) ?? [] }, uuid: { ($0 as! Note).uuid },
+             encode: { m in let n = m as! Note
+                 return ["title": n.title, "body": n.body, "createdAt": J.date(n.createdAt), "updatedAt": J.date(n.updatedAt),
+                         "isJournal": n.isJournal, "pinned": n.pinned, "mood": n.mood, "moodSetByUser": n.moodSetByUser,
+                         "chat": n.chatData?.base64EncodedString() ?? NSNull()] },
+             apply: { d, m in let n = m as! Note
+                 n.title = J.str(d["title"]); n.body = J.str(d["body"]); n.createdAt = J.date(d["createdAt"]) ?? n.createdAt
+                 n.updatedAt = J.date(d["updatedAt"]) ?? n.updatedAt; n.isJournal = J.bool(d["isJournal"]); n.pinned = J.bool(d["pinned"])
+                 n.mood = J.int(d["mood"]); n.moodSetByUser = J.bool(d["moodSetByUser"]); n.chatData = (d["chat"] as? String).flatMap { Data(base64Encoded: $0) } },
+             make: { let n = Note(title: ""); $0.insert(n); return n }),
+    SyncKind(kind: "book",
+             fetch: { (try? $0.fetch(FetchDescriptor<Book>())) ?? [] }, uuid: { ($0 as! Book).uuid },
+             encode: { m in let b = m as! Book
+                 return ["title": b.title, "author": b.author, "status": b.statusRaw, "rating": b.rating, "categories": b.categories,
+                         "notes": b.notes, "coverURL": b.coverURL, "isbn": b.isbn, "pageCount": b.pageCount, "progress": b.progress,
+                         "year": b.year, "addedAt": J.date(b.addedAt), "startedAt": J.date(b.startedAt), "finishedAt": J.date(b.finishedAt),
+                         "source": b.source, "sources": b.sources, "externalID": b.externalID] },
+             apply: { d, m in let b = m as! Book
+                 b.title = J.str(d["title"]); b.author = J.str(d["author"]); b.statusRaw = J.str(d["status"]); b.rating = J.int(d["rating"])
+                 b.categories = J.strings(d["categories"]); b.notes = J.str(d["notes"]); b.coverURL = J.str(d["coverURL"]); b.isbn = J.str(d["isbn"])
+                 b.pageCount = J.int(d["pageCount"]); b.progress = J.num(d["progress"]); b.year = J.int(d["year"])
+                 b.addedAt = J.date(d["addedAt"]) ?? b.addedAt; b.startedAt = J.date(d["startedAt"]); b.finishedAt = J.date(d["finishedAt"])
+                 b.source = J.str(d["source"]); b.sources = J.strings(d["sources"]); b.externalID = J.str(d["externalID"]) },
+             make: { let b = Book(title: "", author: ""); $0.insert(b); return b }),
+    SyncKind(kind: "bookCategory",
+             fetch: { (try? $0.fetch(FetchDescriptor<BookCategory>())) ?? [] }, uuid: { ($0 as! BookCategory).uuid },
+             encode: { m in let c = m as! BookCategory
+                 return ["name": c.name, "colorIndex": c.colorIndex, "symbol": c.symbol, "createdAt": J.date(c.createdAt)] },
+             apply: { d, m in let c = m as! BookCategory
+                 c.name = J.str(d["name"]); c.colorIndex = J.int(d["colorIndex"]); c.symbol = J.str(d["symbol"]); c.createdAt = J.date(d["createdAt"]) ?? c.createdAt },
+             make: { let c = BookCategory(name: "", colorIndex: 0); $0.insert(c); return c }),
+    SyncKind(kind: "bucket",
+             fetch: { (try? $0.fetch(FetchDescriptor<BucketItem>())) ?? [] }, uuid: { ($0 as! BucketItem).uuid },
+             encode: { m in let b = m as! BucketItem
+                 return ["title": b.title, "notes": b.notes, "kind": b.kindRaw, "targetDate": J.date(b.targetDate), "excitement": b.excitement,
+                         "isDone": b.isDone, "doneAt": J.date(b.doneAt), "createdAt": J.date(b.createdAt)] },
+             apply: { d, m in let b = m as! BucketItem
+                 b.title = J.str(d["title"]); b.notes = J.str(d["notes"]); b.kindRaw = J.str(d["kind"]); b.targetDate = J.date(d["targetDate"])
+                 b.excitement = J.int(d["excitement"]); b.isDone = J.bool(d["isDone"]); b.doneAt = J.date(d["doneAt"]); b.createdAt = J.date(d["createdAt"]) ?? b.createdAt },
+             make: { let b = BucketItem(title: ""); $0.insert(b); return b }),
+]
+
+/// Preferences that follow you between Macs (API keys and sign-ins never leave the Keychain).
+private let syncedSettings = ["monthlyBudget", "readingGoal", "currencyCode", "assistantName", "userName", "weatherCity"]
+
+// MARK: - Sync engine
+
+/// Two-way sync between Orbit's local database and Supabase. Local first: Orbit works offline and syncs when it can.
+/// Changes are found by comparing each item with a fingerprint of what was last synced; when both sides changed,
+/// the local edit wins. Deletions are synced as tombstones.
+@MainActor
+final class CloudSync: ObservableObject {
+    static let shared = CloudSync()
+
+    @Published private(set) var email: String? = CloudAuth.session?.email
+    @Published private(set) var syncing = false
+    @Published private(set) var lastSync: Date?
+    @Published private(set) var status: String?
+
+    private struct State: Codable {
+        var cursor = ""                              // last updated_at pulled from the server
+        var known: [String: Known] = [:]             // id → what was last synced
+        struct Known: Codable { var kind: String; var hash: String }
+    }
+    private var state = State()
+    private var stateURL: URL? {
+        CloudAuth.session.map { URL.applicationSupportDirectory.appending(path: "Orbit/sync-\($0.userID).json") }
+    }
+
+    var isSignedIn: Bool { email != nil }
+
+    private init() { loadState() }
+
+    // MARK: Account
+
+    func signIn(email: String, password: String, context: ModelContext) async throws {
+        try await CloudAuth.signIn(email: email, password: password)
+        self.email = CloudAuth.session?.email
+        loadState()
+        await sync(context: context)
+    }
+
+    func signUp(email: String, password: String, context: ModelContext) async throws -> CloudAuth.SignUpResult {
+        let result = try await CloudAuth.signUp(email: email, password: password)
+        if result == .signedIn {
+            self.email = CloudAuth.session?.email
+            loadState()
+            await sync(context: context)
+        }
+        return result
+    }
+
+    func signOut() {
+        CloudAuth.signOut()
+        email = nil
+        state = State()
+        status = nil
+        lastSync = nil
+    }
+
+    // MARK: Sync
+
+    func syncIfSignedIn(context: ModelContext) async {
+        guard isSignedIn, !Snapshot.isActive else { return }
+        await sync(context: context)
+    }
+
+    func sync(context: ModelContext) async {
+        guard !syncing, let session = CloudAuth.session else { return }
+        syncing = true
+        defer { syncing = false }
+        do {
+            assignMissingIDs(context: context)
+            let pulled = try await pull(context: context)
+            let pushed = try await push(context: context, userID: session.userID)
+            try? context.save()
+            saveState()
+            lastSync = .now
+            status = pulled + pushed == 0 ? "Up to date" : "Synced \(pulled) down, \(pushed) up"
+        } catch {
+            status = error.localizedDescription
+        }
+    }
+
+    /// Items made before sync existed get their permanent id now.
+    private func assignMissingIDs(context: ModelContext) {
+        for k in syncKinds {
+            for m in k.fetch(context) where k.uuid(m).isEmpty { setUUID(m, UUID().uuidString.lowercased()) }
+        }
+        try? context.save()
+    }
+
+    private func setUUID(_ m: any PersistentModel, _ id: String) {
+        switch m {
+        case let x as TaskItem: x.uuid = id
+        case let x as EventItem: x.uuid = id
+        case let x as Habit: x.uuid = id
+        case let x as Transaction: x.uuid = id
+        case let x as Note: x.uuid = id
+        case let x as Book: x.uuid = id
+        case let x as BookCategory: x.uuid = id
+        case let x as BucketItem: x.uuid = id
+        default: break
+        }
+    }
+
+    private func fingerprint(_ d: [String: Any]) -> String {
+        let data = (try? JSONSerialization.data(withJSONObject: d, options: [.sortedKeys])) ?? Data()
+        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Stable uuid for a setting key, so every Mac writes the same row.
+    private func settingID(_ key: String) -> String {
+        let h = Array(SHA256.hash(data: Data("orbit-setting:\(key)".utf8)))
+        var b = Array(h.prefix(16)); b[6] = (b[6] & 0x0F) | 0x50; b[8] = (b[8] & 0x3F) | 0x80
+        return UUID(uuid: (b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], b[9], b[10], b[11], b[12], b[13], b[14], b[15])).uuidString.lowercased()
+    }
+
+    private func settingValue(_ key: String) -> [String: Any] {
+        ["key": key, "value": UserDefaults.standard.object(forKey: key) ?? NSNull()]
+    }
+
+    private func pull(context: ModelContext) async throws -> Int {
+        var index: [String: [String: any PersistentModel]] = [:]
+        for k in syncKinds { index[k.kind] = Dictionary(k.fetch(context).map { (k.uuid($0), $0) }, uniquingKeysWith: { a, _ in a }) }
+        var applied = 0
+
+        while true {
+            var comps = URLComponents(string: "\(SupabaseConfig.url)/rest/v1/orbit_records")!
+            comps.queryItems = [.init(name: "select", value: "id,kind,data,deleted,updated_at"),
+                                .init(name: "order", value: "updated_at.asc,id.asc"), .init(name: "limit", value: "1000")]
+                + (state.cursor.isEmpty ? [] : [URLQueryItem(name: "updated_at", value: "gt.\(state.cursor)")])
+            // Timestamps contain "+00:00": encode the plus so it isn't read as a space.
+            comps.percentEncodedQuery = comps.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
+            let rows = try await rest(comps.url!, method: "GET") as? [[String: Any]] ?? []
+            for row in rows {
+                guard let id = row["id"] as? String, let kindName = row["kind"] as? String else { continue }
+                let deleted = J.bool(row["deleted"])
+                let data = row["data"] as? [String: Any] ?? [:]
+                if let ts = row["updated_at"] as? String { state.cursor = ts }
+
+                if kindName == "setting" {
+                    guard let key = data["key"] as? String, syncedSettings.contains(key) else { continue }
+                    let localHash = fingerprint(settingValue(key))
+                    if let known = state.known[id], known.hash != localHash { continue } // changed here too: ours wins
+                    if deleted || data["value"] is NSNull { UserDefaults.standard.removeObject(forKey: key) }
+                    else { UserDefaults.standard.set(data["value"], forKey: key) }
+                    state.known[id] = .init(kind: "setting", hash: fingerprint(settingValue(key)))
+                    applied += 1
+                    continue
+                }
+                guard let k = syncKinds.first(where: { $0.kind == kindName }) else { continue }
+                let local = index[kindName]?[id]
+                if deleted {
+                    if let local { context.delete(local); index[kindName]?[id] = nil; applied += 1 }
+                    state.known[id] = nil
+                    continue
+                }
+                if let local {
+                    if let known = state.known[id], known.hash != fingerprint(k.encode(local)) { continue } // edited here too: ours wins
+                    k.apply(data, local)
+                    state.known[id] = .init(kind: kindName, hash: fingerprint(k.encode(local)))
+                } else {
+                    if state.known[id] != nil { continue } // deleted here since last sync: the deletion gets pushed
+                    let m = k.make(context)
+                    setUUID(m, id)
+                    k.apply(data, m)
+                    index[kindName, default: [:]][id] = m
+                    state.known[id] = .init(kind: kindName, hash: fingerprint(k.encode(m)))
+                }
+                applied += 1
+            }
+            if rows.count < 1000 { break }
+        }
+        return applied
+    }
+
+    private func push(context: ModelContext, userID: String) async throws -> Int {
+        var rows: [[String: Any]] = []
+        var newKnown: [String: State.Known] = [:]
+        var present = Set<String>()
+
+        for k in syncKinds {
+            for m in k.fetch(context) {
+                let id = k.uuid(m)
+                guard !id.isEmpty else { continue }
+                present.insert(id)
+                let d = k.encode(m)
+                let h = fingerprint(d)
+                if state.known[id]?.hash != h {
+                    rows.append(["id": id, "user_id": userID, "kind": k.kind, "data": d, "deleted": false])
+                    newKnown[id] = .init(kind: k.kind, hash: h)
+                }
+            }
+        }
+        for key in syncedSettings {
+            let id = settingID(key)
+            present.insert(id)
+            let d = settingValue(key)
+            let h = fingerprint(d)
+            if state.known[id]?.hash != h, UserDefaults.standard.object(forKey: key) != nil {
+                rows.append(["id": id, "user_id": userID, "kind": "setting", "data": d, "deleted": false])
+                newKnown[id] = .init(kind: "setting", hash: h)
+            }
+        }
+        // Synced before but gone here now: tell other devices it was deleted.
+        var deletions: [String] = []
+        for (id, known) in state.known where !present.contains(id) {
+            rows.append(["id": id, "user_id": userID, "kind": known.kind, "data": [String: Any](), "deleted": true])
+            deletions.append(id)
+        }
+
+        for chunk in stride(from: 0, to: rows.count, by: 200).map({ Array(rows[$0..<min($0 + 200, rows.count)]) }) {
+            var comps = URLComponents(string: "\(SupabaseConfig.url)/rest/v1/orbit_records")!
+            comps.queryItems = [.init(name: "on_conflict", value: "user_id,id")]
+            _ = try await rest(comps.url!, method: "POST", body: chunk, prefer: "resolution=merge-duplicates,return=minimal")
+        }
+        for (id, k) in newKnown { state.known[id] = k }
+        for id in deletions { state.known[id] = nil }
+        return rows.count
+    }
+
+    private func rest(_ url: URL, method: String, body: Any? = nil, prefer: String? = nil) async throws -> Any? {
+        var req = URLRequest(url: url)
+        req.httpMethod = method
+        req.timeoutInterval = 60
+        req.setValue(SupabaseConfig.key, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(try await CloudAuth.accessToken())", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let prefer { req.setValue(prefer, forHTTPHeaderField: "Prefer") }
+        if let body { req.httpBody = try JSONSerialization.data(withJSONObject: body) }
+        let (data, response) = try await URLSession.shared.data(for: req)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200..<300).contains(status) else {
+            let msg = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])?["message"] as? String
+            if status == 404 || (msg ?? "").contains("orbit_records") {
+                throw CloudError("The Orbit tables aren't set up in Supabase yet (run supabase/schema.sql).")
+            }
+            if status == 401 { throw CloudError("Your Orbit sign-in expired. Sign in again in Settings › Account.") }
+            throw CloudError("Sync error \(status)\(msg.map { ": \($0)" } ?? "")")
+        }
+        return data.isEmpty ? nil : try? JSONSerialization.jsonObject(with: data)
+    }
+
+    // MARK: State
+
+    private func loadState() {
+        guard let url = stateURL, let data = try? Data(contentsOf: url), let s = try? JSONDecoder().decode(State.self, from: data) else {
+            state = State(); return
+        }
+        state = s
+    }
+
+    private func saveState() {
+        guard let url = stateURL, let data = try? JSONEncoder().encode(state) else { return }
+        try? data.write(to: url, options: .atomic)
+    }
+}

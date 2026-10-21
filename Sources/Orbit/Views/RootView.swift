@@ -44,6 +44,13 @@ struct RootView: View {
         .sheet(isPresented: $state.searchOpen) { SearchView() }
         .sheet(isPresented: Binding(get: { !onboarded && !Snapshot.isActive }, set: { if !$0 { onboarded = true } })) { WelcomeView() }
         .task {
+            // Sync with your Orbit account every two minutes while signed in.
+            while !Task.isCancelled {
+                await CloudSync.shared.syncIfSignedIn(context: context)
+                try? await Task.sleep(for: .seconds(120))
+            }
+        }
+        .task {
             // Daily background refresh for reading sources and the inbox while Orbit is open.
             while !Task.isCancelled {
                 await ReadingSync.shared.syncIfDue(context: context)

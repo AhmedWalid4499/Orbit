@@ -42,6 +42,8 @@ enum Recurrence: String, CaseIterable, Codable, Identifiable {
 
 @Model
 final class TaskItem {
+    /// Permanent id used to sync this item between devices (assigned on first launch for older items).
+    var uuid: String = ""
     var title: String
     var notes: String
     var areaRaw: String
@@ -96,6 +98,8 @@ final class TaskItem {
 
 @Model
 final class EventItem {
+    /// Permanent id used to sync this item between devices (assigned on first launch for older items).
+    var uuid: String = ""
     var title: String
     var start: Date
     var end: Date
@@ -122,6 +126,8 @@ final class EventItem {
 
 @Model
 final class Habit {
+    /// Permanent id used to sync this item between devices (assigned on first launch for older items).
+    var uuid: String = ""
     var name: String
     var symbol: String
     var areaRaw: String
@@ -174,6 +180,8 @@ final class Habit {
 
 @Model
 final class Transaction {
+    /// Permanent id used to sync this item between devices (assigned on first launch for older items).
+    var uuid: String = ""
     var title: String
     /// Negative = expense, positive = income.
     var amount: Double
@@ -208,6 +216,8 @@ enum MoneyCategory {
 
 @Model
 final class Note {
+    /// Permanent id used to sync this item between devices (assigned on first launch for older items).
+    var uuid: String = ""
     var title: String
     var body: String
     var createdAt: Date
@@ -256,6 +266,8 @@ enum ReadingStatus: String, CaseIterable, Codable, Identifiable {
 
 @Model
 final class Book {
+    /// Permanent id used to sync this item between devices (assigned on first launch for older items).
+    var uuid: String = ""
     var title: String = ""
     var author: String = ""
     var statusRaw: String = ReadingStatus.toRead.rawValue
@@ -311,6 +323,8 @@ final class Book {
 
 @Model
 final class BookCategory {
+    /// Permanent id used to sync this item between devices (assigned on first launch for older items).
+    var uuid: String = ""
     var name: String = ""
     var colorIndex: Int = 0
     var symbol: String = "tag.fill"
@@ -345,6 +359,8 @@ enum BucketKind: String, CaseIterable, Identifiable {
 
 @Model
 final class BucketItem {
+    /// Permanent id used to sync this item between devices (assigned on first launch for older items).
+    var uuid: String = ""
     var title: String = ""
     var notes: String = ""
     var kindRaw: String = BucketKind.experience.rawValue

@@ -311,6 +311,9 @@ struct SettingsView: View {
 
             AISettings()
                 .tabItem { Label("AI", systemImage: "sparkles") }
+
+            AccountSettings()
+                .tabItem { Label("Account", systemImage: "person.crop.circle") }
         }
         .formStyle(.grouped)
         .frame(width: 640, height: 640)
@@ -318,7 +321,7 @@ struct SettingsView: View {
         .confirmationDialog("Delete everything in Orbit?", isPresented: $confirmClear) {
             Button("Delete all data", role: .destructive) { DataReset.clearAll(context) }
         } message: {
-            Text("Tasks, events, habits, transactions, notes and books stored in Orbit will be removed. Apple Calendar and Reminders are not touched.")
+            Text("Tasks, events, habits, transactions, notes, books and bucket list stored in Orbit will be removed, including from your Orbit account if you're signed in. Apple Calendar and Reminders are not touched.")
         }
     }
 }
@@ -542,6 +545,98 @@ private struct GmailSettings: View {
                 .font(.callout)
             Text("Inbox summaries send the sender, subject and a short preview of the last two days of mail (no promotions or social) to Anthropic. Expense import also sends the text of emails that look like receipts or payments.")
                 .font(.caption2).foregroundStyle(.tertiary)
+        }
+    }
+}
+
+// MARK: - Account & sync
+
+private struct AccountSettings: View {
+    @Environment(\.modelContext) private var context
+    @ObservedObject private var cloud = CloudSync.shared
+    @State private var email = ""
+    @State private var password = ""
+    @State private var creating = false
+    @State private var working = false
+    @State private var message: String?
+
+    var body: some View {
+        Form {
+            if !SupabaseConfig.isConfigured {
+                Section { Text("Sync isn't set up in this copy of Orbit yet.").foregroundStyle(.secondary) }
+            } else if let signedIn = cloud.email {
+                Section("Orbit account") {
+                    LabeledContent("Signed in as", value: signedIn)
+                    HStack {
+                        if cloud.syncing { ProgressView().controlSize(.small) }
+                        Text(cloud.status ?? "Not synced yet").font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Sync Now") { Task { await cloud.sync(context: context) } }.disabled(cloud.syncing)
+                    }
+                    if let last = cloud.lastSync {
+                        Text("Last synced \(last.formatted(.relative(presentation: .named)))").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Button("Sign Out", role: .destructive) { cloud.signOut() }
+                }
+                Section {
+                    Text("Your tasks, calendar events you made in Orbit, habits, money, notes and journal, books and bucket list sync to your account every couple of minutes. Sign in with the same account on another Mac to get everything there. API keys and Google, GitHub and Apple connections stay on each Mac.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            } else {
+                Section(creating ? "Create your Orbit account" : "Sign in to sync") {
+                    TextField("Email", text: $email).textContentType(.username)
+                    SecureField("Password", text: $password).textContentType(creating ? .newPassword : .password)
+                    if let message { Text(message).font(.caption).foregroundStyle(.secondary) }
+                    HStack {
+                        Button(creating ? "I already have an account" : "Create an account") { creating.toggle(); message = nil }
+                            .buttonStyle(.link)
+                        Spacer()
+                        if working { ProgressView().controlSize(.small) }
+                        Button(creating ? "Create Account" : "Sign In", action: submit)
+                            .buttonStyle(.borderedProminent)
+                            .disabled(working || !email.contains("@") || password.count < 6)
+                            .keyboardShortcut(.defaultAction)
+                    }
+                    if !creating {
+                        Button("Forgot password?") {
+                            Task {
+                                do { try await CloudAuth.resetPassword(email: email); message = "Check \(email) for a link to reset your password." }
+                                catch { message = error.localizedDescription }
+                            }
+                        }
+                        .buttonStyle(.link).font(.caption).disabled(!email.contains("@"))
+                    }
+                }
+                Section {
+                    Text("An Orbit account keeps your data in sync between your Macs and backs it up online. Each person only ever sees their own data. Passwords need at least 6 characters.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private func submit() {
+        working = true
+        message = nil
+        let e = email.trimmingCharacters(in: .whitespaces)
+        Task {
+            defer { working = false }
+            do {
+                if creating {
+                    switch try await cloud.signUp(email: e, password: password, context: context) {
+                    case .signedIn: password = ""
+                    case .checkEmail:
+                        message = "Almost done: open the email Supabase sent to \(e), confirm it, then come back and sign in."
+                        creating = false
+                    }
+                } else {
+                    try await cloud.signIn(email: e, password: password, context: context)
+                    password = ""
+                }
+            } catch {
+                message = error.localizedDescription
+            }
         }
     }
 }

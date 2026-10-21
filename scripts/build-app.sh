@@ -17,6 +17,7 @@ VERSION="$(cat VERSION | tr -d '[:space:]')"
 BUILD="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" -c "Set :CFBundleVersion $BUILD" "$APP/Contents/Info.plist"
 [[ -f Support/AppIcon.icns ]] && cp Support/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+cp Support/Supabase.json "$APP/Contents/Resources/Supabase.json" # sync project (publishable key only)
 # If the owner chose (in Orbit › Settings) to share their Google setup, build it in so others can sign in without Google Cloud.
 SHARED_GOOGLE="$HOME/Library/Application Support/Orbit/shared-google-client.json"
 [[ -f "$SHARED_GOOGLE" ]] && cp "$SHARED_GOOGLE" "$APP/Contents/Resources/GoogleClient.json" && echo "Included shared Google sign-in"

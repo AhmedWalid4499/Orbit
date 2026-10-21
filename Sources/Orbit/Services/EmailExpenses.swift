@@ -37,6 +37,16 @@ final class EmailExpenses: ObservableObject {
         await sync(context: context)
     }
 
+    /// Each inbox keeps its own "checked up to" date, which only moves forward once every email
+    /// in it was read. A failure anywhere means the next run looks at the same days again.
+    private func cursor(_ account: String) -> Date? {
+        let t = UserDefaults.standard.double(forKey: "emailExpensesCursor:\(account)")
+        return t > 0 ? Date(timeIntervalSince1970: t) : nil
+    }
+    private func setCursor(_ account: String, _ date: Date) {
+        UserDefaults.standard.set(date.timeIntervalSince1970, forKey: "emailExpensesCursor:\(account)")
+    }
+
     func sync(context: ModelContext) async {
         guard !running, !Snapshot.isActive else { return }
         guard let claude = ClaudeClient() else { status = "Add your Anthropic API key in Settings › AI first."; return }
@@ -44,53 +54,55 @@ final class EmailExpenses: ObservableObject {
         guard !accounts.isEmpty else { status = "Connect Gmail in Settings › Connections first."; return }
 
         running = true
-        status = "Looking for receipts…"
         defer { running = false }
-
-        // First run looks back 60 days; later runs overlap the last sync by two days.
-        let since = lastSync > 0 ? Date(timeIntervalSince1970: lastSync).adding(days: -2) : Date.now.adding(days: -60)
-        let after = "after:" + since.formatted(.iso8601.year().month().day().dateSeparator(.dash)).replacingOccurrences(of: "-", with: "/")
-
-        var emails: [PaymentEmail] = []
+        var added = 0, bills = 0, read = 0
         var problems: [String] = []
+
         for account in accounts {
+            let started = Date.now
+            // First run looks back 60 days; later runs overlap the last complete check by two days.
+            let since = cursor(account).map { $0.adding(days: -2) } ?? Date.now.adding(days: -60)
+            let after = "after:" + since.formatted(.iso8601.year().month().day().dateSeparator(.dash)).replacingOccurrences(of: "-", with: "/")
+            status = "Looking for receipts in \(account)…"
+
+            var complete = true
+            let found: (emails: [PaymentEmail], failed: Int)
             do {
-                emails += try await findPaymentEmails(account: account, after: after)
+                found = try await findPaymentEmails(account: account, after: after)
             } catch {
                 problems.append("\(account): \(error.localizedDescription)")
+                continue
             }
-        }
-        let alreadySeen = seen
-        emails = emails.filter { !alreadySeen.contains($0.key) }
-
-        guard !emails.isEmpty else {
-            lastSync = Date.now.timeIntervalSince1970
-            lastAdded = 0
-            status = problems.first ?? "No new receipts. Checked \(accounts.count) inbox\(accounts.count == 1 ? "" : "es")."
-            return
-        }
-
-        status = "Reading \(emails.count) payment email\(emails.count == 1 ? "" : "s")…"
-        var added = 0, bills = 0
-        var handled = Set<String>()
-        for batch in stride(from: 0, to: emails.count, by: 12).map({ Array(emails[$0..<min($0 + 12, emails.count)]) }) {
-            do {
-                let results = try await extract(batch, claude: claude)
-                let counts = await save(results, from: batch, context: context)
-                added += counts.expenses
-                bills += counts.bills
-                handled.formUnion(batch.map(\.key))
-            } catch {
-                problems.append(error.localizedDescription)
-                break // keep the rest for next time
+            if found.failed > 0 {
+                complete = false
+                problems.append("\(account): \(found.failed) email\(found.failed == 1 ? "" : "s") couldn't be opened yet; they'll be retried")
             }
+
+            let emails = found.emails
+            for (i, batch) in stride(from: 0, to: emails.count, by: 12).map({ Array(emails[$0..<min($0 + 12, emails.count)]) }).enumerated() {
+                status = "Reading \(account): \(min((i + 1) * 12, emails.count)) of \(emails.count) payment emails…"
+                do {
+                    let results = try await extract(batch, claude: claude)
+                    let counts = await save(results, from: batch, context: context)
+                    added += counts.expenses
+                    bills += counts.bills
+                    read += batch.count
+                    seen = seen.union(batch.map(\.key))
+                } catch {
+                    complete = false
+                    problems.append(error.localizedDescription)
+                    break // the rest stay unread and are picked up next time
+                }
+            }
+            if complete { setCursor(account, started) }
         }
-        seen = seen.union(handled)
-        if problems.isEmpty || !handled.isEmpty { lastSync = Date.now.timeIntervalSince1970 }
+
+        lastSync = Date.now.timeIntervalSince1970
         lastAdded = added
         var summary = added == 0 ? "No new expenses found" : "Added \(added) expense\(added == 1 ? "" : "s") from email"
         if bills > 0 { summary += ", \(bills) bill\(bills == 1 ? "" : "s") to pay added to Tasks" }
-        status = summary + "." + (problems.first.map { " (\($0))" } ?? "")
+        summary += read > 0 ? " (read \(read) payment emails)." : "."
+        status = summary + (problems.isEmpty ? "" : " " + problems.joined(separator: " · "))
     }
 
     /// You said "not an expense": delete it and never import that email again.
@@ -111,7 +123,8 @@ final class EmailExpenses: ObservableObject {
         var key: String { "gmail:\(account)|\(id)" }
     }
 
-    private func findPaymentEmails(account: String, after: String) async throws -> [PaymentEmail] {
+    /// Returns the unread payment emails and how many couldn't be downloaded this time.
+    private func findPaymentEmails(account: String, after: String) async throws -> (emails: [PaymentEmail], failed: Int) {
         let token = try await GoogleAuth.accessToken(for: account)
         var ids = Set<String>()
 
@@ -128,23 +141,43 @@ final class EmailExpenses: ObservableObject {
         ids.formUnion(try await listIDs(token: token, query: "\(after) category:purchases", labelID: nil))
 
         let seen = self.seen
-        let wanted = ids.filter { !seen.contains("gmail:\(account)|\($0)") }.prefix(80)
-        return try await withThrowingTaskGroup(of: PaymentEmail?.self) { group in
-            for id in wanted {
-                group.addTask { try await Self.fetch(id: id, account: account, token: token) }
+        let wanted = ids.filter { !seen.contains("gmail:\(account)|\($0)") }.sorted()
+
+        // Gmail allows only a few requests at once per account: download 5 at a time.
+        var out: [PaymentEmail] = []
+        var failed = 0
+        for chunk in stride(from: 0, to: wanted.count, by: 5).map({ Array(wanted[$0..<min($0 + 5, wanted.count)]) }) {
+            status = "Downloading \(account): \(out.count + failed) of \(wanted.count) emails…"
+            await withTaskGroup(of: PaymentEmail??.self) { group in
+                for id in chunk {
+                    group.addTask { try? await Self.fetch(id: id, account: account, token: token) }
+                }
+                for await result in group {
+                    switch result {
+                    case .some(.some(let e)): out.append(e)
+                    case .some(.none): break          // message had no content
+                    case .none: failed += 1           // request failed even after retries
+                    }
+                }
             }
-            var out: [PaymentEmail] = []
-            for try await e in group { if let e { out.append(e) } }
-            return out
         }
+        return (out, failed)
     }
 
+    /// Lists every matching message id, following Gmail's pages (up to 1,000).
     private func listIDs(token: String, query: String, labelID: String?) async throws -> [String] {
-        var comps = URLComponents(string: "https://gmail.googleapis.com/gmail/v1/users/me/messages")!
-        comps.queryItems = [.init(name: "q", value: query), .init(name: "maxResults", value: "100")]
-            + (labelID.map { [URLQueryItem(name: "labelIds", value: $0)] } ?? [])
-        let json = try await gmailJSON(comps.url!, token: token)
-        return (json["messages"] as? [[String: Any]] ?? []).compactMap { $0["id"] as? String }
+        var ids: [String] = []
+        var pageToken: String?
+        repeat {
+            var comps = URLComponents(string: "https://gmail.googleapis.com/gmail/v1/users/me/messages")!
+            comps.queryItems = [.init(name: "q", value: query), .init(name: "maxResults", value: "200")]
+                + (labelID.map { [URLQueryItem(name: "labelIds", value: $0)] } ?? [])
+                + (pageToken.map { [URLQueryItem(name: "pageToken", value: $0)] } ?? [])
+            let json = try await gmailJSON(comps.url!, token: token)
+            ids += (json["messages"] as? [[String: Any]] ?? []).compactMap { $0["id"] as? String }
+            pageToken = json["nextPageToken"] as? String
+        } while pageToken != nil && ids.count < 1000
+        return ids
     }
 
     nonisolated private static func fetch(id: String, account: String, token: String) async throws -> PaymentEmail? {
@@ -245,9 +278,10 @@ final class EmailExpenses: ObservableObject {
                 let value = converted ?? f.amount
                 let signed = f.kind == "refund" ? value : -value
 
-                // Skip it if you already logged the same amount that day by hand (or another inbox did).
+                // Skip it if you already logged the same amount that day by hand, or your other inbox has it.
                 let twin = (existing + addedThisRun).contains {
-                    $0.date.isSameDay(as: date) && abs(abs($0.amount) - value) <= max(1, value * 0.01) && $0.isExpense == (signed < 0)
+                    $0.source != "gmail:\(email.account)"
+                        && $0.date.isSameDay(as: date) && abs(abs($0.amount) - value) <= max(1, value * 0.01) && $0.isExpense == (signed < 0)
                 }
                 if twin { continue }
 

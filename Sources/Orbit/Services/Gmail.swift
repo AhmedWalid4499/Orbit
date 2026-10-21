@@ -388,12 +388,23 @@ final class InboxStore: ObservableObject {
 func gmailJSON(_ url: URL, token: String) async throws -> [String: Any] {
     var req = URLRequest(url: url)
     req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-    let (data, response) = try await URLSession.shared.data(for: req)
-    let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-    guard status == 200 else {
+    // Gmail answers 429 when asked too fast; wait and retry (respecting Retry-After) before giving up.
+    for attempt in 0..<5 {
+        let (data, response) = try await URLSession.shared.data(for: req)
+        let http = response as? HTTPURLResponse
+        let status = http?.statusCode ?? 0
+        if status == 200 { return (try JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:] }
+        let body = String(data: data, encoding: .utf8) ?? ""
+        let rateLimited = status == 429 || (status == 403 && body.contains("ateLimitExceeded"))
+        if (rateLimited || status >= 500) && attempt < 4 {
+            let wait = Double(http?.value(forHTTPHeaderField: "Retry-After") ?? "") ?? pow(2, Double(attempt)) + Double.random(in: 0...0.5)
+            try await Task.sleep(for: .seconds(min(wait, 30)))
+            continue
+        }
         if status == 401 { throw GmailError("Gmail access expired. Reconnect the account in Settings.") }
         if status == 403 { throw GmailError("Gmail API refused the request. Is it enabled in your Google Cloud project?") }
+        if rateLimited { throw GmailError("Gmail is limiting requests right now; try again in a few minutes.") }
         throw GmailError("Gmail returned an error (\(status)).")
     }
-    return (try JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+    throw GmailError("Gmail didn't respond.")
 }

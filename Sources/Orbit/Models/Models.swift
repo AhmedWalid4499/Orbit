@@ -180,6 +180,13 @@ final class Transaction {
     var category: String
     var date: Date
     var isRecurring: Bool
+    /// "" for manual entries, "gmail:<address>" for ones imported from email.
+    var source: String = ""
+    /// Gmail message id, used to never import the same email twice.
+    var sourceID: String = ""
+    /// What the receipt said before converting to your currency (e.g. 12.99 USD).
+    var originalAmount: Double = 0
+    var originalCurrency: String = ""
 
     init(title: String, amount: Double, category: String = "General", date: Date = .now, isRecurring: Bool = false) {
         self.title = title
@@ -190,6 +197,7 @@ final class Transaction {
     }
 
     var isExpense: Bool { amount < 0 }
+    var fromEmail: Bool { source.hasPrefix("gmail:") }
 }
 
 enum MoneyCategory {

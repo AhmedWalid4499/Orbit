@@ -76,6 +76,7 @@ struct MoneyView: View {
         HStack(spacing: 12) {
             Text(month.formatted(.dateTime.month(.wide).year())).font(Theme.display(38))
             Spacer()
+            EmailExpensesChip()
             Button { adding = true } label: { Label("Add transaction", systemImage: "plus") }.buttonStyle(SoftButtonStyle())
             CircleIconButton(symbol: "arrow.left", filled: true, size: 46) {
                 month = Calendar.current.date(byAdding: .month, value: -1, to: month)!
@@ -232,7 +233,11 @@ private struct TxnRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(txn.title).font(Theme.ui(14, weight: .medium))
                 HStack(spacing: 6) {
+                    if txn.fromEmail { Image(systemName: "envelope.fill").help("Added from \(txn.source.dropFirst(6))") }
                     Text(txn.category)
+                    if !txn.originalCurrency.isEmpty {
+                        Text("· \(txn.originalAmount.formatted(.number.precision(.fractionLength(0...2)))) \(txn.originalCurrency)")
+                    }
                     if txn.isRecurring { Image(systemName: "repeat") }
                 }
                 .font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
@@ -248,6 +253,12 @@ private struct TxnRow: View {
             Toggle("Recurring", isOn: $txn.isRecurring)
             Menu("Category") { ForEach(MoneyCategory.all, id: \.self) { c in Button(c) { txn.category = c } } }
             Divider()
+            if txn.fromEmail {
+                Button("Not an expense") { EmailExpenses.shared.reject(txn, context: context) }
+                if let link = URL(string: "https://mail.google.com/mail/u/?authuser=\(txn.source.dropFirst(6))#all/\(txn.sourceID)") {
+                    Link("Open email", destination: link)
+                }
+            }
             Button("Delete", role: .destructive) { context.delete(txn) }
         }
     }
@@ -314,6 +325,47 @@ private struct NewTransactionSheet: View {
             Text(label).foregroundStyle(Theme.inkSecondary)
             TextField(prompt, text: text).textFieldStyle(.plain).font(Theme.ui(16))
                 .padding(12).background(RoundedRectangle(cornerRadius: 12).fill(Theme.card))
+        }
+    }
+}
+
+/// Status of receipts imported from Gmail, with a manual sync.
+private struct EmailExpensesChip: View {
+    @Environment(\.modelContext) private var context
+    @ObservedObject private var importer = EmailExpenses.shared
+    @ObservedObject private var inbox = InboxStore.shared
+    @State private var showing = false
+
+    var body: some View {
+        if inbox.isConnected && importer.enabled {
+            Button { showing = true } label: {
+                HStack(spacing: 6) {
+                    if importer.running { ProgressView().controlSize(.mini) } else { Image(systemName: "envelope.badge") }
+                    Text(importer.running ? "Reading receipts…" : "From email")
+                }
+                .font(Theme.ui(13, weight: .medium))
+                .padding(.horizontal, 14).padding(.vertical, 8)
+                .background(Capsule().fill(Theme.card))
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $showing, arrowEdge: .bottom) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Expenses from email").font(Theme.display(20))
+                    Text("Claude checks both inboxes every few hours: anything under a payments, receipts, bank or orders label, plus receipts, invoices and card-charge emails anywhere. Paid amounts are added here (converted to \(Fmt.currencyCode)); bills still due become tasks.")
+                        .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
+                    if let s = importer.status { Text(s).font(Theme.ui(12, weight: .medium)) }
+                    if importer.lastSync > 0 {
+                        Text("Last checked \(Date(timeIntervalSince1970: importer.lastSync).formatted(.relative(presentation: .named)))")
+                            .font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
+                    }
+                    Text("Wrong one? Right-click it › Not an expense, and it won't come back.")
+                        .font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
+                    Button(importer.running ? "Checking…" : "Check now") { Task { await importer.sync(context: context) } }
+                        .buttonStyle(PrimaryButtonStyle()).disabled(importer.running)
+                }
+                .padding(20)
+                .frame(width: 340)
+            }
         }
     }
 }

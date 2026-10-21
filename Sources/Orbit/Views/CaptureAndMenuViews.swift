@@ -498,7 +498,10 @@ private struct GmailSettings: View {
                 }
                 .padding(.top, 4)
             }
-            Text("Inbox summaries send the sender, subject and a short preview of the last two days of mail (no promotions or social) to Anthropic.")
+            Toggle("Add payments and receipts from email to Money", isOn: Binding(
+                get: { EmailExpenses.shared.enabled }, set: { EmailExpenses.shared.enabled = $0 }))
+                .font(.callout)
+            Text("Inbox summaries send the sender, subject and a short preview of the last two days of mail (no promotions or social) to Anthropic. Expense import also sends the text of emails that look like receipts or payments.")
                 .font(.caption2).foregroundStyle(.tertiary)
         }
     }

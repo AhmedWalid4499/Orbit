@@ -69,6 +69,13 @@ enum Snapshot {
             if st == .read { b.finishedAt = .now.adding(days: -20) }
             ctx.insert(b)
         }
+        for (t, a, c, d, mail, orig) in [("Uber", -86.0, "Transport", 0, true, ""), ("Netflix", -620.0, "Subscriptions", 1, true, "12.99 USD"),
+                                         ("Carrefour", -1250.0, "Food", 2, true, ""), ("Coffee", -95.0, "Food", 2, false, "")] {
+            let x = Transaction(title: t, amount: a, category: c, date: .now.adding(days: -d))
+            if mail { x.source = "gmail:ahmedwalid4499@gmail.com"; x.sourceID = "demo\(d)" }
+            if !orig.isEmpty { x.originalAmount = 12.99; x.originalCurrency = "USD" }
+            ctx.insert(x)
+        }
         let j = Note(title: Date.now.formatted(date: .complete, time: .omitted), isJournal: true)
         j.mood = 4
         j.chat = JournalChat(system: "", turns: [

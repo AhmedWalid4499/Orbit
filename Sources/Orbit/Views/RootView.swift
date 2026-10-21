@@ -37,6 +37,7 @@ struct RootView: View {
             while !Task.isCancelled {
                 await ReadingSync.shared.syncIfDue(context: context)
                 await InboxStore.shared.refreshIfDue(context: context)
+                await EmailExpenses.shared.syncIfDue(context: context)
                 await Updater.shared.checkIfDue()
                 try? await Task.sleep(for: .seconds(3600))
             }

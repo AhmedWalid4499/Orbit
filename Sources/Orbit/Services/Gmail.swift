@@ -385,7 +385,7 @@ final class InboxStore: ObservableObject {
     }
 }
 
-private func gmailJSON(_ url: URL, token: String) async throws -> [String: Any] {
+func gmailJSON(_ url: URL, token: String) async throws -> [String: Any] {
     var req = URLRequest(url: url)
     req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
     let (data, response) = try await URLSession.shared.data(for: req)

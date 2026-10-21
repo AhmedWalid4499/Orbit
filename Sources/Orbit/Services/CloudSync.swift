@@ -14,7 +14,8 @@ enum SupabaseConfig {
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: String] else { return [:] }
         return json
     }()
-    static var url: String { file["url"] ?? "" }
+    /// ORBIT_SUPABASE_URL points a test run at a local stand-in server.
+    static var url: String { ProcessInfo.processInfo.environment["ORBIT_SUPABASE_URL"] ?? file["url"] ?? "" }
     static var key: String { file["key"] ?? "" }
     static var isConfigured: Bool { !url.isEmpty && !key.isEmpty }
 }
@@ -243,8 +244,10 @@ final class CloudSync: ObservableObject {
         struct Known: Codable { var kind: String; var hash: String }
     }
     private var state = State()
+    /// Lets a test act as two different Macs on one machine.
+    var deviceTag = "" { didSet { loadState() } }
     private var stateURL: URL? {
-        CloudAuth.session.map { URL.applicationSupportDirectory.appending(path: "Orbit/sync-\($0.userID).json") }
+        CloudAuth.session.map { URL.applicationSupportDirectory.appending(path: "Orbit/sync-\($0.userID)\(deviceTag).json") }
     }
 
     var isSignedIn: Bool { email != nil }
@@ -361,6 +364,7 @@ final class CloudSync: ObservableObject {
 
                 if kindName == "setting" {
                     guard let key = data["key"] as? String, syncedSettings.contains(key) else { continue }
+                    if state.known[id]?.hash == fingerprint(data) { continue } // our own upload coming back
                     let localHash = fingerprint(settingValue(key))
                     if let known = state.known[id], known.hash != localHash { continue } // changed here too: ours wins
                     if deleted || data["value"] is NSNull { UserDefaults.standard.removeObject(forKey: key) }
@@ -370,9 +374,12 @@ final class CloudSync: ObservableObject {
                     continue
                 }
                 guard let k = syncKinds.first(where: { $0.kind == kindName }) else { continue }
+                // Our own upload coming back: nothing to do.
+                if !deleted, let known = state.known[id], known.hash == fingerprint(data) { continue }
                 let local = index[kindName]?[id]
                 if deleted {
                     if let local { context.delete(local); index[kindName]?[id] = nil; applied += 1 }
+                    else if state.known[id] == nil { continue } // already gone here
                     state.known[id] = nil
                     continue
                 }

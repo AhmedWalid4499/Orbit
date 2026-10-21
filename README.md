@@ -52,6 +52,10 @@ Click **Ask Claude** in the top bar, or press ⌘J, to open a chat panel. Claude
 
 Money has an **Overview** and a **Calendar**. The Calendar shows what you spent each day, plus bills and recurring payments that are coming due. The **Money coach** card gives savings tips based on your real spending, and **Discuss with Claude** opens a conversation about it.
 
+## Sync and backup
+
+Sign in under **Settings › Account** to back up Orbit online and keep several Macs in sync. Data is stored in Supabase (Postgres), where each person can only access their own rows. The database setup is in `supabase/schema.sql`. API keys and the Google, GitHub and Apple connections stay on each Mac.
+
 ## Reading
 
 The reading tab is where you track books: Reading, To read, Read and Didn't finish shelves, your own categories (each with a color and icon), a yearly goal, ratings, progress and notes. Use **Add book** to search Open Library. **Connect & import** brings in:

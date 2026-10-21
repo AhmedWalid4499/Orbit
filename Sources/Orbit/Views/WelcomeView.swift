@@ -73,6 +73,10 @@ struct WelcomeView: View {
             }
 
             HStack {
+                if SupabaseConfig.isConfigured {
+                    Text("Already use Orbit on another Mac? After this, sign in under Settings › Account to bring everything over.")
+                        .font(Theme.ui(11)).foregroundStyle(Theme.inkMuted).fixedSize(horizontal: false, vertical: true)
+                }
                 Spacer()
                 Button("Get started") {
                     if !apiKey.trimmingCharacters(in: .whitespaces).isEmpty { _ = ai.setKey(apiKey) }

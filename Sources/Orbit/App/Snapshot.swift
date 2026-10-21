@@ -6,7 +6,7 @@ import AppKit
 @MainActor
 enum Snapshot {
     /// True while rendering screenshots: no network calls, nothing written.
-    static let isActive = ProcessInfo.processInfo.environment["ORBIT_SNAPSHOT_DIR"] != nil
+    static let isActive = ProcessInfo.processInfo.environment["ORBIT_SNAPSHOT_DIR"] != nil || ProcessInfo.processInfo.environment["ORBIT_SYNC_TEST"] != nil
 
     static func runIfRequested(container: ModelContainer, apple: AppleSync) {
         guard let dir = ProcessInfo.processInfo.environment["ORBIT_SNAPSHOT_DIR"] else { return }
@@ -61,7 +61,7 @@ enum Snapshot {
         }
     }
 
-    private static func demoContainer() -> ModelContainer {
+    static func demoContainer() -> ModelContainer {
         let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self])
         let c = try! ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true))
         let ctx = c.mainContext
@@ -111,5 +111,67 @@ enum Snapshot {
         ])
         ctx.insert(j)
         return c
+    }
+}
+
+/// Test hook: `ORBIT_SYNC_TEST=1 ORBIT_SUPABASE_URL=http://127.0.0.1:8799` plays two Macs against a stand-in server.
+@MainActor
+enum SyncTest {
+    static func runIfRequested() {
+        guard ProcessInfo.processInfo.environment["ORBIT_SYNC_TEST"] != nil else { return }
+        Task {
+            var results: [String] = []
+            func check(_ name: String, _ ok: Bool) { results.append("\(ok ? "PASS" : "FAIL")  \(name)") }
+            let cloud = CloudSync.shared
+            let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self])
+            do {
+                // Keep the containers alive for the whole test; a context is only valid while its container exists.
+                let containerA = Snapshot.demoContainer()
+                let containerB = try ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true))
+                let a = containerA.mainContext
+                let b = containerB.mainContext
+
+                cloud.deviceTag = "-testA"
+                try await cloud.signIn(email: "test@example.com", password: "secret1", context: a)
+                check("Mac A uploads (\(cloud.status ?? "-"))", cloud.status?.contains("up") == true)
+
+                cloud.deviceTag = "-testB"
+                await cloud.sync(context: b)
+                func count<T: PersistentModel>(_ t: T.Type, _ c: ModelContext) -> Int { (try? c.fetchCount(FetchDescriptor<T>())) ?? -1 }
+                check("Mac B gets all tasks (\(count(TaskItem.self, b))/\(count(TaskItem.self, a)))", count(TaskItem.self, a) == count(TaskItem.self, b))
+                check("Mac B gets all books (\(count(Book.self, b))/\(count(Book.self, a)))", count(Book.self, a) == count(Book.self, b))
+                check("Mac B gets money (\(count(Transaction.self, b))/\(count(Transaction.self, a)))", count(Transaction.self, a) == count(Transaction.self, b))
+                check("Mac B gets bucket list (\(count(BucketItem.self, b))/\(count(BucketItem.self, a)))", count(BucketItem.self, a) == count(BucketItem.self, b))
+                let journalB = try b.fetch(FetchDescriptor<Note>()).first { $0.isJournal }
+                check("Journal chat comes across", journalB?.chat?.turns.count == 4)
+
+                // Edit and delete on B, then let A catch up.
+                let taskB = try b.fetch(FetchDescriptor<TaskItem>()).first!
+                taskB.title = "Edited on Mac B"
+                let bookB = try b.fetch(FetchDescriptor<Book>()).first!
+                let deletedTitle = bookB.title
+                b.delete(bookB)
+                try b.save()
+                await cloud.sync(context: b)
+                await cloud.sync(context: b)
+                check("Second sync on B finds nothing new (\(cloud.status ?? "-"))", cloud.status == "Up to date")
+
+                cloud.deviceTag = "-testA"
+                await cloud.sync(context: a)
+                let tasksA = try a.fetch(FetchDescriptor<TaskItem>())
+                check("Edit reaches Mac A", tasksA.contains { $0.title == "Edited on Mac B" })
+                check("Deletion reaches Mac A", !(try a.fetch(FetchDescriptor<Book>())).contains { $0.title == deletedTitle })
+            } catch {
+                results.append("FAIL  \(error.localizedDescription)")
+            }
+            // Leave no trace: sign out and remove the test sync state.
+            for tag in ["-testA", "-testB"] { cloud.deviceTag = tag; if let s = CloudAuth.session {
+                try? FileManager.default.removeItem(at: URL.applicationSupportDirectory.appending(path: "Orbit/sync-\(s.userID)\(tag).json")) } }
+            cloud.signOut()
+            cloud.deviceTag = ""
+            print(results.joined(separator: "\n"))
+            fflush(stdout)
+            NSApp.terminate(nil)
+        }
     }
 }

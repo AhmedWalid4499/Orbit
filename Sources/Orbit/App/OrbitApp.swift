@@ -111,7 +111,10 @@ struct OrbitApp: App {
                 .environmentObject(state)
                 .environmentObject(apple)
                 .frame(minWidth: 1180, minHeight: 760)
-                .onAppear { Snapshot.runIfRequested(container: container, apple: apple) }
+                .onAppear {
+                    Snapshot.runIfRequested(container: container, apple: apple)
+                    SyncTest.runIfRequested()
+                }
         }
         .modelContainer(container)
         .windowStyle(.hiddenTitleBar)

@@ -18,27 +18,35 @@ if [[ -z "$TOKEN" ]]; then
   echo "  security add-generic-password -s orbit-github-release -a AhmedWalid4499 -w"
   exit 1
 fi
-if git rev-parse "$TAG" >/dev/null 2>&1; then
-  echo "$TAG already exists. Pick a higher version."; exit 1
+api() { curl -fsS -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" "$@"; }
+
+if curl -fsS -o /dev/null "https://api.github.com/repos/$REPO/releases/tags/$TAG" 2>/dev/null; then
+  echo "$TAG is already published. Pick a higher version."; exit 1
 fi
 
-PREV_TAG="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+ZIP="build/Orbit-$VERSION.zip"
+if git rev-parse "$TAG" >/dev/null 2>&1; then
+  # Tagged by an earlier run that failed before publishing: rebuild that exact commit's state and finish.
+  echo "Resuming $TAG (already tagged, not yet published)"
+  [[ "$(git rev-parse HEAD)" == "$(git rev-list -n1 "$TAG")" ]] || { echo "HEAD has moved past $TAG; use a new version."; exit 1; }
+  PREV_TAG="$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)"
+else
+  PREV_TAG="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+fi
 NOTES="${2:-$(git log --pretty='- %s' ${PREV_TAG:+$PREV_TAG..HEAD} | grep -v '^- Release v' || true)}"
 
-# Stamp the version and commit everything that's going out.
-echo "$VERSION" > VERSION
-git add -A
-git commit -m "Release $TAG" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" >/dev/null || true
+if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+  # Stamp the version and commit everything that's going out.
+  echo "$VERSION" > VERSION
+  git add -A
+  git commit -m "Release $TAG" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" >/dev/null || true
+  git tag -a "$TAG" -m "Orbit $VERSION"
+fi
 
 scripts/build-app.sh release
-ZIP="build/Orbit-$VERSION.zip"
 rm -f "$ZIP"
 ditto -c -k --keepParent build/Orbit.app "$ZIP"
-
-git tag -a "$TAG" -m "Orbit $VERSION"
 git push origin HEAD --follow-tags
-
-api() { curl -fsS -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" "$@"; }
 
 BODY="$(python3 -c 'import json,sys; print(json.dumps({"tag_name": sys.argv[1], "name": "Orbit " + sys.argv[2], "body": sys.argv[3]}))' "$TAG" "$VERSION" "$NOTES")"
 RELEASE_ID="$(api -X POST "https://api.github.com/repos/$REPO/releases" -d "$BODY" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')"

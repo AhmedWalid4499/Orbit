@@ -132,6 +132,7 @@ struct GmailError: LocalizedError {
 private final class LoopbackServer: @unchecked Sendable {
     private let listener: NWListener
     private var codeContinuation: CheckedContinuation<String, Error>?
+    private var started = false
 
     init() throws {
         let params = NWParameters.tcp
@@ -141,15 +142,15 @@ private final class LoopbackServer: @unchecked Sendable {
 
     func start() async throws -> UInt16 {
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<UInt16, Error>) in
-            var resumed = false
+            // The handler runs on the main queue; this just makes sure the continuation resumes once.
             listener.stateUpdateHandler = { [weak self] state in
-                guard !resumed else { return }
+                guard let self, !self.started else { return }
                 switch state {
                 case .ready:
-                    resumed = true
-                    cont.resume(returning: self?.listener.port?.rawValue ?? 0)
+                    self.started = true
+                    cont.resume(returning: self.listener.port?.rawValue ?? 0)
                 case .failed(let e):
-                    resumed = true
+                    self.started = true
                     cont.resume(throwing: e)
                 default: break
                 }

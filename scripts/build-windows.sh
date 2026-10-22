@@ -5,7 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../windows"
 
 VERSION="$(tr -d '[:space:]' < ../VERSION)"
-if [[ "$(uname -m)" == "arm64" ]] && ! arch -x86_64 /usr/bin/true 2>/dev/null; then
+if [[ "$(uname -m)" == "arm64" ]] && ! pkgutil --pkg-info com.apple.pkg.RosettaUpdateAuto >/dev/null 2>&1; then
   echo "Rosetta is needed to build the Windows installer on this Mac: softwareupdate --install-rosetta --agree-to-license"
   exit 2
 fi

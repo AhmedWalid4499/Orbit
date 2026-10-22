@@ -8,6 +8,8 @@ A native macOS app for organizing your life: Today dashboard, calendar, tasks, h
 
 The first time you open it, macOS may say it can't check Orbit for malware, because Orbit isn't from the App Store. Go to **System Settings › Privacy & Security**, scroll down, and click **Open Anyway**. After that, Orbit updates itself.
 
+**Windows:** [Download Orbit-Setup.exe](https://github.com/AhmedWalid4499/Orbit/releases/latest/download/Orbit-Setup.exe) and run it. If Windows shows "Windows protected your PC", click **More info › Run anyway**; this happens once, because the app isn't code-signed. Sign in with the same Orbit account as on your Mac and your data comes with you. The Windows app updates itself too.
+
 ## Build from source
 
 ```bash

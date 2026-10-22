@@ -21,6 +21,20 @@ BUILD="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" -c "Set :CFBundleVersion $BUILD" "$APP/Contents/Info.plist"
 [[ -f Support/AppIcon.icns ]] && cp Support/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cp Support/Supabase.json "$APP/Contents/Resources/Supabase.json" # sync project (publishable key only)
+
+# Siri & Shortcuts: extract App Intents metadata the way Xcode does, from the compiler's constant values.
+CONF_DIR="$( [[ "$CONFIG" == "release" ]] && echo Release || echo Debug )"
+CONSTS=".build/out/Intermediates.noindex/Orbit.build/$CONF_DIR/Orbit-p.build/Objects-normal/arm64"
+INTENTS_TMP="$STAGE_DIR/intents"; mkdir -p "$INTENTS_TMP"
+find "$PWD/Sources/Orbit" -name "*.swift" > "$INTENTS_TMP/sources.txt"
+ls "$PWD/$CONSTS"/*.swiftconstvalues > "$INTENTS_TMP/consts.txt"
+TOOLCHAIN="$(dirname "$(dirname "$(xcrun --find swift)")")"
+xcrun appintentsmetadataprocessor --output "$INTENTS_TMP" --toolchain-dir "$TOOLCHAIN" --module-name Orbit \
+  --sdk-root "$(xcrun --show-sdk-path)" --xcode-version "$(xcodebuild -version | awk '/Build version/ {print $3}')" \
+  --platform-family macOS --deployment-target 15.0 --target-triple arm64-apple-macos15.0 \
+  --source-file-list "$INTENTS_TMP/sources.txt" --swift-const-vals-list "$INTENTS_TMP/consts.txt" \
+  --binary-file "$BIN" --quiet-warnings >/dev/null 2>&1
+cp -R "$INTENTS_TMP/Metadata.appintents" "$APP/Contents/Resources/Metadata.appintents"
 # If the owner chose (in Orbit › Settings) to share their Google setup, build it in so others can sign in without Google Cloud.
 SHARED_GOOGLE="$HOME/Library/Application Support/Orbit/shared-google-client.json"
 [[ -f "$SHARED_GOOGLE" ]] && cp "$SHARED_GOOGLE" "$APP/Contents/Resources/GoogleClient.json" && echo "Included shared Google sign-in"

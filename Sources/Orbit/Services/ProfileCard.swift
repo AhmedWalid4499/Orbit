@@ -98,6 +98,36 @@ struct ProfileCard: Codable, Equatable {
     var showPhoto = true
     /// What the QR code opens: "contact" (adds you to their contacts) or a link id.
     var qrTarget = "contact"
+    /// Public web page: ahmedwalid4499.github.io/Orbit/card/?u=<slug>
+    var publicSlug = ""
+    var publishPublic = false
+    /// Email and phone stay off the public page unless you turn this on.
+    var publicShowContact = false
+
+    init() {}
+
+    // Older saved cards don't have every field; fill in defaults instead of failing.
+    enum CodingKeys: String, CodingKey {
+        case name, headline, company, email, phone, location, bio, links, colorIndex, showPhoto, qrTarget
+        case publicSlug, publishPublic, publicShowContact
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
+        headline = try c.decodeIfPresent(String.self, forKey: .headline) ?? ""
+        company = try c.decodeIfPresent(String.self, forKey: .company) ?? ""
+        email = try c.decodeIfPresent(String.self, forKey: .email) ?? ""
+        phone = try c.decodeIfPresent(String.self, forKey: .phone) ?? ""
+        location = try c.decodeIfPresent(String.self, forKey: .location) ?? ""
+        bio = try c.decodeIfPresent(String.self, forKey: .bio) ?? ""
+        links = try c.decodeIfPresent([Link].self, forKey: .links) ?? []
+        colorIndex = try c.decodeIfPresent(Int.self, forKey: .colorIndex) ?? 0
+        showPhoto = try c.decodeIfPresent(Bool.self, forKey: .showPhoto) ?? true
+        qrTarget = try c.decodeIfPresent(String.self, forKey: .qrTarget) ?? "contact"
+        publicSlug = try c.decodeIfPresent(String.self, forKey: .publicSlug) ?? ""
+        publishPublic = try c.decodeIfPresent(Bool.self, forKey: .publishPublic) ?? false
+        publicShowContact = try c.decodeIfPresent(Bool.self, forKey: .publicShowContact) ?? false
+    }
 
     static let colors: [Color] = [Theme.lime, Theme.pink, Theme.cyan, Theme.purple, Theme.orange, Theme.mint, Color(hex: 0x141416)]
     var color: Color { Self.colors[min(max(colorIndex, 0), Self.colors.count - 1)] }
@@ -153,8 +183,43 @@ struct ProfileCard: Codable, Equatable {
         return lines.joined(separator: "\r\n")
     }
 
+    static let webBase = "https://ahmedwalid4499.github.io/Orbit/card/?u="
+    static func isValidSlug(_ s: String) -> Bool { s.range(of: #"^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$"#, options: .regularExpression) != nil }
+    var publicURL: String? { publishPublic && Self.isValidSlug(publicSlug) ? Self.webBase + publicSlug : nil }
+
+    /// "Sara Hassan" → "sara-hassan"
+    static func slugify(_ s: String) -> String {
+        let folded = s.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current).lowercased()
+        let dashed = folded.map { $0.isLetter && $0.isASCII || $0.isNumber ? String($0) : "-" }.joined()
+        return String(dashed.replacingOccurrences(of: #"-+"#, with: "-", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-")).prefix(40))
+    }
+
+    /// What the public page shows (email and phone only if you chose to).
+    func publicData(photo: NSImage?) -> [String: Any] {
+        var d: [String: Any] = ["name": name, "headline": headline, "company": company, "location": location, "bio": bio,
+                                "colorIndex": colorIndex,
+                                "links": filledLinks.map { ["kind": $0.kind.rawValue, "url": $0.url, "display": $0.display] },
+                                "email": publicShowContact ? email : "", "phone": publicShowContact ? phone : "", "photo": ""]
+        if showPhoto, let photo, let tiff = photo.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
+            let side = 200
+            if let small = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: side, pixelsHigh: side, bitsPerSample: 8, samplesPerPixel: 4,
+                                            hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) {
+                NSGraphicsContext.saveGraphicsState()
+                NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: small)
+                rep.draw(in: NSRect(x: 0, y: 0, width: side, height: side))
+                NSGraphicsContext.restoreGraphicsState()
+                if let jpeg = small.representation(using: .jpeg, properties: [.compressionFactor: 0.7]) {
+                    d["photo"] = "data:image/jpeg;base64," + jpeg.base64EncodedString()
+                }
+            }
+        }
+        return d
+    }
+
     /// What the QR code holds.
     var qrPayload: String {
+        if qrTarget == "web", let url = publicURL { return url }
         if qrTarget != "contact", let l = filledLinks.first(where: { $0.id.uuidString == qrTarget }) { return l.url }
         return vCard
     }

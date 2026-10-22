@@ -21,4 +21,6 @@ Desktop widgets are a WidgetKit extension in `Widgets/` (SwiftPM can't build ext
 ## Notes
 
 - Secrets live in one Keychain item (`Keychain` in `Services/Claude.swift`); never put keys in files.
+- Siri and Shortcuts: `Services/OrbitIntents.swift`. `scripts/build-app.sh` runs `appintentsmetadataprocessor` on SwiftPM's `.swiftconstvalues` to produce `Metadata.appintents`; without it the intents don't show up in Siri or Shortcuts.
+- Public card page: `docs/card/index.html`, served by GitHub Pages (main, /docs) and reading the Supabase `public_cards` table (`supabase/public_cards.sql`).
 - `ORBIT_SNAPSHOT_DIR=... ORBIT_SNAPSHOT_DEMO=1 build/Orbit.app/Contents/MacOS/Orbit` renders every tab to PNG with in-memory demo data and makes no network calls.

@@ -78,6 +78,9 @@ struct ProfileCardSheet: View {
     @State private var card = ProfileCard.load()
     @State private var files: (png: URL, vcf: URL)?
     @State private var copied: String?
+    @ObservedObject private var cloud = CloudSync.shared
+    @State private var publishStatus: String?
+    @State private var publishTask: Task<Void, Never>?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -95,7 +98,11 @@ struct ProfileCardSheet: View {
             .background(Theme.card.opacity(0.5))
         }
         .frame(width: 900, height: 720)
-        .onChange(of: card) { card.save(); refreshFiles() }
+        .onChange(of: card) { old, new in
+            card.save()
+            refreshFiles()
+            schedulePublish(turnedOff: old.publishPublic && !new.publishPublic)
+        }
         .onAppear(perform: refreshFiles)
     }
 
@@ -150,6 +157,37 @@ struct ProfileCardSheet: View {
                     .menuStyle(.button).fixedSize()
                 }
 
+                group("Public link") {
+                    if !cloud.isSignedIn {
+                        Text("Sign in under Settings › Account to get a web link for your card.").font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
+                    } else {
+                        Toggle("Publish my card on the web", isOn: $card.publishPublic)
+                        if card.publishPublic {
+                            HStack(spacing: 4) {
+                                Text("…/card/?u=").font(Theme.ui(12)).foregroundStyle(Theme.inkMuted)
+                                TextField("your-name", text: Binding(get: { card.publicSlug },
+                                                                     set: { card.publicSlug = ProfileCard.slugify($0) }))
+                                    .textFieldStyle(.roundedBorder)
+                            }
+                            Toggle("Show my email and phone on the page", isOn: $card.publicShowContact)
+                            if let url = card.publicURL {
+                                HStack {
+                                    Link(url.replacingOccurrences(of: "https://", with: ""), destination: URL(string: url)!).font(Theme.ui(11)).lineLimit(1)
+                                    Spacer()
+                                    Button("Copy link") {
+                                        NSPasteboard.general.clearContents()
+                                        NSPasteboard.general.setString(url, forType: .string)
+                                        copied = "Link copied."
+                                    }
+                                }
+                            } else {
+                                Text("Use 3–40 lowercase letters, numbers or dashes.").font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
+                            }
+                            if let publishStatus { Text(publishStatus).font(Theme.ui(11)).foregroundStyle(Theme.inkSecondary) }
+                        }
+                    }
+                }
+
                 group("Look") {
                     HStack(spacing: 8) {
                         ForEach(0..<ProfileCard.colors.count, id: \.self) { i in
@@ -160,6 +198,7 @@ struct ProfileCardSheet: View {
                     }
                     Picker("QR code opens", selection: $card.qrTarget) {
                         Text("My contact card").tag("contact")
+                        if card.publicURL != nil { Text("My web page").tag("web") }
                         ForEach(card.filledLinks) { Text($0.kind.title).tag($0.id.uuidString) }
                     }
                 }
@@ -179,6 +218,31 @@ struct ProfileCardSheet: View {
 
     private func field(_ label: String, _ value: Binding<String>, _ prompt: String) -> some View {
         TextField(label, text: value, prompt: Text(prompt)).textFieldStyle(.roundedBorder)
+    }
+
+    /// Publishes a moment after you stop typing; removes the page when you switch publishing off.
+    private func schedulePublish(turnedOff: Bool) {
+        publishTask?.cancel()
+        guard cloud.isSignedIn else { return }
+        if turnedOff {
+            publishTask = Task { try? await cloud.unpublishCard(); publishStatus = "Your card is no longer on the web." }
+            return
+        }
+        guard card.publishPublic else { return }
+        if card.publicSlug.isEmpty { card.publicSlug = ProfileCard.slugify(card.name) }
+        guard ProfileCard.isValidSlug(card.publicSlug) else { return }
+        let snapshot = card, photo = profile.photo
+        publishTask = Task {
+            try? await Task.sleep(for: .seconds(1.5))
+            guard !Task.isCancelled else { return }
+            publishStatus = "Publishing…"
+            do {
+                try await cloud.publishCard(slug: snapshot.publicSlug, data: snapshot.publicData(photo: photo))
+                publishStatus = "Live: anyone with the link sees your latest card."
+            } catch {
+                publishStatus = error.localizedDescription
+            }
+        }
     }
 
     // MARK: Sharing

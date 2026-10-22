@@ -289,6 +289,45 @@ private let syncKinds: [SyncKind] = [
                  h.note = J.str(d["note"]); h.location = J.str(d["location"]); h.createdAt = J.date(d["createdAt"]) ?? h.createdAt
                  h.source = J.str(d["source"]); h.externalID = J.str(d["externalID"]) },
              make: { let h = Highlight(bookTitle: "", author: "", text: ""); $0.insert(h); return h }),
+    SyncKind(kind: "subscription",
+             fetch: { (try? $0.fetch(FetchDescriptor<Subscription>())) ?? [] }, uuid: { ($0 as! Subscription).uuid },
+             encode: { m in let s = m as! Subscription
+                 return ["name": s.name, "amount": s.amount, "originalAmount": s.originalAmount, "originalCurrency": s.originalCurrency,
+                         "cycle": s.cycleRaw, "nextDate": J.date(s.nextDate), "lastCharged": J.date(s.lastCharged), "category": s.category,
+                         "status": s.status, "trialEnds": J.date(s.trialEnds), "previousAmount": s.previousAmount,
+                         "priceChangedAt": J.date(s.priceChangedAt), "source": s.source, "notes": s.notes, "createdAt": J.date(s.createdAt)] },
+             apply: { d, m in let s = m as! Subscription
+                 s.name = J.str(d["name"]); s.amount = J.num(d["amount"]); s.originalAmount = J.num(d["originalAmount"])
+                 s.originalCurrency = J.str(d["originalCurrency"]); s.cycleRaw = J.str(d["cycle"]).isEmpty ? "monthly" : J.str(d["cycle"])
+                 s.nextDate = J.date(d["nextDate"]); s.lastCharged = J.date(d["lastCharged"]); s.category = J.str(d["category"])
+                 s.status = J.str(d["status"]).isEmpty ? "active" : J.str(d["status"]); s.trialEnds = J.date(d["trialEnds"])
+                 s.previousAmount = J.num(d["previousAmount"]); s.priceChangedAt = J.date(d["priceChangedAt"])
+                 s.source = J.str(d["source"]); s.notes = J.str(d["notes"]); s.createdAt = J.date(d["createdAt"]) ?? s.createdAt },
+             make: { let s = Subscription(name: "", amount: 0); $0.insert(s); return s }),
+    SyncKind(kind: "document",
+             fetch: { (try? $0.fetch(FetchDescriptor<DocItem>())) ?? [] }, uuid: { ($0 as! DocItem).uuid },
+             encode: { m in let x = m as! DocItem
+                 return ["title": x.title, "kind": x.kindRaw, "number": x.number, "issuer": x.issuer, "issued": J.date(x.issued),
+                         "expires": J.date(x.expires), "remindDays": x.remindDays, "notes": x.notes, "source": x.source,
+                         "sourceID": x.sourceID, "createdAt": J.date(x.createdAt)] },
+             apply: { d, m in let x = m as! DocItem
+                 x.title = J.str(d["title"]); x.kindRaw = J.str(d["kind"]); x.number = J.str(d["number"]); x.issuer = J.str(d["issuer"])
+                 x.issued = J.date(d["issued"]); x.expires = J.date(d["expires"]); x.remindDays = J.int(d["remindDays"])
+                 x.notes = J.str(d["notes"]); x.source = J.str(d["source"]); x.sourceID = J.str(d["sourceID"])
+                 x.createdAt = J.date(d["createdAt"]) ?? x.createdAt },
+             make: { let x = DocItem(title: ""); $0.insert(x); return x }),
+    SyncKind(kind: "person",
+             fetch: { (try? $0.fetch(FetchDescriptor<Person>())) ?? [] }, uuid: { ($0 as! Person).uuid },
+             encode: { m in let p = m as! Person
+                 return ["name": p.name, "email": p.email, "phone": p.phone, "relation": p.relationRaw, "birthday": J.date(p.birthday),
+                         "notes": p.notes, "giftIdeas": p.giftIdeas, "lastContact": J.date(p.lastContact),
+                         "lastContactSource": p.lastContactSource, "contactEveryDays": p.contactEveryDays, "createdAt": J.date(p.createdAt)] },
+             apply: { d, m in let p = m as! Person
+                 p.name = J.str(d["name"]); p.email = J.str(d["email"]); p.phone = J.str(d["phone"]); p.relationRaw = J.str(d["relation"])
+                 p.birthday = J.date(d["birthday"]); p.notes = J.str(d["notes"]); p.giftIdeas = J.strings(d["giftIdeas"])
+                 p.lastContact = J.date(d["lastContact"]); p.lastContactSource = J.str(d["lastContactSource"])
+                 p.contactEveryDays = J.int(d["contactEveryDays"]); p.createdAt = J.date(d["createdAt"]) ?? p.createdAt },
+             make: { let p = Person(name: ""); $0.insert(p); return p }),
 ]
 
 /// Preferences that follow you between Macs (API keys and sign-ins never leave the Keychain).
@@ -409,6 +448,9 @@ final class CloudSync: ObservableObject {
         case let x as BucketItem: x.uuid = id
         case let x as ReadingSession: x.uuid = id
         case let x as Highlight: x.uuid = id
+        case let x as Subscription: x.uuid = id
+        case let x as DocItem: x.uuid = id
+        case let x as Person: x.uuid = id
         default: break
         }
     }
@@ -554,6 +596,26 @@ final class CloudSync: ObservableObject {
             throw CloudError("Sync error \(status)\(msg.map { ": \($0)" } ?? "")")
         }
         return data.isEmpty ? nil : try? JSONSerialization.jsonObject(with: data)
+    }
+
+    // MARK: Public card page
+
+    /// Publishes (or moves) your card to public_cards under `slug`; anyone with the link can read it.
+    func publishCard(slug: String, data: [String: Any]) async throws {
+        guard let session = CloudAuth.session else { throw CloudError("Sign in under Settings › Account to publish your card.") }
+        let base = "\(SupabaseConfig.url)/rest/v1/public_cards"
+        _ = try await rest(URL(string: "\(base)?user_id=eq.\(session.userID)")!, method: "DELETE")
+        do {
+            _ = try await rest(URL(string: base)!, method: "POST", body: [["slug": slug, "user_id": session.userID, "data": data]],
+                               prefer: "return=minimal")
+        } catch let e as CloudError where e.message.contains("409") || e.message.lowercased().contains("duplicate") {
+            throw CloudError("“\(slug)” is taken. Try another name.")
+        }
+    }
+
+    func unpublishCard() async throws {
+        guard let session = CloudAuth.session else { return }
+        _ = try await rest(URL(string: "\(SupabaseConfig.url)/rest/v1/public_cards?user_id=eq.\(session.userID)")!, method: "DELETE")
     }
 
     // MARK: API keys & connections (end-to-end encrypted)

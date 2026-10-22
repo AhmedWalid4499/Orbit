@@ -16,7 +16,7 @@ export interface Rec<T = Record<string, any>> {
 }
 
 /** Settings that follow you between devices (same list as the Mac app). */
-export const SYNCED_SETTINGS = ['monthlyBudget', 'readingGoal', 'currencyCode', 'assistantName', 'userName', 'weatherCity'] as const
+export const SYNCED_SETTINGS = ['monthlyBudget', 'readingGoal', 'currencyCode', 'assistantName', 'userName', 'weatherCity', 'profileCard'] as const
 export type SettingKey = (typeof SYNCED_SETTINGS)[number]
 
 interface Cache {

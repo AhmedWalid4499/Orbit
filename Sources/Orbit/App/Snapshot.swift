@@ -55,7 +55,8 @@ enum Snapshot {
             }
             withDefault("calendarMode", "month") { render("calendar-month", tab: .calendar, appearance: .aqua) }
             withDefault("calendarMode", "day") { render("calendar-day", tab: .calendar, appearance: .aqua) }
-            withDefault("moneyMode", true) { render("money-calendar", tab: .money, appearance: .aqua) }
+            withDefault("moneyTab", "calendar") { render("money-calendar", tab: .money, appearance: .aqua) }
+            withDefault("moneyTab", "subscriptions") { render("money-subscriptions", tab: .money, appearance: .aqua) }
             render("assistant", tab: .today, appearance: .aqua) { $0.assistantOpen = true }
             // Sample profile card (made-up details), rendered the way the share button exports it.
             var demo = ProfileCard()
@@ -90,7 +91,7 @@ enum Snapshot {
     }
 
     static func demoContainer() -> ModelContainer {
-        let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self, ReadingSession.self, Highlight.self])
+        let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self, ReadingSession.self, Highlight.self, Subscription.self, DocItem.self, Person.self])
         let c = try! ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true))
         let ctx = c.mainContext
         let cats = [("Philosophy", 3, "brain.head.profile"), ("Favourites", 0, "heart.fill"), ("Business", 4, "briefcase.fill")]
@@ -160,6 +161,38 @@ enum Snapshot {
             JournalTurn(role: "assistant", text: "Tired-but-productive is a good kind of tired. What was the thing you're most glad you finished?"),
         ])
         ctx.insert(j)
+
+        let today = Date.now.startOfDay
+        for (n, amt, cyc, days) in [("Netflix", 240.0, BillingCycle.monthly, 5), ("Spotify", 100.0, .monthly, 12), ("iCloud+", 50.0, .monthly, 20),
+                                    ("Gym membership", 1200.0, .monthly, 2), ("Adobe Creative Cloud", 9000.0, .yearly, 64)] {
+            let s = Subscription(name: n, amount: amt, cycle: cyc)
+            s.nextDate = today.adding(days: days); s.lastCharged = today.adding(days: days - 30)
+            if n == "Netflix" { s.previousAmount = 200; s.priceChangedAt = today.adding(days: -25) }
+            ctx.insert(s)
+        }
+        let trial = Subscription(name: "Duolingo Max", amount: 450)
+        trial.status = "trial"; trial.trialEnds = today.adding(days: 3)
+        ctx.insert(trial)
+
+        for (t, k, days, issuer) in [("Egyptian passport", DocKind.passport, 150, "Passport Office"), ("Driving licence", .license, 410, "Traffic Dept."),
+                                     ("Car insurance", .insurance, 21, "Allianz"), ("MacBook Pro", .warranty, 290, "Apple"),
+                                     ("National ID", .id, 1300, "Civil Registry")] {
+            let d = DocItem(title: t, kind: k, expires: today.adding(days: days))
+            d.issuer = issuer; d.number = "4821"
+            ctx.insert(d)
+        }
+
+        let cal = Calendar.current
+        for (n, rel, bdayIn, lastTalked, every) in [("Omar Khaled", Relation.friend, 9, 64, 30), ("Mom", .family, 40, 2, 7),
+                                                    ("Nour Adel", .partner, 120, 0, 0), ("Youssef Samir", .work, 200, 12, 60), ("Laila Fathy", .friend, 3, 20, 30)] {
+            let p = Person(name: n, relation: rel)
+            let next = today.adding(days: bdayIn)
+            p.birthday = cal.date(from: DateComponents(year: 1996, month: cal.component(.month, from: next), day: cal.component(.day, from: next)))
+            p.lastContact = today.adding(days: -lastTalked); p.lastContactSource = "gmail"
+            p.contactEveryDays = every
+            if n == "Laila Fathy" { p.giftIdeas = ["Film camera", "Pottery class"] }
+            ctx.insert(p)
+        }
         return c
     }
 }
@@ -179,7 +212,7 @@ enum SyncTest {
             let realSession = Keychain.read("supabase-session")
             let realKeySync = cloud.syncSecrets
             cloud.syncSecrets = false
-            let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self, ReadingSession.self, Highlight.self])
+            let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self, ReadingSession.self, Highlight.self, Subscription.self, DocItem.self, Person.self])
             do {
                 // Keep the containers alive for the whole test; a context is only valid while its container exists.
                 let containerA = Snapshot.demoContainer()
@@ -198,6 +231,13 @@ enum SyncTest {
                 check("Mac B gets all books (\(count(Book.self, b))/\(count(Book.self, a)))", count(Book.self, a) == count(Book.self, b))
                 check("Mac B gets money (\(count(Transaction.self, b))/\(count(Transaction.self, a)))", count(Transaction.self, a) == count(Transaction.self, b))
                 check("Mac B gets bucket list (\(count(BucketItem.self, b))/\(count(BucketItem.self, a)))", count(BucketItem.self, a) == count(BucketItem.self, b))
+                check("Mac B gets subscriptions (\(count(Subscription.self, b))/\(count(Subscription.self, a)))", count(Subscription.self, a) == count(Subscription.self, b))
+                check("Mac B gets documents (\(count(DocItem.self, b))/\(count(DocItem.self, a)))", count(DocItem.self, a) == count(DocItem.self, b))
+                check("Mac B gets people (\(count(Person.self, b))/\(count(Person.self, a)))", count(Person.self, a) == count(Person.self, b))
+                let lailaB = try b.fetch(FetchDescriptor<Person>()).first { $0.name == "Laila Fathy" }
+                check("Gift ideas and birthday come across", lailaB?.giftIdeas.count == 2 && lailaB?.birthday != nil)
+                let trialB = try b.fetch(FetchDescriptor<Subscription>()).first { $0.status == "trial" }
+                check("Trial end date comes across", trialB?.trialEnds != nil)
                 let journalB = try b.fetch(FetchDescriptor<Note>()).first { $0.isJournal && $0.chatData != nil }
                 check("Journal chat comes across", journalB?.chat?.turns.count == 4)
 

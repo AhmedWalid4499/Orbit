@@ -243,6 +243,17 @@ enum AssistantTools {
                 ]],
             ]),
             tool("create_note", "Save a note.", ["title": ["type": "string"], "body": ["type": "string"]]),
+            tool("add_gift_idea", "Save a gift idea for someone in the user's People list (matched by name).", [
+                "person": ["type": "string"], "idea": ["type": "string"],
+            ]),
+            tool("add_document", "Track a document or warranty with an expiry date so Orbit reminds the user. expires yyyy-MM-dd or empty.", [
+                "title": ["type": "string"], "kind": ["type": "string", "enum": DocKind.allCases.map(\.rawValue)], "expires": ["type": "string"],
+            ]),
+            tool("add_subscription", "Track a subscription. amount per charge in the home currency; next_date yyyy-MM-dd or empty.", [
+                "name": ["type": "string"], "amount": ["type": "number"],
+                "cycle": ["type": "string", "enum": BillingCycle.allCases.map(\.rawValue)],
+                "status": ["type": "string", "enum": ["active", "trial", "cancelled"]], "next_date": ["type": "string"],
+            ]),
             tool("add_bucket_item", "Add something to the user's bucket list (things they want to do in life). target_date yyyy-MM-dd or empty.", [
                 "title": ["type": "string"], "kind": ["type": "string", "enum": BucketKind.allCases.map(\.rawValue)],
                 "notes": ["type": "string"], "target_date": ["type": "string"],
@@ -343,6 +354,33 @@ enum AssistantTools {
                            action: ChatItem(role: .action, text: "Added to reading list: \(names)", symbol: "books.vertical.fill",
                                             undo: added.isEmpty ? nil : .models(added.map(\.persistentModelID))))
 
+        case "add_gift_idea":
+            let people = (try? context.fetch(FetchDescriptor<Person>())) ?? []
+            let who = str("person").lowercased()
+            guard let p = people.first(where: { $0.name.lowercased() == who }) ?? people.first(where: { $0.name.lowercased().contains(who) || who.contains($0.name.lowercased()) }) else {
+                return Outcome(result: "No one called “\(str("person"))” in People. Ask the user to add them first.", isError: true)
+            }
+            p.giftIdeas.append(str("idea"))
+            return Outcome(result: "Saved.", action: ChatItem(role: .action, text: "Gift idea for \(p.name): \(str("idea"))", symbol: "gift"))
+
+        case "add_document":
+            guard !str("title").isEmpty else { return Outcome(result: "title is required", isError: true) }
+            let d = DocItem(title: str("title"), kind: DocKind(rawValue: str("kind")) ?? .other, expires: day.date(from: str("expires")))
+            context.insert(d)
+            return Outcome(result: "Saved.", action: ChatItem(role: .action,
+                text: "Document “\(d.title)”\(d.expires.map { " · expires \($0.formatted(date: .abbreviated, time: .omitted))" } ?? "")",
+                symbol: "doc.text.fill", undo: .models([d.persistentModelID])))
+
+        case "add_subscription":
+            guard !str("name").isEmpty else { return Outcome(result: "name is required", isError: true) }
+            let s = Subscription(name: str("name"), amount: abs(num("amount")), cycle: BillingCycle(rawValue: str("cycle")) ?? .monthly)
+            s.status = ["active", "trial", "cancelled"].contains(str("status")) ? str("status") : "active"
+            s.nextDate = day.date(from: str("next_date"))
+            if s.status == "trial" { s.trialEnds = s.nextDate }
+            context.insert(s)
+            return Outcome(result: "Saved.", action: ChatItem(role: .action, text: "Subscription “\(s.name)” \(Fmt.money(s.amount)) \(s.cycle.title.lowercased())",
+                                                             symbol: "repeat", undo: .models([s.persistentModelID])))
+
         case "add_bucket_item":
             guard !str("title").isEmpty else { return Outcome(result: "title is required", isError: true) }
             let b = BucketItem(title: str("title"), kind: BucketKind(rawValue: str("kind")) ?? .other, notes: str("notes"),
@@ -390,6 +428,14 @@ enum AssistantTools {
         text += "To read: \(books.filter { $0.status == .toRead }.count). Read: \(books.filter { $0.status == .read }.count). "
         let bucket = ((try? context.fetch(FetchDescriptor<BucketItem>())) ?? [])
         text += "Bucket list: \(bucket.filter { !$0.isDone }.prefix(20).map(\.title).joined(separator: "; ")) (\(bucket.filter(\.isDone).count) done). "
+        let people = (try? context.fetch(FetchDescriptor<Person>())) ?? []
+        let bdays = people.filter { ($0.nextBirthday ?? .distantFuture) < Date.now.adding(days: 30) }
+        text += "\nPeople: \(people.count). Birthdays in the next 30 days: \(bdays.isEmpty ? "none" : bdays.map { "\($0.name) \($0.nextBirthday!.formatted(.dateTime.day().month()))" }.joined(separator: ", ")). "
+        text += "Overdue to reach out: \(people.filter(\.overdueForContact).map(\.name).prefix(8).joined(separator: ", ")). "
+        let docs = ((try? context.fetch(FetchDescriptor<DocItem>())) ?? []).filter { ($0.daysLeft ?? 999) <= 90 }
+        text += "Documents expiring within 90 days: \(docs.isEmpty ? "none" : docs.map { "\($0.title) (\($0.daysLeft ?? 0) days)" }.joined(separator: ", ")). "
+        let subs = ((try? context.fetch(FetchDescriptor<Subscription>())) ?? []).filter { $0.status != "cancelled" }
+        text += "Subscriptions: \(subs.count), \(Fmt.money(SubscriptionTracker.monthlyTotal(subs))) a month (\(subs.map { "\($0.name) \(Fmt.money($0.amount))/\($0.cycle.rawValue)" }.prefix(15).joined(separator: ", "))). "
         text += "Book categories: \(cats.isEmpty ? "none" : cats.joined(separator: ", ")). Yearly goal: \(UserDefaults.standard.integer(forKey: "readingGoal") == 0 ? 24 : UserDefaults.standard.integer(forKey: "readingGoal")) books."
         return text
     }

@@ -25,6 +25,8 @@ struct RootView: View {
                 case .money: MoneyView()
                 case .notes: NotesView()
                 case .reading: ReadingView()
+                case .people: PeopleView()
+                case .documents: DocumentsView()
                 case .bucket: BucketListView()
                 case .github: GitHubView()
                 }
@@ -76,6 +78,8 @@ struct RootView: View {
                 await InboxStore.shared.refreshIfDue(context: context)
                 await EmailExpenses.shared.syncIfDue(context: context)
                 await GoogleCalendarStore.shared.refreshIfDue()
+                await PeopleStore.shared.refreshIfDue(context: context)
+                SubscriptionTracker.detect(context: context)
                 await Updater.shared.checkIfDue()
                 try? await Task.sleep(for: .seconds(3600))
             }
@@ -89,47 +93,47 @@ private struct TopBar: View {
     let userName: String
 
     var body: some View {
-        ZStack {
-            HStack {
-                HStack(spacing: 2) {
-                    Text("orbit")
-                        .font(.system(size: 34, weight: .black, design: .rounded))
-                        .tracking(-1)
-                    Circle().fill(Theme.lime).frame(width: 9, height: 9).offset(y: 9)
-                }
-                .padding(.leading, 70) // traffic lights
-                Spacer()
-                HStack(spacing: 10) {
-                    ReadingTimerPill()
-                    UpdatePill()
-                    Button { state.assistantOpen.toggle() } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "sparkles")
-                            Text(assistantName)
-                        }
-                        .font(Theme.ui(13, weight: .semibold))
-                        .foregroundStyle(Theme.stickerInk)
-                        .padding(.horizontal, 14).frame(height: 42)
-                        .background(Capsule().fill(Theme.lime))
-                    }
-                    .buttonStyle(.plain)
-                    .help("\(assistantName) (⌘J)")
-                    CircleIconButton(symbol: "magnifyingglass", size: 42) { state.searchOpen = true }
-                        .help("Search (⌘K)")
-                    CircleIconButton(symbol: "plus", size: 42) { CapturePanel.shared.show() }
-                        .help("Quick capture (⌥Space)")
-                    SettingsLink {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 16, weight: .semibold))
-                            .frame(width: 42, height: 42)
-                            .background(Circle().fill(Theme.card))
-                    }
-                    .buttonStyle(.plain)
-                    .help("Settings")
-                    ProfileMenu(name: userName)
-                }
+        HStack {
+            HStack(spacing: 2) {
+                Text("orbit")
+                    .font(.system(size: 34, weight: .black, design: .rounded))
+                    .tracking(-1)
+                Circle().fill(Theme.lime).frame(width: 9, height: 9).offset(y: 9)
             }
-            NavDock()
+            .padding(.leading, 70) // traffic lights
+            Spacer(minLength: 16)
+            // Shows the current tab's name when there's room, icons only when the window is narrow.
+            ViewThatFits(in: .horizontal) { NavDock(compact: false); NavDock(compact: true) }
+            Spacer(minLength: 16)
+            HStack(spacing: 10) {
+                ReadingTimerPill()
+                UpdatePill()
+                Button { state.assistantOpen.toggle() } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "sparkles")
+                        Text(assistantName)
+                    }
+                    .font(Theme.ui(13, weight: .semibold))
+                    .foregroundStyle(Theme.stickerInk)
+                    .padding(.horizontal, 14).frame(height: 42)
+                    .background(Capsule().fill(Theme.lime))
+                }
+                .buttonStyle(.plain)
+                .help("\(assistantName) (⌘J)")
+                CircleIconButton(symbol: "magnifyingglass", size: 42) { state.searchOpen = true }
+                    .help("Search (⌘K)")
+                CircleIconButton(symbol: "plus", size: 42) { CapturePanel.shared.show() }
+                    .help("Quick capture (⌥Space)")
+                SettingsLink {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 16, weight: .semibold))
+                        .frame(width: 42, height: 42)
+                        .background(Circle().fill(Theme.card))
+                }
+                .buttonStyle(.plain)
+                .help("Settings")
+                ProfileMenu(name: userName)
+            }
         }
     }
 }
@@ -137,6 +141,7 @@ private struct TopBar: View {
 /// Compact navigation: icons in one capsule, the current tab expands to show its name.
 private struct NavDock: View {
     @EnvironmentObject private var state: AppState
+    let compact: Bool
     @Namespace private var ns
 
     var body: some View {
@@ -146,7 +151,7 @@ private struct NavDock: View {
                     Capsule().fill(Theme.line).frame(width: 1.5, height: 22).padding(.horizontal, 4)
                 }
                 ForEach(group) { tab in
-                    DockItem(tab: tab, selected: state.tab == tab, ns: ns) {
+                    DockItem(tab: tab, selected: state.tab == tab, showsTitle: !compact, ns: ns) {
                         withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) { state.tab = tab }
                     }
                 }
@@ -160,6 +165,7 @@ private struct NavDock: View {
 private struct DockItem: View {
     let tab: Tab
     let selected: Bool
+    let showsTitle: Bool
     let ns: Namespace.ID
     let action: () -> Void
     @State private var hovering = false
@@ -168,12 +174,12 @@ private struct DockItem: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 Image(systemName: tab.symbol).font(.system(size: 14, weight: .semibold))
-                if selected {
+                if selected && showsTitle {
                     Text(tab.title).font(Theme.ui(14, weight: .semibold)).lineLimit(1).fixedSize()
                 }
             }
             .foregroundStyle(selected ? Theme.onInverse : (hovering ? Theme.ink : Theme.inkSecondary))
-            .padding(.horizontal, selected ? 16 : 0)
+            .padding(.horizontal, selected && showsTitle ? 16 : 0)
             .frame(minWidth: 40, minHeight: 40)
             .background {
                 if selected {
@@ -186,7 +192,7 @@ private struct DockItem: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .help("\(tab.title)  ⌘\(Tab.allCases.firstIndex(of: tab)! + 1)")
+        .help(tab.shortcutNumber.map { "\(tab.title)  ⌘\($0)" } ?? tab.title)
     }
 }
 

@@ -1,13 +1,15 @@
 import { useEffect, useState, ReactNode } from 'react'
-import { Sun, Calendar, ListChecks, Flame, Mountain, CreditCard, BookOpenText, Library, Settings as Gear, Sparkles } from 'lucide-react'
+import { Sun, Calendar, ListChecks, Flame, Mountain, CreditCard, BookOpenText, Library, Settings as Gear, Sparkles, Users, FileText, IdCard, Camera, Trash2 } from 'lucide-react'
 import * as cloud from '@/lib/cloud'
 import { store, useSetting } from '@/lib/store'
-import { demoRecords } from '@/lib/demo'
+import { demoRecords, demoProfileCard } from '@/lib/demo'
 import { syncVault } from '@/lib/vault'
 import { startEmailExpensesTimer } from '@/lib/emailExpenses'
 import { onOpenAsk } from '@/lib/askBus'
 import { useAssistantName } from '@/lib/ai'
 import AskPanel from '@/components/AskPanel'
+import { ReadingTimerPill, FinishedReading } from '@/components/ReadingTimer'
+import { useProfilePhoto, chooseProfilePhoto, removeProfilePhoto } from '@/lib/profileCard'
 
 /** Open with ?demo to preview with sample data (used for screenshots; nothing is synced). */
 const DEMO = new URLSearchParams(location.search).has('demo')
@@ -21,11 +23,15 @@ import Bucket from '@/screens/Bucket'
 import Money from '@/screens/Money'
 import Notes from '@/screens/Notes'
 import Reading from '@/screens/Reading'
+import People from '@/screens/People'
+import Documents from '@/screens/Documents'
+import Review from '@/screens/Review'
+import MyCard from '@/screens/MyCard'
 
-export type Tab = 'today' | 'calendar' | 'tasks' | 'habits' | 'bucket' | 'money' | 'notes' | 'reading'
+export type Tab = 'today' | 'calendar' | 'tasks' | 'habits' | 'bucket' | 'money' | 'notes' | 'reading' | 'people' | 'documents'
 
 /** Lets any screen switch tabs (e.g. "Open calendar" on Today). */
-export interface Nav { go: (t: Tab) => void; openJournal: () => void }
+export interface Nav { go: (t: Tab) => void; openJournal: () => void; openReview: () => void }
 
 export default function App() {
   const [ready, setReady] = useState(false)
@@ -34,7 +40,7 @@ export default function App() {
 
   useEffect(() => {
     if (DEMO) {
-      store.startDemo(demoRecords(), { userName: 'Yuto', monthlyBudget: 2000, currencyCode: 'EGP', readingGoal: 24 }).then(() => { setReady(true); setSignedIn(true) })
+      store.startDemo(demoRecords(), { userName: 'Yuto', monthlyBudget: 2000, currencyCode: 'EGP', readingGoal: 24, profileCard: demoProfileCard }).then(() => { setReady(true); setSignedIn(true) })
       return
     }
     window.orbit.config().then((c) => {
@@ -68,12 +74,16 @@ const TABS: { id: Tab; title: string; icon: ReactNode }[][] = [
     { id: 'money', title: 'Money', icon: <CreditCard size={16} /> },
     { id: 'notes', title: 'Journal & Notes', icon: <BookOpenText size={16} /> },
     { id: 'reading', title: 'Reading', icon: <Library size={16} /> },
+    { id: 'people', title: 'People', icon: <Users size={16} /> },
+    { id: 'documents', title: 'Documents', icon: <FileText size={16} /> },
   ],
 ]
 
 function Shell({ platform }: { platform: string }) {
   const [tab, setTab] = useState<Tab>('today')
   const [settings, setSettings] = useState(false)
+  const [review, setReview] = useState(false)
+  const [card, setCard] = useState(false)
   const [journalRequest, setJournalRequest] = useState(0)
   const [ask, setAsk] = useState<{ open: boolean; seed?: string }>({ open: false })
   const assistant = useAssistantName()
@@ -81,7 +91,7 @@ function Shell({ platform }: { platform: string }) {
   const userName = useSetting<string>('userName', '')
   const first = userName.split(' ')[0]
   const initials = userName.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'Me'
-  const nav: Nav = { go: setTab, openJournal: () => { setJournalRequest((n) => n + 1); setTab('notes') } }
+  const nav: Nav = { go: setTab, openJournal: () => { setJournalRequest((n) => n + 1); setTab('notes') }, openReview: () => setReview(true) }
 
   // Ctrl/Cmd + 1…8 switches tabs, like ⌘1…⌘9 on the Mac.
   useEffect(() => {
@@ -100,7 +110,7 @@ function Shell({ platform }: { platform: string }) {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div className="topbar" style={{ paddingLeft: platform === 'darwin' ? 96 : 32, paddingRight: platform === 'win32' ? 150 : 32 }}>
-        <div className="logo">orbit<i /></div>
+        <div className="logo" style={{ flex: 'none' }}>orbit<i /></div>
         <nav className="dock">
           {TABS.map((group, gi) => (
             <span key={gi} className="row" style={{ gap: 4 }}>
@@ -115,11 +125,11 @@ function Shell({ platform }: { platform: string }) {
             </span>
           ))}
         </nav>
-        <span className="spacer" />
         <div className="row">
+          <ReadingTimerPill onOpen={() => setTab('reading')} />
           <button className="btn-lime" title={`${assistant} (Ctrl+J)`} onClick={() => setAsk((a) => ({ open: !a.open }))}><Sparkles size={15} /> {assistant}</button>
           <button className="icon-btn" title="Settings (Ctrl+,)" onClick={() => setSettings(true)}><Gear size={17} /></button>
-          <button className="avatar" title="Account & settings" onClick={() => setSettings(true)}>{initials}</button>
+          <ProfileMenu initials={initials} onCard={() => setCard(true)} onSettings={() => setSettings(true)} />
         </div>
       </div>
       <main style={{ flex: 1, minHeight: 0, position: 'relative' }}>
@@ -131,9 +141,43 @@ function Shell({ platform }: { platform: string }) {
         {tab === 'money' && <Money />}
         {tab === 'notes' && <Notes openJournalRequest={journalRequest} />}
         {tab === 'reading' && <Reading />}
+        {tab === 'people' && <People />}
+        {tab === 'documents' && <Documents />}
         {ask.open && <AskPanel seed={ask.seed} onSeedUsed={() => setAsk((a) => ({ ...a, seed: undefined }))} onClose={() => setAsk({ open: false })} />}
       </main>
       <SettingsModal open={settings} onClose={() => setSettings(false)} />
+      <Review open={review} onClose={() => setReview(false)} />
+      <MyCard open={card} onClose={() => setCard(false)} />
+      <FinishedReading />
+    </div>
+  )
+}
+
+/** Avatar in the top bar: My Card, profile photo and Settings (like the Mac's ProfileMenu). */
+function ProfileMenu({ initials, onCard, onSettings }: { initials: string; onCard: () => void; onSettings: () => void }) {
+  const [open, setOpen] = useState(false)
+  const photo = useProfilePhoto()
+  useEffect(() => {
+    if (!open) return
+    const close = () => setOpen(false)
+    window.addEventListener('mousedown', close)
+    return () => window.removeEventListener('mousedown', close)
+  }, [open])
+  const item = (label: ReactNode, fn: () => void) => <button onMouseDown={(e) => e.stopPropagation()} onClick={() => { setOpen(false); fn() }}>{label}</button>
+  return (
+    <div style={{ position: 'relative' }} className="no-drag">
+      <button className="avatar" title="Profile" onClick={() => setOpen((o) => !o)} onMouseDown={(e) => e.stopPropagation()}
+        style={photo ? { background: `center / cover url(${photo})` } : undefined}>{photo ? '' : initials}</button>
+      {open && (
+        <div className="pop-menu" onMouseDown={(e) => e.stopPropagation()}>
+          {item(<><IdCard size={14} />My Card…</>, onCard)}
+          <div className="sep" />
+          {item(<><Camera size={14} />{photo ? 'Change Profile Photo…' : 'Add Profile Photo…'}</>, chooseProfilePhoto)}
+          {photo && item(<><Trash2 size={14} />Remove Photo</>, removeProfilePhoto)}
+          <div className="sep" />
+          {item(<><Gear size={14} />Settings…</>, onSettings)}
+        </div>
+      )}
     </div>
   )
 }

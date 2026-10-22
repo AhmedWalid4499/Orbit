@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Card · Orbit</title>
+<meta name="description" content="A contact card made with Orbit.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #f4f4f5; --ink: #111111; --muted: #5c5c63; --card-ink: #111111; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #111113; --ink: #f4f4f5; --muted: #a1a1aa; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink); font-family: Inter, system-ui, sans-serif;
+         display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 16px; }
+  .card { width: 100%; max-width: 420px; border-radius: 32px; padding: 30px; color: var(--card-ink);
+          box-shadow: 0 20px 50px rgba(0,0,0,.18); }
+  .top { display: flex; gap: 16px; align-items: center; }
+  .photo { width: 86px; height: 86px; border-radius: 50%; object-fit: cover; flex: none; border: 3px solid rgba(0,0,0,.12); }
+  h1 { font-family: Fraunces, Georgia, serif; font-size: 30px; line-height: 1.1; margin: 0 0 4px; }
+  .sub { font-size: 15px; font-weight: 500; opacity: .8; }
+  .loc { font-size: 12px; opacity: .65; margin-top: 4px; }
+  .bio { font-family: Fraunces, Georgia, serif; font-weight: 400; font-size: 15px; opacity: .85; margin: 18px 0 4px; line-height: 1.45; }
+  .links { list-style: none; padding: 0; margin: 18px 0 0; display: grid; gap: 9px; }
+  .links a { display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; font-size: 15px; font-weight: 500;
+             padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,.35); transition: background .15s; word-break: break-all; }
+  .links a:hover { background: rgba(255,255,255,.6); }
+  .dark .links a { background: rgba(255,255,255,.08); }
+  .dark .links a:hover { background: rgba(255,255,255,.16); }
+  .kind { font-size: 11px; font-weight: 600; opacity: .6; min-width: 72px; }
+  .save { display: block; width: 100%; margin-top: 20px; padding: 14px; border: 0; border-radius: 999px; background: #111111; color: #fff;
+          font: 600 15px Inter, system-ui, sans-serif; cursor: pointer; }
+  .dark .save { background: #e6ff1f; color: #111111; }
+  .foot { margin-top: 18px; font-size: 12px; color: var(--muted); }
+  .foot a { color: inherit; }
+  .msg { text-align: center; max-width: 360px; }
+  .msg h1 { font-size: 26px; }
+</style>
+</head>
+<body>
+<main id="root"><p class="msg">Loading…</p></main>
+<p class="foot">Made with <a href="https://github.com/AhmedWalid4499/Orbit">Orbit</a></p>
+<script>
+// Reads a published card from Orbit's Supabase project (public read-only table) and shows it.
+const SUPABASE = "https://qngpfkqupvxeuxzwdeex.supabase.co";
+const KEY = "sb_publishable_89YmEqm9OVBoYLJpkjh-kQ_adxqYFfQ";
+const COLORS = ["#E6FF1F", "#F7C2EC", "#27D3F6", "#B58CF7", "#EDAA2F", "#8EEDBF", "#141416"];
+const KIND_TITLES = { linkedin: "LinkedIn", x: "X", github: "GitHub", youtube: "YouTube", tiktok: "TikTok", whatsapp: "WhatsApp" };
+const root = document.getElementById("root");
+
+function el(tag, attrs = {}, ...children) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) k === "class" ? (e.className = v) : e.setAttribute(k, v);
+  for (const c of children) if (c != null && c !== "") e.append(c);
+  return e;
+}
+const title = (k) => KIND_TITLES[k] || (k ? k[0].toUpperCase() + k.slice(1) : "Link");
+const safeURL = (u) => /^(https?:|mailto:|tel:)/i.test(u) ? u : "#";
+
+function vcard(d) {
+  const esc = (s) => String(s || "").replace(/\\/g, "\\\\").replace(/,/g, "\\,").replace(/;/g, "\;").replace(/\n/g, "\\n");
+  const parts = (d.name || "").split(" ");
+  const last = parts.length > 1 ? parts.pop() : "";
+  const lines = ["BEGIN:VCARD", "VERSION:3.0", `N:${esc(last)};${esc(parts.join(" "))};;;`, `FN:${esc(d.name)}`];
+  if (d.headline) lines.push(`TITLE:${esc(d.headline)}`);
+  if (d.company) lines.push(`ORG:${esc(d.company)}`);
+  if (d.email) lines.push(`EMAIL;TYPE=INTERNET:${d.email}`);
+  if (d.phone) lines.push(`TEL;TYPE=CELL:${d.phone}`);
+  for (const l of d.links || []) lines.push(`URL;TYPE=${title(l.kind)}:${l.url}`);
+  if (d.bio) lines.push(`NOTE:${esc(d.bio)}`);
+  lines.push("END:VCARD");
+  return lines.join("\r\n");
+}
+
+function render(d) {
+  const color = COLORS[Math.min(Math.max(d.colorIndex || 0, 0), COLORS.length - 1)];
+  const dark = (d.colorIndex || 0) === COLORS.length - 1;
+  document.title = `${d.name || "Card"} · Orbit`;
+  const card = el("article", { class: "card" + (dark ? " dark" : "") });
+  card.style.background = color;
+  if (dark) card.style.color = "#F4F4F5";
+  const top = el("div", { class: "top" });
+  if (d.photo && d.photo.startsWith("data:image/")) top.append(el("img", { class: "photo", src: d.photo, alt: "" }));
+  const sub = [d.headline, d.company].filter(Boolean).join(" · ");
+  top.append(el("div", {}, el("h1", {}, d.name || ""), sub ? el("div", { class: "sub" }, sub) : null,
+                d.location ? el("div", { class: "loc" }, "📍 " + d.location) : null));
+  card.append(top);
+  if (d.bio) card.append(el("p", { class: "bio" }, d.bio));
+  const list = el("ul", { class: "links" });
+  if (d.email) list.append(el("li", {}, el("a", { href: "mailto:" + d.email }, el("span", { class: "kind" }, "Email"), d.email)));
+  if (d.phone) list.append(el("li", {}, el("a", { href: "tel:" + d.phone.replace(/[^+\d]/g, "") }, el("span", { class: "kind" }, "Phone"), d.phone)));
+  for (const l of d.links || []) {
+    list.append(el("li", {}, el("a", { href: safeURL(l.url), target: "_blank", rel: "noopener" }, el("span", { class: "kind" }, title(l.kind)), l.display || l.url)));
+  }
+  card.append(list);
+  const save = el("button", { class: "save", type: "button" }, "Save contact");
+  save.onclick = () => {
+    const blob = new Blob([vcard(d)], { type: "text/vcard" });
+    const a = el("a", { href: URL.createObjectURL(blob), download: (d.name || "contact") + ".vcf" });
+    document.body.append(a); a.click(); a.remove();
+  };
+  card.append(save);
+  root.replaceChildren(card);
+}
+
+function message(h, p) { root.replaceChildren(el("div", { class: "msg" }, el("h1", {}, h), el("p", {}, p))); }
+
+const slug = new URLSearchParams(location.search).get("u") || location.hash.slice(1);
+if (!slug || !/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/.test(slug)) {
+  message("No card here", "This link is missing the name of a card.");
+} else {
+  fetch(`${SUPABASE}/rest/v1/public_cards?slug=eq.${encodeURIComponent(slug)}&select=data`, { headers: { apikey: KEY } })
+    .then((r) => r.ok ? r.json() : Promise.reject(r.status))
+    .then((rows) => rows.length ? render(rows[0].data || {}) : message("Card not found", "It may have been unpublished, or the link has a typo."))
+    .catch(() => message("Couldn't load this card", "Check your connection and try again."));
+}
+</script>
+</body>
+</html>

@@ -22,6 +22,7 @@
     <key>NSHighResolutionCapable</key><true/>
     <key>NSCalendarsFullAccessUsageDescription</key><string>Orbit shows your calendar events alongside your tasks and plans.</string>
     <key>NSCalendarsUsageDescription</key><string>Orbit shows your calendar events alongside your tasks and plans.</string>
+    <key>NSContactsUsageDescription</key><string>Orbit imports the people you choose, with their birthdays, emails and phone numbers.</string>
     <key>NSMicrophoneUsageDescription</key><string>Hold ⌥Space and talk: Orbit listens so Ask can file what you said.</string>
     <key>NSSpeechRecognitionUsageDescription</key><string>Orbit turns what you say into text on your Mac so Ask can file it as a task, event, expense or note.</string>
     <key>NSRemindersFullAccessUsageDescription</key><string>Orbit shows and completes your Apple Reminders next to your tasks.</string>

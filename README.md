@@ -33,7 +33,7 @@ To publish a new version: `scripts/release.sh 1.2.0 "What changed"`.
   - `$12 lunch` becomes an expense and `+500 freelance` becomes income
   - `note: …` and `journal: …` go to Notes
   - `!`, `!!`, `!!!` set priority
-- **⌘K** opens search and **⌘1–6** switch tabs.
+- **⌘K** opens search and **⌘1–9** switch tabs.
 - The menu bar icon shows your next event and the tasks due today.
 - **Settings › Connections** links Apple Calendar and Apple Reminders. Apple Calendar includes Google, iCloud and Outlook calendars that are already added to macOS.
 
@@ -52,7 +52,21 @@ Click **Ask Claude** in the top bar, or press ⌘J, to open a chat panel. Claude
 
 ## Money
 
-Money has an **Overview** and a **Calendar**. The Calendar shows what you spent each day, plus bills and recurring payments that are coming due. The **Money coach** card gives savings tips based on your real spending, and **Discuss with Claude** opens a conversation about it.
+Money has an **Overview**, a **Calendar** and **Subscriptions**. The Calendar shows what you spent each day, plus bills and recurring payments that are coming due. The **Money coach** card gives savings tips based on your real spending, and **Discuss with Claude** opens a conversation about it.
+
+**Subscriptions** lists every recurring charge with the monthly and yearly total. Orbit finds them in your transactions and in receipt emails, flags price increases, and reminds you two days before a free trial turns into a paid plan. **Which can I cut?** asks Claude to go through them with you.
+
+## Documents
+
+Keep your passport, ID, driving licence, car registration, insurance, memberships and warranties in one place. Orbit reminds you before each one expires (a month by default, six months for passports and visas). Warranties are added by themselves from order emails that mention one.
+
+## People
+
+Birthdays, gift ideas and when you last talked to someone. **Import from Contacts** brings in names, emails and birthdays. Orbit checks connected Gmail inboxes to see when you last emailed each person, and with a "keep in touch" interval set it reminds you on Saturdays when it's been too long. **Gift ideas** asks Claude for suggestions.
+
+## Siri and Shortcuts
+
+Say "Hey Siri, add to Orbit", "What's on today in Orbit", "Ask Orbit" or "Log an expense in Orbit". The same actions appear in the Shortcuts app, so you can build automations with them (for example, read your day out loud when you open your laptop in the morning).
 
 ## Reminders, review and insights
 
@@ -69,6 +83,8 @@ Right-click the desktop › **Edit Widgets** and search for Orbit to add **Orbit
 ## My card
 
 Click your avatar and choose **My Card…**. Add your headline, contact details and links (LinkedIn, website, GitHub, Instagram, X and more), pick a colour, and share it as an image together with a contact file. The card's QR code adds you to someone's contacts with all your links, or can open one link instead.
+
+Turn on **Public link** to publish the card as a web page at `ahmedwalid4499.github.io/Orbit/card/?u=yourname`. Point the QR code at **My web page** and anyone who scans it, from a slide or a CV, always sees your latest details. The page (`docs/card/index.html`) reads from the `public_cards` table, which anyone can read; set it up with `supabase/public_cards.sql`. Email and phone are only shown if you choose to.
 
 ## Sync and backup
 
@@ -99,7 +115,7 @@ Today's journal entry has a chat with Claude next to it. Claude asks about your 
 
 ## Project layout
 
-- `Sources/Orbit/Models`: SwiftData models (tasks, events, habits, transactions, notes)
+- `Sources/Orbit/Models`: SwiftData models (tasks, events, habits, transactions, notes, books, subscriptions, documents, people)
 - `Sources/Orbit/Design`: theme (colors, type, pills, cards)
 - `Sources/Orbit/Services`: Claude, Gmail, GitHub, reading sources, Apple Calendar/Reminders, quick capture, updater
 - `Sources/Orbit/Views`: one file per screen

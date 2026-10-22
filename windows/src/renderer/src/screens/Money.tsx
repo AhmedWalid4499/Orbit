@@ -17,9 +17,10 @@ import {
   relativeDay, fmtDay, fromInputs, toDateInput, relativeTime,
 } from '@/lib/dates'
 import { Card, EmptyHint, Segmented, Modal, useMoney } from '@/components/ui'
+import SubscriptionsView from './Subscriptions'
 import './Money.css'
 
-type Mode = 'overview' | 'calendar'
+type Mode = 'overview' | 'calendar' | 'subscriptions'
 
 const CATEGORY_ICON: Record<string, ReactNode> = {
   Food: <UtensilsCrossed size={14} />, Transport: <Car size={14} />, Bills: <Zap size={14} />, Shopping: <ShoppingBag size={14} />,
@@ -35,7 +36,7 @@ export default function Money() {
   const budget = Number(useSetting<number>('monthlyBudget', 2000)) || 0
   const money = useMoney()
 
-  const [mode, setModeState] = useState<Mode>(() => (localStorage.getItem('orbit.moneyMode') === 'calendar' ? 'calendar' : 'overview'))
+  const [mode, setModeState] = useState<Mode>(() => { const m = localStorage.getItem('orbit.moneyMode'); return m === 'calendar' || m === 'subscriptions' ? m : 'overview' })
   const setMode = (m: Mode) => { setModeState(m); localStorage.setItem('orbit.moneyMode', m) }
   const [month, setMonth] = useState(() => startOfMonth(new Date()))
   const [adding, setAdding] = useState(false)
@@ -51,17 +52,20 @@ export default function Money() {
     <div className="page">
       <div className="col" style={{ gap: 22 }}>
         <div className="row" style={{ gap: 12 }}>
-          <h1 className="page-title">{month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</h1>
+          <h1 className="page-title">{mode === 'subscriptions' ? 'Subscriptions' : month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</h1>
           <span style={{ marginLeft: 8 }}>
-            <Segmented<Mode> options={[{ id: 'overview', label: 'Overview' }, { id: 'calendar', label: 'Calendar' }]} value={mode} onChange={setMode} />
+            <Segmented<Mode> options={[{ id: 'overview', label: 'Overview' }, { id: 'calendar', label: 'Calendar' }, { id: 'subscriptions', label: 'Subscriptions' }]} value={mode} onChange={setMode} />
           </span>
           <span className="spacer" />
           <EmailChip />
           <button className="btn-soft" onClick={() => setAdding(true)}><Plus size={14} />Add transaction</button>
+          {mode !== 'subscriptions' && <>
           <button className="icon-btn filled" style={{ width: 46, height: 46 }} onClick={() => setMonth(addMonths(month, -1))} title="Previous month"><ArrowLeft size={18} /></button>
           <button className="icon-btn filled" style={{ width: 46, height: 46 }} onClick={() => setMonth(addMonths(month, 1))} title="Next month"><ArrowRight size={18} /></button>
+          </>}
         </div>
 
+        {mode === 'subscriptions' ? <SubscriptionsView /> : <>
         <div className="row" style={{ gap: 20, alignItems: 'stretch' }}>
           <BalanceCard title="Left to spend" value={money(budget - spent)} caption={`of ${money(budget)} budget`}
             fill="linear-gradient(135deg, var(--lime), var(--mint))" icon={<Target size={15} />} />
@@ -86,6 +90,7 @@ export default function Money() {
             </div>
           </>
         )}
+        </>}
       </div>
       <NewTransaction open={adding} onClose={() => setAdding(false)} />
     </div>

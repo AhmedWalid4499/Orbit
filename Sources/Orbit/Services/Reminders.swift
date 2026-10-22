@@ -17,6 +17,9 @@ final class Reminders: NSObject, ObservableObject, UNUserNotificationCenterDeleg
     @AppStorage("notify.habits") var habits = true
     @AppStorage("notify.journal") var journal = true
     @AppStorage("notify.review") var review = true
+    @AppStorage("notify.subscriptions") var subscriptions = true
+    @AppStorage("notify.documents") var documents = true
+    @AppStorage("notify.people") var people = true
     @AppStorage("notify.morningHour") var morningHour = 9
     @AppStorage("notify.habitHour") var habitHour = 20
     @AppStorage("notify.journalHour") var journalHour = 21
@@ -136,6 +139,68 @@ final class Reminders: NSObject, ObservableObject, UNUserNotificationCenterDeleg
             }
         }
 
+        func within(_ d: Date) -> Bool { d > now && d < dayAfter.adding(days: 1) }
+
+        if subscriptions {
+            for s in (try? context.fetch(FetchDescriptor<Subscription>())) ?? [] where s.status != "cancelled" {
+                if s.status == "trial", let ends = s.trialEnds {
+                    let when = at(ends.adding(days: -2), 10)
+                    if within(when) {
+                        add("trial-\(s.uuid.isEmpty ? s.name : s.uuid)", "\(s.name) trial ends in 2 days",
+                            "Then it charges \(Fmt.money(s.amount)) \(s.cycle.title.lowercased()). Cancel before \(ends.formatted(.dateTime.weekday(.wide))) if you don't want it.",
+                            at: when, route: "money")
+                    }
+                } else if let next = s.nextDate, s.cycle == .yearly || s.cycle == .quarterly {
+                    let when = at(next.adding(days: -1), 10)
+                    if within(when) {
+                        add("renew-\(s.uuid.isEmpty ? s.name : s.uuid)", "\(s.name) renews tomorrow", "\(Fmt.money(s.amount)) for another \(s.cycle == .yearly ? "year" : "quarter").",
+                            at: when, route: "money")
+                    }
+                }
+            }
+        }
+
+        if documents {
+            for d in (try? context.fetch(FetchDescriptor<DocItem>())) ?? [] {
+                guard let exp = d.expires else { continue }
+                let early = at(exp.adding(days: -d.remindDays), 10)
+                if within(early) {
+                    add("doc-\(d.uuid.isEmpty ? d.title : d.uuid)", "\(d.title) expires in \(d.remindDays) days",
+                        "On \(exp.formatted(date: .long, time: .omitted)). Time to renew.", at: early, route: "documents")
+                }
+                let onDay = at(exp, 9)
+                if within(onDay) {
+                    add("docday-\(d.uuid.isEmpty ? d.title : d.uuid)", "\(d.title) expires today", d.kind == .warranty ? "Your warranty ends today." : "Renew it if you haven't yet.",
+                        at: onDay, route: "documents")
+                }
+            }
+        }
+
+        if people {
+            let everyone = (try? context.fetch(FetchDescriptor<Person>())) ?? []
+            for p in everyone {
+                guard let next = p.nextBirthday else { continue }
+                let onDay = at(next, 9)
+                if within(onDay) {
+                    add("bday-\(p.uuid.isEmpty ? p.name : p.uuid)", "🎂 It's \(p.name)'s birthday", p.turningAge.map { "They turn \($0) today." } ?? "Send them a message.",
+                        at: onDay, route: "people")
+                }
+                let weekBefore = at(next.adding(days: -7), 10)
+                if within(weekBefore) {
+                    add("bdayweek-\(p.uuid.isEmpty ? p.name : p.uuid)", "\(p.name)'s birthday is next week",
+                        p.giftIdeas.isEmpty ? "Want gift ideas? Ask \(AssistantName.current)." : "Gift ideas: \(p.giftIdeas.prefix(3).joined(separator: ", "))",
+                        at: weekBefore, route: "people")
+                }
+            }
+            let overdue = everyone.filter(\.overdueForContact)
+            if !overdue.isEmpty {
+                var sat = today
+                while cal.component(.weekday, from: sat) != 7 || at(sat, 11) <= now { sat = sat.adding(days: 1) }
+                add("reachout-\(DayKey.key(sat))", "Time to catch up", "It's been a while with \(overdue.prefix(3).map(\.name).joined(separator: ", ")).",
+                    at: at(sat, 11), route: "people")
+            }
+        }
+
         if review {
             // Next Sunday at 6 pm.
             var next = today
@@ -201,6 +266,9 @@ struct NotificationSettingsView: View {
                 Toggle("Habits not done yet, in the evening", isOn: $r.habits)
                 Toggle("Journal check-in at night", isOn: $r.journal)
                 Toggle("Weekly review on Sunday evening", isOn: $r.review)
+                Toggle("Free trials ending and yearly renewals", isOn: $r.subscriptions)
+                Toggle("Documents and warranties about to expire", isOn: $r.documents)
+                Toggle("Birthdays and people to catch up with", isOn: $r.people)
             }
             Section("Times") {
                 Picker("Morning summary", selection: $r.morningHour) { ForEach(5..<13) { Text("\($0):00").tag($0) } }

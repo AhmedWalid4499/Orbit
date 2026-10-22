@@ -114,3 +114,31 @@ export function defaultCurrency(): string {
   const byRegion: Record<string, string> = { EG: 'EGP', US: 'USD', GB: 'GBP', AE: 'AED', SA: 'SAR', KW: 'KWD', QA: 'QAR', JP: 'JPY', CA: 'CAD', AU: 'AUD', IN: 'INR', DE: 'EUR', FR: 'EUR', ES: 'EUR', IT: 'EUR', NL: 'EUR' }
   return byRegion[region] ?? 'USD'
 }
+
+/** A date picker for an optional ISO date (stored at noon local time, so it never slips a day). */
+export function DateInput({ value, onChange, allowClear = true, style }: {
+  value: string | null; onChange: (v: string | null) => void; allowClear?: boolean; style?: React.CSSProperties
+}) {
+  const d = value ? new Date(value) : null
+  const v = d && !isNaN(d.getTime()) ? `${String(d.getFullYear()).padStart(4, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : ''
+  return (
+    <input type="date" className="field" style={{ width: 170, ...style }} value={v}
+      onChange={(e) => {
+        if (!e.target.value) { if (allowClear) onChange(null); return }
+        const [y, m, day] = e.target.value.split('-').map(Number)
+        const n = new Date(2000, m - 1, day, 12)
+        n.setFullYear(y)
+        onChange(n.toISOString().replace(/\.\d{3}Z$/, 'Z'))
+      }} />
+  )
+}
+
+/** Small labelled row for edit sheets. */
+export function FormRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="row" style={{ gap: 12, fontSize: 13 }}>
+      <span className="secondary" style={{ width: 110, flex: 'none' }}>{label}</span>
+      {children}
+    </label>
+  )
+}

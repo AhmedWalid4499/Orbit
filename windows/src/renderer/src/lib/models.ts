@@ -94,6 +94,13 @@ export interface Book {
 }
 export const IMPORTED_SOURCES = ['goodreads', 'apple-books', 'kindle']
 
+/** Same match key as the Mac (Book.matchKey): title before ":" or "(", plus the author's last word. */
+export function matchKey(title: string, author: string): string {
+  const t = (title.toLowerCase().split(/[:(]/)[0] ?? '').trim()
+  const words = author.toLowerCase().split(' ').filter(Boolean)
+  return `${t}|${words[words.length - 1] ?? ''}`
+}
+
 export interface BookCategory {
   name: string
   colorIndex: number
@@ -147,4 +154,104 @@ export interface Highlight {
   /** kindle-clippings, kindle-notebook, kindle-app, manual */
   source: string
   externalID: string
+}
+
+/** Session length in minutes (an open session counts up to now), same as the Mac's ReadingSession.minutes. */
+export const sessionMinutes = (s: ReadingSession, now = new Date()): number => {
+  const start = new Date(s.start).getTime(), end = s.end ? new Date(s.end).getTime() : now.getTime()
+  return isNaN(start) || isNaN(end) ? 0 : (end - start) / 60_000
+}
+
+// MARK: Subscriptions
+
+export type BillingCycle = 'weekly' | 'monthly' | 'quarterly' | 'yearly'
+export const BILLING_CYCLES: BillingCycle[] = ['weekly', 'monthly', 'quarterly', 'yearly']
+/** How many charges per month, for monthly totals (BillingCycle.perMonth on the Mac). */
+export const PER_MONTH: Record<BillingCycle, number> = { weekly: 52 / 12, monthly: 1, quarterly: 1 / 3, yearly: 1 / 12 }
+
+/** kind "subscription": a recurring charge, found in transactions or email, or added by hand. Same fields as the Mac encoder in CloudSync.swift. */
+export interface Subscription {
+  name: string
+  /** Per charge, in your home currency. */
+  amount: number
+  originalAmount: number
+  originalCurrency: string
+  cycle: BillingCycle
+  nextDate: string | null
+  lastCharged: string | null
+  category: string
+  /** active, trial, cancelled */
+  status: 'active' | 'trial' | 'cancelled'
+  trialEnds: string | null
+  /** Set when a charge comes in at a different price. */
+  previousAmount: number
+  priceChangedAt: string | null
+  /** manual, detected (from transactions), email */
+  source: string
+  notes: string
+  createdAt: string | null
+}
+export const monthlyCost = (s: Subscription): number =>
+  s.status === 'cancelled' ? 0 : (Number(s.amount) || 0) * (PER_MONTH[s.cycle] ?? 1)
+export const priceWentUp = (s: Subscription): boolean => s.previousAmount > 0 && s.amount > s.previousAmount * 1.01
+
+// MARK: Documents
+
+export type DocKind = 'passport' | 'id' | 'license' | 'visa' | 'car' | 'insurance' | 'warranty' | 'membership' | 'other'
+export const DOC_KINDS: { id: DocKind; title: string; color: string }[] = [
+  { id: 'passport', title: 'Passport', color: 'var(--cyan)' },
+  { id: 'id', title: 'ID card', color: 'var(--purple)' },
+  { id: 'license', title: 'Driving licence', color: 'var(--orange)' },
+  { id: 'visa', title: 'Visa', color: 'var(--pink)' },
+  { id: 'car', title: 'Car registration', color: 'var(--peach)' },
+  { id: 'insurance', title: 'Insurance', color: 'var(--mint)' },
+  { id: 'warranty', title: 'Warranty', color: 'var(--lime)' },
+  { id: 'membership', title: 'Membership', color: 'var(--purple)' },
+  { id: 'other', title: 'Other', color: 'var(--card-hover)' },
+]
+export const docKind = (k: string) => DOC_KINDS.find((d) => d.id === k) ?? DOC_KINDS[DOC_KINDS.length - 1]
+
+/** kind "document": something with an expiry date (passport, ID, licence, insurance, a warranty…). Same fields as the Mac's DocItem. */
+export interface Doc {
+  title: string
+  kind: DocKind
+  /** Keep this short (e.g. last 4 digits); Orbit isn't a password manager. */
+  number: string
+  issuer: string
+  issued: string | null
+  expires: string | null
+  /** Remind this many days before it expires. */
+  remindDays: number
+  notes: string
+  /** manual, email */
+  source: string
+  /** Gmail message id for warranties found in email (avoids duplicates). */
+  sourceID: string
+  createdAt: string | null
+}
+
+// MARK: People
+
+export type Relation = 'family' | 'partner' | 'friend' | 'work' | 'other'
+export const RELATIONS: Relation[] = ['family', 'partner', 'friend', 'work', 'other']
+export const RELATION_COLOR: Record<Relation, string> = {
+  family: 'var(--pink)', partner: 'var(--orange)', friend: 'var(--cyan)', work: 'var(--lime)', other: 'var(--mint)',
+}
+
+/** kind "person": someone you care about. Same fields as the Mac's Person in CloudSync.swift. */
+export interface Person {
+  name: string
+  email: string
+  phone: string
+  relation: Relation
+  /** Year 1 means the year isn't known. */
+  birthday: string | null
+  notes: string
+  giftIdeas: string[]
+  lastContact: string | null
+  /** "gmail" when found in your email, "manual" when you logged it. */
+  lastContactSource: string
+  /** Nudge after this many days without contact (0 = never). */
+  contactEveryDays: number
+  createdAt: string | null
 }

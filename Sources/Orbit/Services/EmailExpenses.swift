@@ -204,6 +204,9 @@ final class EmailExpenses: ObservableObject {
         let category: String
         let recurring: Bool
         let duplicate_of: Int
+        let cycle: String
+        let item: String
+        let warranty_months: Int
     }
     private struct Out: Decodable { let items: [Found] }
 
@@ -218,6 +221,7 @@ final class EmailExpenses: ObservableObject {
         - "expense": a completed payment by the user: receipt, order confirmation with a charged total, payment confirmation, subscription renewal charged, card/bank/wallet debit alert (e.g. "your card was charged", InstaPay/Vodafone Cash/Fawry transfers out).
         - "refund": money returned to the user.
         - "bill_due": a bill or invoice the user still has to pay (not paid yet).
+        - "trial": a free trial the user started that will turn into a paid subscription. amount = the price after the trial, due_date = the day it starts charging (yyyy-MM-dd).
         - "not_payment": anything else: marketing, shipping updates without a charge, OTP codes, failed or declined payments, account statements, money the user received from someone, newsletters.
         Rules:
         - amount: the final total actually charged, including tax and shipping, as a positive number. Not the subtotal, not a single line item.
@@ -226,6 +230,9 @@ final class EmailExpenses: ObservableObject {
         - date: the day of the charge, yyyy-MM-dd. due_date: for bill_due only, yyyy-MM-dd, else "".
         - category: one of \(MoneyCategory.all.filter { $0 != "Income" }.joined(separator: ", ")).
         - recurring: true for subscriptions and recurring bills.
+        - cycle: for subscriptions and trials, how often it charges: "weekly", "monthly", "quarterly" or "yearly"; otherwise "".
+        - item: for a purchase of a physical product, its short name ("AirPods Pro", "Dyson V15"); otherwise "".
+        - warranty_months: if the email states a warranty or guarantee period for the purchase, its length in months; otherwise 0. Don't guess.
         - duplicate_of: if two emails describe the same payment (e.g. a store receipt and the bank's charge alert for the same amount on the same day), set duplicate_of on the second one to the first one's ref; otherwise -1.
         - When unsure whether money really left the account, use "not_payment".
         For not_payment, use empty strings, amount 0 and category "General".
@@ -235,7 +242,7 @@ final class EmailExpenses: ObservableObject {
             "type": "object",
             "properties": [
                 "ref": ["type": "integer"],
-                "kind": ["type": "string", "enum": ["expense", "refund", "bill_due", "not_payment"]],
+                "kind": ["type": "string", "enum": ["expense", "refund", "bill_due", "trial", "not_payment"]],
                 "merchant": ["type": "string"],
                 "amount": ["type": "number"],
                 "currency": ["type": "string"],
@@ -244,8 +251,12 @@ final class EmailExpenses: ObservableObject {
                 "category": ["type": "string", "enum": MoneyCategory.all],
                 "recurring": ["type": "boolean"],
                 "duplicate_of": ["type": "integer"],
+                "cycle": ["type": "string", "enum": ["", "weekly", "monthly", "quarterly", "yearly"]],
+                "item": ["type": "string"],
+                "warranty_months": ["type": "integer"],
             ],
-            "required": ["ref", "kind", "merchant", "amount", "currency", "date", "due_date", "category", "recurring", "duplicate_of"],
+            "required": ["ref", "kind", "merchant", "amount", "currency", "date", "due_date", "category", "recurring", "duplicate_of",
+                         "cycle", "item", "warranty_months"],
             "additionalProperties": false,
         ]
         let schema: [String: Any] = [
@@ -295,6 +306,26 @@ final class EmailExpenses: ObservableObject {
                 context.insert(t)
                 addedThisRun.append(t)
                 expenses += 1
+                // A stated warranty becomes a document with a reminder before it runs out.
+                if f.kind == "expense", f.warranty_months > 0 {
+                    let docs = (try? context.fetch(FetchDescriptor<DocItem>())) ?? []
+                    if !docs.contains(where: { $0.sourceID == email.id }) {
+                        let name = f.item.isEmpty ? title : "\(f.item) (\(title))"
+                        let d = DocItem(title: name, kind: .warranty,
+                                        expires: Calendar.current.date(byAdding: .month, value: f.warranty_months, to: date))
+                        d.issued = date; d.issuer = title; d.source = "email"; d.sourceID = email.id
+                        d.notes = "From email: \(email.subject)"
+                        context.insert(d)
+                    }
+                }
+            case "trial":
+                let ends = df.date(from: f.due_date) ?? df.date(from: f.date)
+                let currency = f.currency.uppercased().trimmingCharacters(in: .whitespaces)
+                let converted = f.amount > 0 ? await Currency.convert(f.amount, from: currency.isEmpty ? Fmt.currencyCode : currency, to: Fmt.currencyCode) : 0
+                SubscriptionTracker.recordTrial(name: f.merchant.isEmpty ? "Free trial" : f.merchant, amount: converted ?? f.amount,
+                                                originalAmount: f.amount, currency: currency, cycle: BillingCycle(rawValue: f.cycle) ?? .monthly,
+                                                ends: ends, context: context)
+                bills += 1
             case "bill_due":
                 let due = df.date(from: f.due_date) ?? df.date(from: f.date)
                 let amount = f.amount > 0 ? " — \(f.amount.formatted(.number.precision(.fractionLength(0...2)))) \(f.currency)" : ""

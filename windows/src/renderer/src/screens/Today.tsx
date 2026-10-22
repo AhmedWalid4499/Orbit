@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Sun, Flame, CreditCard, Library, Check, Plus, MessagesSquare, Mountain, Sparkles, RefreshCw, Mail, ArrowUpRight, AlertCircle } from 'lucide-react'
+import { TrendingUp, Sun, Flame, CreditCard, Library, Check, Plus, MessagesSquare, Mountain, Sparkles, RefreshCw, Mail, ArrowUpRight, AlertCircle } from 'lucide-react'
 import type { Nav } from '@/App'
 import { store, useRecords, useSetting, Rec } from '@/lib/store'
 import { Task, CalEvent, Habit, Txn, Note, Book, Bucket, AREA_COLOR, areaOf, bucketKind, MOOD_FACES, MOOD_WORDS, AREAS, Area } from '@/lib/models'
@@ -53,9 +53,14 @@ export default function Today({ nav }: { nav: Nav }) {
       <div className="row" style={{ gap: 20 }}>
         <div style={{ minWidth: 0 }}>
           <h1 className="page-title" style={{ fontSize: 32 }}>{fmtDay(today)}</h1>
-          <div className="secondary clamp1" style={{ fontSize: 13 }}>
-            {greeting} {next ? `Next up: ${next.data.title} ${relativeTime(parse(next.data.start)!)}.` : 'Nothing else on the calendar today.'}
-            {overdue > 0 && ` ${overdue} overdue.`}
+          <div className="row" style={{ gap: 10, minWidth: 0 }}>
+            <div className="secondary clamp1" style={{ fontSize: 13, minWidth: 0 }}>
+              {greeting} {next ? `Next up: ${next.data.title} ${relativeTime(parse(next.data.start)!)}.` : 'Nothing else on the calendar today.'}
+              {overdue > 0 && ` ${overdue} overdue.`}
+            </div>
+            <button className="row" style={{ gap: 5, fontSize: 12, fontWeight: 600, flex: 'none' }} title="Your week, mood and patterns" onClick={nav.openReview}>
+              <TrendingUp size={13} />Week in review
+            </button>
           </div>
         </div>
         <span className="spacer" />

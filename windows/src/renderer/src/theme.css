@@ -129,7 +129,7 @@ textarea.field { resize: none; }
 .topbar button, .topbar input, .topbar .no-drag { -webkit-app-region: no-drag; }
 .logo { font: 900 32px/1 var(--ui); letter-spacing: -1.5px; display: flex; align-items: flex-end; gap: 2px; }
 .logo i { width: 9px; height: 9px; border-radius: 50%; background: var(--lime); display: inline-block; margin-bottom: 4px; }
-.dock { position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; padding: 5px; background: var(--card); border-radius: 999px; }
+.dock { margin: 0 auto; flex: none; display: flex; align-items: center; gap: 4px; padding: 5px; background: var(--card); border-radius: 999px; }
 .dock .sep { width: 1.5px; height: 22px; background: var(--line); margin: 0 4px; border-radius: 1px; }
 .dock button { height: 40px; min-width: 40px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; color: var(--ink2); font-weight: 600; font-size: 14px; }
 .dock button:hover { color: var(--ink); background: var(--card-hover); }
@@ -138,3 +138,21 @@ textarea.field { resize: none; }
 
 /* Button labels never wrap */
 .btn-soft, .btn-primary, .btn-lime { white-space: nowrap; flex: none; }
+
+/* Reading timer pill (top bar) */
+.timer-pill { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border-radius: 999px; background: var(--purple); color: var(--sticker-ink); font-size: 12px; font-weight: 600; cursor: pointer; -webkit-app-region: no-drag; }
+.timer-pill button { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.5); color: var(--sticker-ink); }
+
+/* Small popup menu (avatar) */
+.pop-menu { position: absolute; right: 0; top: 48px; background: var(--canvas); border-radius: 14px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22); padding: 6px; z-index: 40; min-width: 210px; border: 1px solid var(--line); }
+.pop-menu button { display: flex; width: 100%; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; font-size: 13px; text-align: left; }
+.pop-menu button:hover { background: var(--card); }
+.pop-menu .sep { height: 1px; background: var(--line); margin: 4px 6px; }
+
+/* Days-left badge (Documents, People) */
+.days-badge { min-width: 54px; text-align: center; padding: 6px 8px; border-radius: 12px; color: var(--sticker-ink); font-family: var(--display); font-weight: 700; font-size: 15px; line-height: 1.1; flex: none; }
+.days-badge small { display: block; font-family: var(--ui); font-size: 10px; font-weight: 600; opacity: 0.75; }
+.list-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; background: var(--canvas); text-align: left; width: 100%; color: var(--ink); }
+.list-row:hover { background: var(--card-hover); }
+.timer-title { max-width: 120px; }
+@media (max-width: 1400px) { .timer-title { display: none; } }

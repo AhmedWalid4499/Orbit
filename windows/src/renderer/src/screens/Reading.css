@@ -41,3 +41,10 @@
 .sortmenu button:hover { background: var(--card); }
 .ol-result { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 12px; background: var(--card); }
 .ol-result img, .ol-result .noimg { width: 40px; height: 60px; border-radius: 4px; object-fit: cover; background: var(--card-hover); flex: none; }
+
+.hl-row { display: flex; gap: 12px; padding: 10px; border-radius: 12px; background: var(--canvas); align-items: flex-start; }
+.hl-row .bar { width: 4px; align-self: stretch; border-radius: 2px; background: var(--lime); flex: none; }
+.hl-row .hl-actions { display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; }
+.hl-row:hover .hl-actions { opacity: 1; }
+.hl-actions button { width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--ink2); }
+.hl-actions button:hover { background: var(--card); color: var(--ink); }

@@ -3,7 +3,7 @@ import SwiftData
 import AppKit
 
 enum Tab: String, CaseIterable, Identifiable {
-    case today, calendar, tasks, habits, bucket, money, notes, reading, github
+    case today, calendar, tasks, habits, bucket, money, notes, reading, people, documents, github
     var id: String { rawValue }
 
     var title: String {
@@ -18,6 +18,10 @@ enum Tab: String, CaseIterable, Identifiable {
             return "GitHub"
         case .bucket:
             return "Bucket list"
+        case .people:
+            return "People"
+        case .documents:
+            return "Documents"
         default:
             return rawValue.capitalized
         }
@@ -33,14 +37,17 @@ enum Tab: String, CaseIterable, Identifiable {
         case .notes: "book.pages.fill"
         case .reading: "books.vertical.fill"
         case .bucket: "mountain.2.fill"
+        case .people: "person.2.fill"
+        case .documents: "doc.text.fill"
         case .github: "chevron.left.forwardslash.chevron.right"
         }
     }
 
     /// Nav groups: day, plan, life.
-    static let groups: [[Tab]] = [[.today], [.calendar, .tasks, .habits, .bucket], [.money, .notes, .reading, .github]]
+    static let groups: [[Tab]] = [[.today], [.calendar, .tasks, .habits, .bucket], [.money, .notes, .reading, .people, .documents, .github]]
 
-    var shortcut: KeyEquivalent { KeyEquivalent(Character("\(Tab.allCases.firstIndex(of: self)! + 1)")) }
+    /// ⌘1…⌘9 for the first nine tabs (there's no ⌘10).
+    var shortcutNumber: Int? { let i = Tab.allCases.firstIndex(of: self)! + 1; return i <= 9 ? i : nil }
 }
 
 @MainActor
@@ -127,7 +134,7 @@ struct OrbitApp: App {
         if UserDefaults.standard.string(forKey: "userName") == nil {
             UserDefaults.standard.set(NSFullUserName(), forKey: "userName")
         }
-        let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self, ReadingSession.self, Highlight.self])
+        let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self, ReadingSession.self, Highlight.self, Subscription.self, DocItem.self, Person.self])
         let url = URL.applicationSupportDirectory.appending(path: "Orbit", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         let config = ModelConfiguration(schema: schema, url: url.appending(path: "Orbit.store"))
@@ -168,7 +175,11 @@ struct OrbitApp: App {
             }
             CommandMenu("Go") {
                 ForEach(Tab.allCases) { tab in
-                    Button(tab.title) { state.tab = tab }.keyboardShortcut(tab.shortcut, modifiers: .command)
+                    if let n = tab.shortcutNumber {
+                        Button(tab.title) { state.tab = tab }.keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: .command)
+                    } else {
+                        Button(tab.title) { state.tab = tab }
+                    }
                 }
             }
         }

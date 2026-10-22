@@ -388,6 +388,189 @@ final class Highlight {
     }
 }
 
+// MARK: - Subscriptions
+
+enum BillingCycle: String, CaseIterable, Codable, Identifiable {
+    case weekly, monthly, quarterly, yearly
+    var id: String { rawValue }
+    var title: String { rawValue.capitalized }
+    /// How many charges per month, for monthly totals.
+    var perMonth: Double {
+        switch self { case .weekly: 52.0 / 12; case .monthly: 1; case .quarterly: 1.0 / 3; case .yearly: 1.0 / 12 }
+    }
+    func next(after d: Date) -> Date {
+        let cal = Calendar.current
+        switch self {
+        case .weekly: return cal.date(byAdding: .day, value: 7, to: d)!
+        case .monthly: return cal.date(byAdding: .month, value: 1, to: d)!
+        case .quarterly: return cal.date(byAdding: .month, value: 3, to: d)!
+        case .yearly: return cal.date(byAdding: .year, value: 1, to: d)!
+        }
+    }
+}
+
+/// A recurring charge: found in your transactions or email, or added by hand.
+@Model
+final class Subscription {
+    /// Permanent id used to sync this item between devices.
+    var uuid: String = ""
+    var name: String = ""
+    /// Per charge, in your home currency.
+    var amount: Double = 0
+    var originalAmount: Double = 0
+    var originalCurrency: String = ""
+    var cycleRaw: String = BillingCycle.monthly.rawValue
+    var nextDate: Date? = nil
+    var lastCharged: Date? = nil
+    var category: String = "Subscriptions"
+    /// active, trial, cancelled
+    var status: String = "active"
+    var trialEnds: Date? = nil
+    /// Set when a charge comes in at a different price.
+    var previousAmount: Double = 0
+    var priceChangedAt: Date? = nil
+    /// manual, detected (from transactions), email
+    var source: String = "manual"
+    var notes: String = ""
+    var createdAt: Date = Date.now
+
+    init(name: String, amount: Double, cycle: BillingCycle = .monthly) {
+        self.name = name
+        self.amount = amount
+        self.cycleRaw = cycle.rawValue
+        self.createdAt = .now
+    }
+
+    var cycle: BillingCycle {
+        get { BillingCycle(rawValue: cycleRaw) ?? .monthly }
+        set { cycleRaw = newValue.rawValue }
+    }
+    var monthlyCost: Double { status == "cancelled" ? 0 : amount * cycle.perMonth }
+    var priceWentUp: Bool { previousAmount > 0 && amount > previousAmount * 1.01 }
+}
+
+// MARK: - Documents
+
+enum DocKind: String, CaseIterable, Codable, Identifiable {
+    case passport, id, license, visa, car, insurance, warranty, membership, other
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .id: "ID card"
+        case .license: "Driving licence"
+        case .car: "Car registration"
+        default: rawValue.capitalized
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .passport: "globe.europe.africa.fill"
+        case .id: "person.text.rectangle.fill"
+        case .license: "car.fill"
+        case .visa: "airplane"
+        case .car: "car.side.fill"
+        case .insurance: "shield.lefthalf.filled"
+        case .warranty: "checkmark.seal.fill"
+        case .membership: "creditcard.fill"
+        case .other: "doc.text.fill"
+        }
+    }
+}
+
+/// Something with an expiry date: passport, ID, licence, insurance, a warranty…
+@Model
+final class DocItem {
+    /// Permanent id used to sync this item between devices.
+    var uuid: String = ""
+    var title: String = ""
+    var kindRaw: String = DocKind.other.rawValue
+    /// Keep this short (e.g. last 4 digits); Orbit isn't a password manager.
+    var number: String = ""
+    var issuer: String = ""
+    var issued: Date? = nil
+    var expires: Date? = nil
+    /// Remind this many days before it expires.
+    var remindDays: Int = 30
+    var notes: String = ""
+    /// manual, email
+    var source: String = "manual"
+    /// Gmail message id for warranties found in email (avoids duplicates).
+    var sourceID: String = ""
+    var createdAt: Date = Date.now
+
+    init(title: String, kind: DocKind = .other, expires: Date? = nil) {
+        self.title = title
+        self.kindRaw = kind.rawValue
+        self.expires = expires
+        self.createdAt = .now
+    }
+
+    var kind: DocKind {
+        get { DocKind(rawValue: kindRaw) ?? .other }
+        set { kindRaw = newValue.rawValue }
+    }
+    var daysLeft: Int? {
+        expires.map { Calendar.current.dateComponents([.day], from: Date.now.startOfDay, to: $0.startOfDay).day ?? 0 }
+    }
+}
+
+// MARK: - People
+
+enum Relation: String, CaseIterable, Codable, Identifiable {
+    case family, partner, friend, work, other
+    var id: String { rawValue }
+    var title: String { rawValue.capitalized }
+}
+
+/// Someone you care about: birthday, how to reach them, gift ideas, and when you last talked.
+@Model
+final class Person {
+    /// Permanent id used to sync this item between devices.
+    var uuid: String = ""
+    var name: String = ""
+    var email: String = ""
+    var phone: String = ""
+    var relationRaw: String = Relation.friend.rawValue
+    /// Year 1 means the year isn't known.
+    var birthday: Date? = nil
+    var notes: String = ""
+    var giftIdeas: [String] = []
+    var lastContact: Date? = nil
+    /// "gmail" when found in your email, "manual" when you logged it.
+    var lastContactSource: String = ""
+    /// Nudge after this many days without contact (0 = never).
+    var contactEveryDays: Int = 0
+    var createdAt: Date = Date.now
+
+    init(name: String, relation: Relation = .friend) {
+        self.name = name
+        self.relationRaw = relation.rawValue
+        self.createdAt = .now
+    }
+
+    var relation: Relation {
+        get { Relation(rawValue: relationRaw) ?? .other }
+        set { relationRaw = newValue.rawValue }
+    }
+
+    /// Next birthday on or after today.
+    var nextBirthday: Date? {
+        guard let b = birthday else { return nil }
+        let cal = Calendar.current
+        let c = cal.dateComponents([.month, .day], from: b)
+        return cal.nextDate(after: Date.now.startOfDay.adding(days: -1), matching: c, matchingPolicy: .nextTime)
+    }
+    var turningAge: Int? {
+        guard let b = birthday, let next = nextBirthday, Calendar.current.component(.year, from: b) > 1900 else { return nil }
+        return Calendar.current.component(.year, from: next) - Calendar.current.component(.year, from: b)
+    }
+    var overdueForContact: Bool {
+        guard contactEveryDays > 0 else { return false }
+        guard let last = lastContact else { return true }
+        return Date.now.timeIntervalSince(last) > Double(contactEveryDays) * 86400
+    }
+}
+
 // MARK: - Bucket list
 
 enum BucketKind: String, CaseIterable, Identifiable {

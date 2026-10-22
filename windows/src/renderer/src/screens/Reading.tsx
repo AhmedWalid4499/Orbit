@@ -1,24 +1,22 @@
 // Reading: shelves, categories, library tabs (Goodreads, Kindle, Apple Books, added by you) and Open Library search.
 // Mirrors ReadingView.swift on the Mac; books are the same `book` / `bookCategory` records.
-import { useMemo, useState, ReactNode } from 'react'
+import { useMemo, useRef, useState, ReactNode } from 'react'
 import {
+  Highlighter, Timer, Square, Download, Copy, Trash2, StickyNote,
   Library, BookOpen, Bookmark, BadgeCheck, CircleX, Tag, Plus, Minus, Search, ArrowUpDown, Check, Star,
   Heart, Brain, Briefcase, Sparkles, Globe, FlaskConical, Drama, Leaf, Moon, Zap, BookMarked, GraduationCap, DollarSign, Users, User, Flame,
 } from 'lucide-react'
 import { store, useRecords, useSetting, Rec } from '@/lib/store'
-import { Book, BookCategory, ReadingStatus, READING_STATUS, IMPORTED_SOURCES, paletteColor, PALETTE } from '@/lib/models'
-import { iso, parse, toDateInput, fromInputs } from '@/lib/dates'
+import { Book, BookCategory, ReadingStatus, READING_STATUS, IMPORTED_SOURCES, paletteColor, PALETTE, matchKey, Highlight, ReadingSession, sessionMinutes } from '@/lib/models'
+import { iso, parse, toDateInput, fromInputs, startOfWeek } from '@/lib/dates'
+import { useActiveSession, startReading, stopReading, minutesSince, readingStreak } from '@/lib/readingTimer'
+import { parseKindleFile, importHighlights } from '@/lib/kindle'
 import { Modal, Segmented, EmptyHint } from '@/components/ui'
 import './Reading.css'
 
 // MARK: - Helpers
 
-/** Same match key as the Mac (Book.matchKey): title before ":" or "(", plus the author's last word. */
-export function matchKey(title: string, author: string): string {
-  const t = (title.toLowerCase().split(/[:(]/)[0] ?? '').trim()
-  const words = author.toLowerCase().split(' ').filter(Boolean)
-  return `${t}|${words[words.length - 1] ?? ''}`
-}
+export { matchKey }
 
 const sourcesOf = (b: Book): string[] => (b.sources?.length ? b.sources : [b.source])
 const inLibrary = (b: Book, lib: string): boolean =>
@@ -90,6 +88,9 @@ type Sort = (typeof SORTS)[number]
 
 export default function Reading() {
   const books = useRecords<Book>('book')
+  const highlights = useRecords<Highlight>('highlight')
+  const sessions = useRecords<ReadingSession>('readingSession')
+  const active = useActiveSession()
   const categories = useRecords<BookCategory>('bookCategory')
     .slice().sort((a, b) => (a.data.createdAt ?? '').localeCompare(b.data.createdAt ?? ''))
   const userName = useSetting<string>('userName', '')
@@ -199,13 +200,16 @@ export default function Reading() {
           <div className="rstat" style={{ background: 'var(--cyan)' }}><div className="v">{books.filter((b) => b.data.status === 'toRead').length}</div><div className="l">To read</div></div>
           <div className="rstat" style={{ background: 'var(--purple)' }}><div className="v">{books.filter((b) => b.data.status === 'read').length}</div><div className="l">Read all time</div></div>
           <div className="rstat" style={{ background: 'var(--orange)' }}>
-            <div className="v">{readThisYear.reduce((n, b) => n + (b.data.pageCount || 0), 0).toLocaleString()}</div><div className="l">Pages in {year}</div>
+            <div className="v">{minutesSince(sessions, startOfWeek(new Date()))} min</div>
+            <div className="l clamp1">{readingStreak(sessions) > 1 ? `This week · ${readingStreak(sessions)}-day streak` : 'Read this week'}</div>
           </div>
         </div>
 
-        <LibraryTabs books={books} value={library} onChange={setLibrary} />
+        <LibraryTabs books={books} highlights={highlights.length} value={library} onChange={setLibrary} />
 
-        {filter.type === 'all' && !library && !query.trim() && reading.length > 0 && (
+        {library === 'highlights' && <HighlightsList highlights={highlights} />}
+
+        {library !== 'highlights' && filter.type === 'all' && !library && !query.trim() && reading.length > 0 && (
           <div className="col" style={{ gap: 14 }}>
             <h3 className="section-title">Currently reading</h3>
             <div className="row" style={{ gap: 16, overflowX: 'auto', alignItems: 'stretch' }}>
@@ -221,6 +225,9 @@ export default function Reading() {
                       {b.data.pageCount > 0 && ` · page ${Math.round((b.data.progress || 0) * b.data.pageCount)} of ${b.data.pageCount}`}
                     </div>
                     <div className="pbar"><div style={{ width: `${Math.max(3, (b.data.progress || 0) * 100)}%` }} /></div>
+                    {active?.data.bookUUID === b.id
+                      ? <span role="button" className="btn-soft" style={{ background: 'var(--canvas)', alignSelf: 'flex-start' }} onClick={(e) => { e.stopPropagation(); stopReading(active) }}><Square size={11} fill="currentColor" />Stop</span>
+                      : <span role="button" className="btn-soft" style={{ background: 'var(--canvas)', alignSelf: 'flex-start' }} onClick={(e) => { e.stopPropagation(); startReading(b) }}><Timer size={13} />Start reading</span>}
                   </div>
                 </button>
               ))}
@@ -228,7 +235,7 @@ export default function Reading() {
           </div>
         )}
 
-        <div className="col" style={{ gap: 14 }}>
+        {library !== 'highlights' && <div className="col" style={{ gap: 14 }}>
           <div className="row" style={{ alignItems: 'baseline' }}>
             <h3 className="section-title">{shelfTitle}</h3>
             <span className="display muted" style={{ fontSize: 21, fontWeight: 500 }}>{visible.length}</span>
@@ -255,7 +262,7 @@ export default function Reading() {
               </button>
             ))}
           </div>
-        </div>
+        </div>}
       </section>
 
       <AddBookModal open={adding} onClose={() => setAdding(false)} books={books} categories={categories} defaultCategory={currentCategory} />
@@ -304,19 +311,20 @@ function GoalTile({ done, goal, year }: { done: number; goal: number; year: numb
   )
 }
 
-function LibraryTabs({ books, value, onChange }: { books: Rec<Book>[]; value: string | null; onChange: (v: string | null) => void }) {
+function LibraryTabs({ books, highlights, value, onChange }: { books: Rec<Book>[]; highlights: number; value: string | null; onChange: (v: string | null) => void }) {
   const tabs: { key: string | null; title: string; icon: ReactNode; color: string }[] = [
     { key: null, title: 'All', icon: <Library size={12} />, color: 'transparent' },
     { key: 'goodreads', title: 'Goodreads', icon: <span style={{ fontWeight: 800, fontSize: 12 }}>g</span>, color: 'var(--peach)' },
     { key: 'kindle', title: 'Kindle', icon: <Flame size={12} />, color: 'var(--cyan)' },
     { key: 'apple-books', title: 'Books', icon: <BookOpen size={12} />, color: 'var(--orange)' },
     { key: 'mine', title: 'Added by me', icon: <User size={12} />, color: 'var(--mint)' },
+    { key: 'highlights', title: 'Highlights', icon: <Highlighter size={12} />, color: 'var(--lime)' },
   ]
   return (
     <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
       {tabs.map((t) => {
-        const count = t.key === null ? books.length : books.filter((b) => inLibrary(b.data, t.key!)).length
-        if (t.key !== null && count === 0) return null
+        const count = t.key === 'highlights' ? highlights : t.key === null ? books.length : books.filter((b) => inLibrary(b.data, t.key!)).length
+        if (t.key !== null && t.key !== 'highlights' && count === 0) return null
         const on = value === t.key
         return (
           <button key={t.title} className={`libtab ${on ? 'on' : ''}`} onClick={() => onChange(t.key)}>
@@ -398,6 +406,7 @@ function BookDetail({ book, categories, onClose }: { book: Rec<Book>; categories
                 const cur = b.categories ?? []
                 set({ categories: cur.includes(name) ? cur.filter((x) => x !== name) : [...cur, name] })
               }} />}
+          <BookExtras book={book} />
           <div style={{ fontSize: 12, fontWeight: 600 }} className="muted">Notes & highlights</div>
           <textarea className="field" rows={5} style={{ fontFamily: 'var(--display)', fontSize: 14 }} value={b.notes ?? ''}
             onChange={(e) => set({ notes: e.target.value })} />
@@ -409,6 +418,118 @@ function BookDetail({ book, categories, onClose }: { book: Rec<Book>; categories
         </div>
       </div>
     </Modal>
+  )
+}
+
+/** Reading time, the timer button, and this book's highlights. */
+function BookExtras({ book }: { book: Rec<Book> }) {
+  const active = useActiveSession()
+  const sessions = useRecords<ReadingSession>('readingSession')
+  const all = useRecords<Highlight>('highlight')
+  const mine = all.filter((h) => h.data.bookUUID === book.id || (h.data.bookTitle ?? '').toLowerCase() === (book.data.title ?? '').toLowerCase())
+    .sort((a, b) => (a.data.createdAt ?? '').localeCompare(b.data.createdAt ?? ''))
+  const minutes = Math.floor(sessions.filter((s) => s.data.bookUUID === book.id).reduce((n, s) => n + sessionMinutes(s.data), 0))
+  return (
+    <>
+      <div className="row">
+        <span className="row secondary" style={{ gap: 6, fontSize: 12 }}><Timer size={13} />
+          {minutes === 0 ? 'No reading time yet' : minutes < 60 ? `${minutes} min read` : `${(minutes / 60).toFixed(1)} h read`}</span>
+        <span className="spacer" />
+        {active?.data.bookUUID === book.id
+          ? <button className="btn-soft" onClick={() => stopReading(active)}><Square size={11} fill="currentColor" />Stop reading</button>
+          : <button className="btn-soft" onClick={() => startReading(book)}><Timer size={13} />Start reading</button>}
+      </div>
+      {mine.length > 0 && (
+        <>
+          <div style={{ fontSize: 12, fontWeight: 600 }} className="muted">Highlights ({mine.length})</div>
+          <div className="col scroll" style={{ gap: 6, maxHeight: 180 }}>{mine.map((h) => <HighlightRow key={h.id} h={h} />)}</div>
+        </>
+      )}
+    </>
+  )
+}
+
+// MARK: - Highlights
+
+function HighlightsList({ highlights }: { highlights: Rec<Highlight>[] }) {
+  const [query, setQuery] = useState('')
+  const [message, setMessage] = useState('')
+  const input = useRef<HTMLInputElement>(null)
+  const q = query.trim().toLowerCase()
+  const filtered = highlights.filter((h) => !q || h.data.text.toLowerCase().includes(q) || h.data.bookTitle.toLowerCase().includes(q))
+    .sort((a, b) => (b.data.createdAt ?? '').localeCompare(a.data.createdAt ?? ''))
+  const groups = new Map<string, Rec<Highlight>[]>()
+  for (const h of filtered) groups.set(h.data.bookTitle, [...(groups.get(h.data.bookTitle) ?? []), h])
+  const grouped = [...groups].sort((a, b) => a[0].localeCompare(b[0]))
+
+  const onFile = async (file: File | undefined) => {
+    if (!file) return
+    try {
+      const items = await parseKindleFile(file)
+      const source = file.name.toLowerCase().endsWith('.txt') ? 'kindle-clippings' : 'kindle-notebook'
+      const [added, skipped] = importHighlights(items, source)
+      setMessage(`Imported ${added} highlight${added === 1 ? '' : 's'}${skipped > 0 ? ` (${skipped} already here).` : '.'}`)
+    } catch (e) {
+      setMessage((e as Error).message)
+    }
+    if (input.current) input.current.value = ''
+  }
+
+  return (
+    <div className="col" style={{ gap: 16 }}>
+      <div className="row" style={{ gap: 10 }}>
+        <h3 className="section-title">Highlights</h3>
+        <span className="display muted" style={{ fontSize: 21, fontWeight: 500 }}>{highlights.length}</span>
+        <span className="spacer" />
+        <div className="row" style={{ background: 'var(--card)', borderRadius: 999, padding: '8px 12px', gap: 6 }}>
+          <Search size={14} color="var(--ink3)" />
+          <input className="plain" style={{ width: 160 }} placeholder="Search highlights" value={query} onChange={(e) => setQuery(e.target.value)} />
+        </div>
+        <button className="btn-soft" onClick={() => input.current?.click()}><Download size={14} />Import Kindle highlights…</button>
+        <input ref={input} type="file" accept=".txt,.html,.htm,text/plain,text/html" style={{ display: 'none' }} onChange={(e) => onFile(e.target.files?.[0])} />
+      </div>
+      {message && <div style={{ fontSize: 12, fontWeight: 500 }}>{message}</div>}
+      {highlights.length === 0 && (
+        <div className="card col" style={{ gap: 8, fontSize: 13 }}>
+          <strong style={{ fontSize: 14 }}>Bring in your Kindle highlights and notes:</strong>
+          <div>• <b>Kindle e-reader:</b> plug it in with USB, open it in File Explorer, and import <b>documents › My Clippings.txt</b>.</div>
+          <div>• <b>Kindle app on iPhone, iPad or Android:</b> open a book › Notebook › Share › <b>Export notebook</b>, send the file to this PC, and import it.</div>
+          <div className="muted">Orbit matches highlights to the books in your library and skips ones it already has.</div>
+        </div>
+      )}
+      {grouped.map(([title, items]) => (
+        <div key={title} className="card col" style={{ gap: 10, padding: 16 }}>
+          <div className="row">
+            <strong style={{ fontSize: 16 }}>{title}</strong>
+            {items[0]?.data.author && <span className="secondary" style={{ fontSize: 12 }}>{items[0].data.author}</span>}
+            <span className="spacer" />
+            <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>{items.length}</span>
+          </div>
+          {items.map((h) => <HighlightRow key={h.id} h={h} />)}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function HighlightRow({ h }: { h: Rec<Highlight> }) {
+  const [copied, setCopied] = useState(false)
+  const copy = () => {
+    navigator.clipboard.writeText(`“${h.data.text}” — ${h.data.bookTitle}`).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) })
+  }
+  return (
+    <div className="hl-row">
+      <span className="bar" />
+      <div className="col" style={{ gap: 6, flex: 1, minWidth: 0 }}>
+        <div className="display" style={{ fontSize: 15, fontWeight: 500, userSelect: 'text', whiteSpace: 'pre-wrap' }}>{h.data.text}</div>
+        {h.data.note && <div className="row secondary" style={{ gap: 6, fontSize: 12, alignItems: 'flex-start' }}><StickyNote size={12} style={{ marginTop: 2, flex: 'none' }} />{h.data.note}</div>}
+        {h.data.location && <div className="muted" style={{ fontSize: 10, textTransform: 'capitalize' }}>{h.data.location.toLowerCase()}</div>}
+      </div>
+      <div className="hl-actions">
+        <button title="Copy" onClick={copy}>{copied ? <Check size={13} /> : <Copy size={13} />}</button>
+        <button title="Delete" onClick={() => store.remove(h.id)}><Trash2 size={13} /></button>
+      </div>
+    </div>
   )
 }
 

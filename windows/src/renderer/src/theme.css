@@ -149,7 +149,7 @@ textarea.field { resize: none; }
 .pop-menu button:hover { background: var(--card); }
 .pop-menu .sep { height: 1px; background: var(--line); margin: 4px 6px; }
 
-/* Days-left badge (Documents, People) */
+/* Days-left badge (Documents) */
 .days-badge { min-width: 54px; text-align: center; padding: 6px 8px; border-radius: 12px; color: var(--sticker-ink); font-family: var(--display); font-weight: 700; font-size: 15px; line-height: 1.1; flex: none; }
 .days-badge small { display: block; font-family: var(--ui); font-size: 10px; font-weight: 600; opacity: 0.75; }
 .list-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; background: var(--canvas); text-align: left; width: 100%; color: var(--ink); }

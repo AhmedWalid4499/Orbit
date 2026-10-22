@@ -316,18 +316,6 @@ private let syncKinds: [SyncKind] = [
                  x.notes = J.str(d["notes"]); x.source = J.str(d["source"]); x.sourceID = J.str(d["sourceID"])
                  x.createdAt = J.date(d["createdAt"]) ?? x.createdAt },
              make: { let x = DocItem(title: ""); $0.insert(x); return x }),
-    SyncKind(kind: "person",
-             fetch: { (try? $0.fetch(FetchDescriptor<Person>())) ?? [] }, uuid: { ($0 as! Person).uuid },
-             encode: { m in let p = m as! Person
-                 return ["name": p.name, "email": p.email, "phone": p.phone, "relation": p.relationRaw, "birthday": J.date(p.birthday),
-                         "notes": p.notes, "giftIdeas": p.giftIdeas, "lastContact": J.date(p.lastContact),
-                         "lastContactSource": p.lastContactSource, "contactEveryDays": p.contactEveryDays, "createdAt": J.date(p.createdAt)] },
-             apply: { d, m in let p = m as! Person
-                 p.name = J.str(d["name"]); p.email = J.str(d["email"]); p.phone = J.str(d["phone"]); p.relationRaw = J.str(d["relation"])
-                 p.birthday = J.date(d["birthday"]); p.notes = J.str(d["notes"]); p.giftIdeas = J.strings(d["giftIdeas"])
-                 p.lastContact = J.date(d["lastContact"]); p.lastContactSource = J.str(d["lastContactSource"])
-                 p.contactEveryDays = J.int(d["contactEveryDays"]); p.createdAt = J.date(d["createdAt"]) ?? p.createdAt },
-             make: { let p = Person(name: ""); $0.insert(p); return p }),
 ]
 
 /// Preferences that follow you between Macs (API keys and sign-ins never leave the Keychain).
@@ -450,7 +438,6 @@ final class CloudSync: ObservableObject {
         case let x as Highlight: x.uuid = id
         case let x as Subscription: x.uuid = id
         case let x as DocItem: x.uuid = id
-        case let x as Person: x.uuid = id
         default: break
         }
     }

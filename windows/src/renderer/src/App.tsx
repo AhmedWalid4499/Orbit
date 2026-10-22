@@ -1,5 +1,5 @@
 import { useEffect, useState, ReactNode } from 'react'
-import { Sun, Calendar, ListChecks, Flame, Mountain, CreditCard, BookOpenText, Library, Settings as Gear, Sparkles, Users, FileText, IdCard, Camera, Trash2 } from 'lucide-react'
+import { Sun, Calendar, ListChecks, Flame, Mountain, CreditCard, BookOpenText, Library, Settings as Gear, Sparkles, FileText, IdCard, Camera, Trash2 } from 'lucide-react'
 import * as cloud from '@/lib/cloud'
 import { store, useSetting } from '@/lib/store'
 import { demoRecords, demoProfileCard } from '@/lib/demo'
@@ -23,12 +23,11 @@ import Bucket from '@/screens/Bucket'
 import Money from '@/screens/Money'
 import Notes from '@/screens/Notes'
 import Reading from '@/screens/Reading'
-import People from '@/screens/People'
 import Documents from '@/screens/Documents'
 import Review from '@/screens/Review'
 import MyCard from '@/screens/MyCard'
 
-export type Tab = 'today' | 'calendar' | 'tasks' | 'habits' | 'bucket' | 'money' | 'notes' | 'reading' | 'people' | 'documents'
+export type Tab = 'today' | 'calendar' | 'tasks' | 'habits' | 'bucket' | 'money' | 'notes' | 'reading' | 'documents'
 
 /** Lets any screen switch tabs (e.g. "Open calendar" on Today). */
 export interface Nav { go: (t: Tab) => void; openJournal: () => void; openReview: () => void }
@@ -74,7 +73,6 @@ const TABS: { id: Tab; title: string; icon: ReactNode }[][] = [
     { id: 'money', title: 'Money', icon: <CreditCard size={16} /> },
     { id: 'notes', title: 'Journal & Notes', icon: <BookOpenText size={16} /> },
     { id: 'reading', title: 'Reading', icon: <Library size={16} /> },
-    { id: 'people', title: 'People', icon: <Users size={16} /> },
     { id: 'documents', title: 'Documents', icon: <FileText size={16} /> },
   ],
 ]
@@ -141,7 +139,6 @@ function Shell({ platform }: { platform: string }) {
         {tab === 'money' && <Money />}
         {tab === 'notes' && <Notes openJournalRequest={journalRequest} />}
         {tab === 'reading' && <Reading />}
-        {tab === 'people' && <People />}
         {tab === 'documents' && <Documents />}
         {ask.open && <AskPanel seed={ask.seed} onSeedUsed={() => setAsk((a) => ({ ...a, seed: undefined }))} onClose={() => setAsk({ open: false })} />}
       </main>

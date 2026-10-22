@@ -94,13 +94,6 @@ export function demoRecords(): Rec[] {
     ['Car insurance', 'insurance', -3, 'Allianz', ''], ['Laptop warranty', 'warranty', 160, 'Apple', ''], ['National ID', 'id', 900, 'Egypt', '']] as const) {
     out.push(rec('document', { title, kind, number, issuer, issued: null, expires: iso(at(expires, 12)), remindDays: 30, notes: '', source: 'manual', sourceID: '', createdAt: iso(t) }))
   }
-  const bday = (days: number, year: number) => { const d = addDays(t, days); d.setHours(12); d.setFullYear(year); return iso(d) }
-  for (const [name, relation, birthday, every, lastAgo, gifts] of [['Sara Hassan', 'friend', bday(6, 1994), 30, 45, ['Pottery class', 'Fujifilm Instax']],
-    ['Mom', 'family', bday(23, 1966), 7, 3, ['Cookbook']], ['Omar Khaled', 'work', bday(70, 1), 60, 80, []], ['Grandma', 'family', bday(140, 1941), 14, 20, ['Photo album']],
-    ['Lina', 'partner', bday(200, 1997), 0, 0, []]] as const) {
-    out.push(rec('person', { name, email: '', phone: '', relation, birthday, notes: '', giftIdeas: [...gifts], lastContact: lastAgo ? iso(addDays(t, -lastAgo)) : null,
-      lastContactSource: lastAgo ? 'manual' : '', contactEveryDays: every, createdAt: iso(t) }))
-  }
   out.push(rec('bookCategory', { name: 'Philosophy', colorIndex: 3, symbol: 'brain.head.profile', createdAt: iso(t) }))
   for (const [title, kind, day, ex] of [['See the northern lights in Norway', 'travel', 23, 3], ['Concert with friends', 'people', 6, 3], ['Learn to surf', 'adventure', null, 2]] as const) {
     out.push(rec('bucket', { title, notes: '', kind, targetDate: day === null ? null : iso(addDays(t, day)), excitement: ex, isDone: false, doneAt: null, createdAt: iso(t) }))

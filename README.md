@@ -60,10 +60,6 @@ Money has an **Overview**, a **Calendar** and **Subscriptions**. The Calendar sh
 
 Keep your passport, ID, driving licence, car registration, insurance, memberships and warranties in one place. Orbit reminds you before each one expires (a month by default, six months for passports and visas). Warranties are added by themselves from order emails that mention one.
 
-## People
-
-Birthdays, gift ideas and when you last talked to someone. **Import from Contacts** brings in names, emails and birthdays. Orbit checks connected Gmail inboxes to see when you last emailed each person, and with a "keep in touch" interval set it reminds you on Saturdays when it's been too long. **Gift ideas** asks Claude for suggestions.
-
 ## Siri and Shortcuts
 
 Say "Hey Siri, add to Orbit", "What's on today in Orbit", "Ask Orbit" or "Log an expense in Orbit". The same actions appear in the Shortcuts app, so you can build automations with them (for example, read your day out loud when you open your laptop in the morning).
@@ -115,7 +111,7 @@ Today's journal entry has a chat with Claude next to it. Claude asks about your 
 
 ## Project layout
 
-- `Sources/Orbit/Models`: SwiftData models (tasks, events, habits, transactions, notes, books, subscriptions, documents, people)
+- `Sources/Orbit/Models`: SwiftData models (tasks, events, habits, transactions, notes, books, subscriptions, documents)
 - `Sources/Orbit/Design`: theme (colors, type, pills, cards)
 - `Sources/Orbit/Services`: Claude, Gmail, GitHub, reading sources, Apple Calendar/Reminders, quick capture, updater
 - `Sources/Orbit/Views`: one file per screen

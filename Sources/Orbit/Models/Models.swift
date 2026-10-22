@@ -514,63 +514,6 @@ final class DocItem {
     }
 }
 
-// MARK: - People
-
-enum Relation: String, CaseIterable, Codable, Identifiable {
-    case family, partner, friend, work, other
-    var id: String { rawValue }
-    var title: String { rawValue.capitalized }
-}
-
-/// Someone you care about: birthday, how to reach them, gift ideas, and when you last talked.
-@Model
-final class Person {
-    /// Permanent id used to sync this item between devices.
-    var uuid: String = ""
-    var name: String = ""
-    var email: String = ""
-    var phone: String = ""
-    var relationRaw: String = Relation.friend.rawValue
-    /// Year 1 means the year isn't known.
-    var birthday: Date? = nil
-    var notes: String = ""
-    var giftIdeas: [String] = []
-    var lastContact: Date? = nil
-    /// "gmail" when found in your email, "manual" when you logged it.
-    var lastContactSource: String = ""
-    /// Nudge after this many days without contact (0 = never).
-    var contactEveryDays: Int = 0
-    var createdAt: Date = Date.now
-
-    init(name: String, relation: Relation = .friend) {
-        self.name = name
-        self.relationRaw = relation.rawValue
-        self.createdAt = .now
-    }
-
-    var relation: Relation {
-        get { Relation(rawValue: relationRaw) ?? .other }
-        set { relationRaw = newValue.rawValue }
-    }
-
-    /// Next birthday on or after today.
-    var nextBirthday: Date? {
-        guard let b = birthday else { return nil }
-        let cal = Calendar.current
-        let c = cal.dateComponents([.month, .day], from: b)
-        return cal.nextDate(after: Date.now.startOfDay.adding(days: -1), matching: c, matchingPolicy: .nextTime)
-    }
-    var turningAge: Int? {
-        guard let b = birthday, let next = nextBirthday, Calendar.current.component(.year, from: b) > 1900 else { return nil }
-        return Calendar.current.component(.year, from: next) - Calendar.current.component(.year, from: b)
-    }
-    var overdueForContact: Bool {
-        guard contactEveryDays > 0 else { return false }
-        guard let last = lastContact else { return true }
-        return Date.now.timeIntervalSince(last) > Double(contactEveryDays) * 86400
-    }
-}
-
 // MARK: - Bucket list
 
 enum BucketKind: String, CaseIterable, Identifiable {

@@ -19,7 +19,6 @@ final class Reminders: NSObject, ObservableObject, UNUserNotificationCenterDeleg
     @AppStorage("notify.review") var review = true
     @AppStorage("notify.subscriptions") var subscriptions = true
     @AppStorage("notify.documents") var documents = true
-    @AppStorage("notify.people") var people = true
     @AppStorage("notify.morningHour") var morningHour = 9
     @AppStorage("notify.habitHour") var habitHour = 20
     @AppStorage("notify.journalHour") var journalHour = 21
@@ -176,31 +175,6 @@ final class Reminders: NSObject, ObservableObject, UNUserNotificationCenterDeleg
             }
         }
 
-        if people {
-            let everyone = (try? context.fetch(FetchDescriptor<Person>())) ?? []
-            for p in everyone {
-                guard let next = p.nextBirthday else { continue }
-                let onDay = at(next, 9)
-                if within(onDay) {
-                    add("bday-\(p.uuid.isEmpty ? p.name : p.uuid)", "🎂 It's \(p.name)'s birthday", p.turningAge.map { "They turn \($0) today." } ?? "Send them a message.",
-                        at: onDay, route: "people")
-                }
-                let weekBefore = at(next.adding(days: -7), 10)
-                if within(weekBefore) {
-                    add("bdayweek-\(p.uuid.isEmpty ? p.name : p.uuid)", "\(p.name)'s birthday is next week",
-                        p.giftIdeas.isEmpty ? "Want gift ideas? Ask \(AssistantName.current)." : "Gift ideas: \(p.giftIdeas.prefix(3).joined(separator: ", "))",
-                        at: weekBefore, route: "people")
-                }
-            }
-            let overdue = everyone.filter(\.overdueForContact)
-            if !overdue.isEmpty {
-                var sat = today
-                while cal.component(.weekday, from: sat) != 7 || at(sat, 11) <= now { sat = sat.adding(days: 1) }
-                add("reachout-\(DayKey.key(sat))", "Time to catch up", "It's been a while with \(overdue.prefix(3).map(\.name).joined(separator: ", ")).",
-                    at: at(sat, 11), route: "people")
-            }
-        }
-
         if review {
             // Next Sunday at 6 pm.
             var next = today
@@ -268,7 +242,6 @@ struct NotificationSettingsView: View {
                 Toggle("Weekly review on Sunday evening", isOn: $r.review)
                 Toggle("Free trials ending and yearly renewals", isOn: $r.subscriptions)
                 Toggle("Documents and warranties about to expire", isOn: $r.documents)
-                Toggle("Birthdays and people to catch up with", isOn: $r.people)
             }
             Section("Times") {
                 Picker("Morning summary", selection: $r.morningHour) { ForEach(5..<13) { Text("\($0):00").tag($0) } }

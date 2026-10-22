@@ -16,7 +16,6 @@ enum DataReset {
         try? context.delete(model: Highlight.self)
         try? context.delete(model: Subscription.self)
         try? context.delete(model: DocItem.self)
-        try? context.delete(model: Person.self)
         try? context.save()
         UserDefaults.standard.removeObject(forKey: "aiMorningBriefCache")
     }

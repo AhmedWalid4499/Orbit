@@ -229,29 +229,3 @@ export interface Doc {
   sourceID: string
   createdAt: string | null
 }
-
-// MARK: People
-
-export type Relation = 'family' | 'partner' | 'friend' | 'work' | 'other'
-export const RELATIONS: Relation[] = ['family', 'partner', 'friend', 'work', 'other']
-export const RELATION_COLOR: Record<Relation, string> = {
-  family: 'var(--pink)', partner: 'var(--orange)', friend: 'var(--cyan)', work: 'var(--lime)', other: 'var(--mint)',
-}
-
-/** kind "person": someone you care about. Same fields as the Mac's Person in CloudSync.swift. */
-export interface Person {
-  name: string
-  email: string
-  phone: string
-  relation: Relation
-  /** Year 1 means the year isn't known. */
-  birthday: string | null
-  notes: string
-  giftIdeas: string[]
-  lastContact: string | null
-  /** "gmail" when found in your email, "manual" when you logged it. */
-  lastContactSource: string
-  /** Nudge after this many days without contact (0 = never). */
-  contactEveryDays: number
-  createdAt: string | null
-}

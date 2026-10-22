@@ -3,7 +3,7 @@ import SwiftData
 import AppKit
 
 enum Tab: String, CaseIterable, Identifiable {
-    case today, calendar, tasks, habits, bucket, money, notes, reading, people, documents, github
+    case today, calendar, tasks, habits, bucket, money, notes, reading, documents, github
     var id: String { rawValue }
 
     var title: String {
@@ -18,8 +18,6 @@ enum Tab: String, CaseIterable, Identifiable {
             return "GitHub"
         case .bucket:
             return "Bucket list"
-        case .people:
-            return "People"
         case .documents:
             return "Documents"
         default:
@@ -37,14 +35,13 @@ enum Tab: String, CaseIterable, Identifiable {
         case .notes: "book.pages.fill"
         case .reading: "books.vertical.fill"
         case .bucket: "mountain.2.fill"
-        case .people: "person.2.fill"
         case .documents: "doc.text.fill"
         case .github: "chevron.left.forwardslash.chevron.right"
         }
     }
 
     /// Nav groups: day, plan, life.
-    static let groups: [[Tab]] = [[.today], [.calendar, .tasks, .habits, .bucket], [.money, .notes, .reading, .people, .documents, .github]]
+    static let groups: [[Tab]] = [[.today], [.calendar, .tasks, .habits, .bucket], [.money, .notes, .reading, .documents, .github]]
 
     /// ⌘1…⌘9 for the first nine tabs (there's no ⌘10).
     var shortcutNumber: Int? { let i = Tab.allCases.firstIndex(of: self)! + 1; return i <= 9 ? i : nil }
@@ -134,7 +131,7 @@ struct OrbitApp: App {
         if UserDefaults.standard.string(forKey: "userName") == nil {
             UserDefaults.standard.set(NSFullUserName(), forKey: "userName")
         }
-        let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self, ReadingSession.self, Highlight.self, Subscription.self, DocItem.self, Person.self])
+        let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self, ReadingSession.self, Highlight.self, Subscription.self, DocItem.self])
         let url = URL.applicationSupportDirectory.appending(path: "Orbit", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         let config = ModelConfiguration(schema: schema, url: url.appending(path: "Orbit.store"))

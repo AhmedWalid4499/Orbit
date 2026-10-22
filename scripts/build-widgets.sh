@@ -9,7 +9,8 @@ OUT="$(mktemp -d)"
 trap 'rm -rf "$OUT"' EXIT
 
 xcrun swiftc -target arm64-apple-macos15.0 -sdk "$SDK" -O -parse-as-library -application-extension \
-  -module-name OrbitWidgets Widgets/OrbitWidgets.swift -o "$OUT/OrbitWidgets"
+  -module-name OrbitWidgets Widgets/OrbitWidgets.swift -o "$OUT/OrbitWidgets" \
+  -Xlinker -e -Xlinker _NSExtensionMain  # extensions start in Foundation's NSExtensionMain (as Xcode links them), not Swift's main
 
 # Assemble and sign in a temp folder: folders like an iCloud-synced Desktop add attributes codesign rejects.
 STAGE="$OUT/OrbitWidgets.appex"

@@ -55,6 +55,7 @@ final class AppState: ObservableObject {
     @Published var openTodayJournal = false
     @Published var assistantOpen = false
     @Published var reviewOpen = false
+    @Published var cardOpen = false
     /// A message to send as soon as the assistant opens (e.g. from "Discuss with Claude").
     @Published var assistantSeed: String?
 

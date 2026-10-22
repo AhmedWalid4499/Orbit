@@ -57,6 +57,18 @@ enum Snapshot {
             withDefault("calendarMode", "day") { render("calendar-day", tab: .calendar, appearance: .aqua) }
             withDefault("moneyMode", true) { render("money-calendar", tab: .money, appearance: .aqua) }
             render("assistant", tab: .today, appearance: .aqua) { $0.assistantOpen = true }
+            // Sample profile card (made-up details), rendered the way the share button exports it.
+            var demo = ProfileCard()
+            demo.name = "Sara Hassan"; demo.headline = "Product Designer"; demo.company = "Studio Nile"; demo.location = "Cairo, Egypt"
+            demo.email = "sara@example.com"; demo.bio = "Designing calm software. Coffee, books and long walks."
+            demo.links = [.init(kind: .linkedin, value: "linkedin.com/in/sarahassan"), .init(kind: .website, value: "sarahassan.design"),
+                          .init(kind: .instagram, value: "@sara.designs"), .init(kind: .github, value: "sarahassan")]
+            let face = ImageRenderer(content: CardFace(card: demo, photo: nil, qr: ProfileCardSheet.qr(demo.qrPayload)).padding(20))
+            face.scale = 2
+            if let cg = face.cgImage {
+                try? NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])?
+                    .write(to: URL(fileURLWithPath: dir).appending(path: "card.png"))
+            }
             // Sheets don't show up offscreen, so render the review screens on their own.
             for (name, insights) in [("review", false), ("insights", true)] {
                 let state = AppState()

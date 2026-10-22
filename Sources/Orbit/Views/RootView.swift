@@ -44,6 +44,7 @@ struct RootView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.9), value: state.assistantOpen)
         .sheet(isPresented: $state.searchOpen) { SearchView() }
         .sheet(isPresented: $state.reviewOpen) { ReviewView() }
+        .sheet(isPresented: $state.cardOpen) { ProfileCardSheet() }
         .sheet(isPresented: Binding(get: { !onboarded && !Snapshot.isActive }, set: { if !$0 { onboarded = true } })) { WelcomeView() }
         .task {
             // Keep the next two days of notifications current.
@@ -196,6 +197,8 @@ private struct ProfileMenu: View {
 
     var body: some View {
         Menu {
+            Button("My Card…") { AppState.current?.cardOpen = true }
+            Divider()
             Button(profile.photo == nil ? "Add Profile Photo…" : "Change Profile Photo…") { profile.choosePhoto() }
             if profile.photo != nil { Button("Remove Photo", role: .destructive) { profile.removePhoto() } }
             Divider()

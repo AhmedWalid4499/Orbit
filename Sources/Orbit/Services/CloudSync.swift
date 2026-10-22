@@ -292,7 +292,7 @@ private let syncKinds: [SyncKind] = [
 ]
 
 /// Preferences that follow you between Macs (API keys and sign-ins never leave the Keychain).
-private let syncedSettings = ["monthlyBudget", "readingGoal", "currencyCode", "assistantName", "userName", "weatherCity"]
+private let syncedSettings = ["monthlyBudget", "readingGoal", "currencyCode", "assistantName", "userName", "weatherCity", "profileCard"]
 
 // MARK: - Sync engine
 

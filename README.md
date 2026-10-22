@@ -66,6 +66,10 @@ Hold **⌥Space** and talk; let go and Ask files what you said as a task, event,
 
 Right-click the desktop › **Edit Widgets** and search for Orbit to add **Orbit Today** (small, medium or large), **Orbit Habits**, or **Looking forward to**, a countdown to your next bucket-list date.
 
+## My card
+
+Click your avatar and choose **My Card…**. Add your headline, contact details and links (LinkedIn, website, GitHub, Instagram, X and more), pick a colour, and share it as an image together with a contact file. The card's QR code adds you to someone's contacts with all your links, or can open one link instead.
+
 ## Sync and backup
 
 Sign in under **Settings › Account** to back up Orbit online and keep several Macs in sync. Data is stored in Supabase (Postgres), where each person can only access their own rows. The database setup is in `supabase/schema.sql`. You can sign in with Google or with email. Use the same Google account everywhere and you're in the same Orbit account.

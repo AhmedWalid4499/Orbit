@@ -12,7 +12,7 @@ The owner installs updates through the in-app updater, which reads GitHub Releas
 
 ## Windows app
 
-`windows/` is the Windows version (Electron + React + TypeScript). It reads and writes the same Supabase `orbit_records` rows as the Mac app's `CloudSync.swift`, so field names in `windows/src/renderer/src/lib/models.ts` must match the Mac encoders, and dates must be ISO strings without milliseconds. `scripts/release.sh` also builds the Windows installer (`scripts/build-windows.sh`, needs Rosetta on Apple silicon) and uploads `Orbit-Setup.exe`, its blockmap and `latest.yml` (read by the Windows updater) to the same release. Preview the window with sample data: build with `npx electron-vite build` in `windows/`, run `node windows/scripts-preview.cjs`, open `/?demo`.
+`windows/` is the Windows version (Electron + React + TypeScript). It reads and writes the same Supabase `orbit_records` rows as the Mac app's `CloudSync.swift`, so field names in `windows/src/renderer/src/lib/models.ts` must match the Mac encoders, and dates must be ISO strings without milliseconds. `scripts/release.sh` also builds the Windows installer (`scripts/build-windows.sh`, needs Rosetta on Apple silicon) and uploads `Orbit-Setup.exe`, its blockmap and `latest.yml` (read by the Windows updater) to the same release. `ORBIT_SKIP_WINDOWS=1 scripts/release.sh …` publishes a Mac-only update and carries the previous Windows files over unchanged. Preview the window with sample data: build with `npx electron-vite build` in `windows/`, run `node windows/scripts-preview.cjs`, open `/?demo`.
 
 ## Widgets
 

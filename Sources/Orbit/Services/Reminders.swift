@@ -252,6 +252,7 @@ final class Reminders: NSObject, ObservableObject, UNUserNotificationCenterDeleg
 /// Notification preferences, shown in Settings › Notifications.
 struct NotificationSettingsView: View {
     @ObservedObject private var r = Reminders.shared
+    @AppStorage("launchSound") private var launchSound = true
 
     var body: some View {
         Form {
@@ -288,6 +289,9 @@ struct NotificationSettingsView: View {
                 Toggle("Open Orbit when I log in", isOn: Binding(get: { r.openAtLogin }, set: { r.openAtLogin = $0 }))
                 Text("Orbit schedules the next two days of reminders ahead, so they arrive even when it's closed. Opening it at login keeps them up to date.")
                     .font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
+                Toggle("Play a little chime when Orbit opens", isOn: $launchSound)
             }
         }
         .formStyle(.grouped)

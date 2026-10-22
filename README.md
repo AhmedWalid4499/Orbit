@@ -50,6 +50,8 @@ Both features use `claude-opus-5-5`, with server-side refusal fallback turned on
 
 Click **Ask Claude** in the top bar, or press ⌘J, to open a chat panel. Claude can talk things through and also act in Orbit: create habits, tasks, events, notes and expenses, add recommended books to your reading list, and change your budget. Every action shows an **Undo** button.
 
+
+**Files and voice:** click the paperclip (or drop files on the panel) to send PDFs, photos, Word and text documents; the assistant reads them and can add the dates, bills and to-dos in them. Click the mic to talk instead of typing, and the speaker icon to hear replies. With both on, the conversation continues hands-free: it listens again after each spoken reply until you click stop.
 ## Money
 
 Money has an **Overview**, a **Calendar** and **Subscriptions**. The Calendar shows what you spent each day, plus bills and recurring payments that are coming due. The **Money coach** card gives savings tips based on your real spending, and **Discuss with Claude** opens a conversation about it.
@@ -68,7 +70,7 @@ Hover over a task and click the timer, or use **Focus** on Today, to start a 15,
 
 ## Plan tomorrow
 
-In the evening, **Plan tomorrow** on Today (or the 8:30 pm reminder) walks you through what's left today (done, move to tomorrow, or no date), shows tomorrow's calendar, and asks for your top 3. They appear at the top of Today the next morning, and the morning brief starts from them.
+In the evening, **Plan tomorrow** on Today (or the 8:30 pm reminder) walks you through what's left today (done, move to tomorrow, or no date), shows tomorrow's calendar, and asks for your top 3. With an API key, **Talk it through** lets you just say how tomorrow looks, typed or out loud: the assistant moves leftovers, adds tasks, picks your top 3 and writes the note, and saves when you say so. Your top 3 appears at the top of Today the next morning, and the morning brief starts from it.
 
 ## Trips
 

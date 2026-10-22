@@ -7,6 +7,7 @@ import AppKit
 enum Snapshot {
     /// True while rendering screenshots: no network calls, nothing written.
     static let isActive = ProcessInfo.processInfo.environment["ORBIT_SNAPSHOT_DIR"] != nil || ProcessInfo.processInfo.environment["ORBIT_SYNC_TEST"] != nil
+        || ProcessInfo.processInfo.environment["ORBIT_AI_TEST"] != nil
 
     static func runIfRequested(container: ModelContainer, apple: AppleSync) {
         guard let dir = ProcessInfo.processInfo.environment["ORBIT_SNAPSHOT_DIR"] else { return }
@@ -87,7 +88,7 @@ enum Snapshot {
             renderAlone("review", width: 920, height: 740, ReviewView(startOnInsights: false))
             renderAlone("insights", width: 920, height: 740, ReviewView(startOnInsights: true))
             for (i, a) in [0.6, 2.2, 4.0].enumerated() { renderAlone("splash-\(i)", width: size.width, height: size.height, SplashView(angle: a)) }
-            renderAlone("plan-tomorrow", width: 640, height: 700, PlanTomorrowSheet())
+            renderAlone("plan-tomorrow", width: 1040, height: 720, PlanTomorrowSheet())
             if let trip = try? container.mainContext.fetch(FetchDescriptor<Trip>()).first {
                 renderAlone("trip", width: 820, height: 720, TripSheet(trip: trip))
             }
@@ -221,6 +222,34 @@ enum Snapshot {
         ctx.insert(loose)
 
         return c
+    }
+}
+
+/// Test hook: `ORBIT_AI_TEST=<file>` runs the planning conversation and a file question against Claude with demo data,
+/// prints what happened and quits. Nothing is saved to your real data or chat history.
+@MainActor
+enum AITest {
+    static func runIfRequested(apple: AppleSync) {
+        guard let file = ProcessInfo.processInfo.environment["ORBIT_AI_TEST"] else { return }
+        Task {
+            let container = Snapshot.demoContainer()
+            let context = container.mainContext
+            let draft = PlanDraft(), chat = PlanChat()
+            var saved = false
+            chat.onSave = { saved = true }
+            chat.greet(leftovers: [], tomorrowEvents: 0)
+            await chat.send("Move the electricity bill to tomorrow. Tomorrow I really need to finish the budget review deck, call my mom, and go to the gym. Remind me to bring my charger. That's it, save it.",
+                            draft: draft, context: context, apple: apple)
+            for i in chat.items { print("PLAN [\(i.role.rawValue)] \(i.text)") }
+            print("PLAN top: \(draft.picks.map(\.title)) note: \(draft.note) saved: \(saved) error: \(chat.error ?? "-")")
+            if let client = ClaudeClient(), let a = try? ChatAttachment.load(URL(fileURLWithPath: file)) {
+                let reply = try? await client.stream(system: "Answer in one sentence.", messages: [["role": "user", "content": [a.block, ["type": "text", "text": "What is this document about, and what's the due date in it?"]]]],
+                                                     effort: "low", onText: { _ in })
+                print("FILE [\(a.kind)] \(reply?.text ?? "no reply")")
+            }
+            fflush(stdout)
+            NSApp.terminate(nil)
+        }
     }
 }
 

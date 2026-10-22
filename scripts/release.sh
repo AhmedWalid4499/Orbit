@@ -58,7 +58,24 @@ api -X POST -H "Content-Type: application/x-apple-diskimage" --data-binary @buil
   "https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=Orbit.dmg" >/dev/null
 
 # Windows: installer for new people (always Orbit-Setup.exe) plus latest.yml and the blockmap for the in-app updater.
-if scripts/build-windows.sh; then
+# ORBIT_SKIP_WINDOWS=1 releases the Mac only: the previous release's Windows files are carried over unchanged,
+# so the Windows updater still finds latest.yml and simply sees no new version.
+if [[ -n "${ORBIT_SKIP_WINDOWS:-}" ]]; then
+  PREV="$(api "https://api.github.com/repos/$REPO/releases?per_page=10" | python3 -c '
+import json, sys
+for r in json.load(sys.stdin):
+    if r["tag_name"] != sys.argv[1] and any(a["name"] == "latest.yml" for a in r["assets"]):
+        print(r["tag_name"]); break' "$TAG")"
+  TMPW="$(mktemp -d)"
+  for f in Orbit-Setup.exe Orbit-Setup.exe.blockmap latest.yml; do
+    curl -fsSL -o "$TMPW/$f" "https://github.com/$REPO/releases/download/$PREV/$f"
+    case "$f" in *.exe) type=application/vnd.microsoft.portable-executable;; *.yml) type=text/yaml;; *) type=application/octet-stream;; esac
+    api -X POST -H "Content-Type: $type" --data-binary @"$TMPW/$f" \
+      "https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=$f" >/dev/null
+  done
+  rm -rf "$TMPW"
+  echo "Windows: kept $PREV's installer (no Windows update in this release)."
+elif scripts/build-windows.sh; then
   for f in Orbit-Setup.exe Orbit-Setup.exe.blockmap latest.yml; do
     case "$f" in *.exe) type=application/vnd.microsoft.portable-executable;; *.yml) type=text/yaml;; *) type=application/octet-stream;; esac
     api -X POST -H "Content-Type: $type" --data-binary @"windows/dist/$f" \

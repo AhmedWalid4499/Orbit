@@ -10,7 +10,16 @@ struct AssistantPanel: View {
     @ObservedObject private var ai = AIAssistant.shared
 
     @AppStorage("assistantName") private var assistantName = "Ask"
+    @AppStorage("assistantSpeaks") private var speaks = false
+    @ObservedObject private var dictation = Dictation.shared
+    @ObservedObject private var speaker = Speaker.shared
     @State private var draft = ""
+    @State private var attachments: [ChatAttachment] = []
+    @State private var picking = false
+    @State private var dropping = false
+    @State private var fileError: String?
+    /// The last message was spoken, so keep the conversation going by voice.
+    @State private var voiceTurn = false
     @FocusState private var focused: Bool
 
     private let suggestions = [
@@ -46,6 +55,49 @@ struct AssistantPanel: View {
         .shadow(color: .black.opacity(0.12), radius: 24, x: -8)
         .onAppear { focused = true; sendSeed() }
         .onChange(of: state.assistantSeed) { sendSeed() }
+        .onChange(of: store.busy) { _, busy in if !busy { replyFinished() } }
+        .onDisappear { dictation.cancel(); speaker.stop(); voiceTurn = false }
+        .fileImporter(isPresented: $picking, allowedContentTypes: ChatAttachment.allowedTypes, allowsMultipleSelection: true) { result in
+            if case .success(let urls) = result { add(urls) }
+        }
+        .onDrop(of: [.fileURL], isTargeted: $dropping) { providers in
+            for p in providers {
+                _ = p.loadObject(ofClass: URL.self) { url, _ in
+                    if let url { Task { @MainActor in add([url]) } }
+                }
+            }
+            return true
+        }
+        .overlay {
+            if dropping {
+                RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.inverse, style: StrokeStyle(lineWidth: 2, dash: [6]))
+                    .background(Theme.canvas.opacity(0.85))
+                    .overlay(Label("Drop to send to \(assistantName)", systemImage: "doc.badge.plus").font(Theme.ui(14, weight: .semibold)))
+                    .padding(10)
+            }
+        }
+    }
+
+    private func add(_ urls: [URL]) {
+        fileError = nil
+        for url in urls.prefix(5) {
+            do { attachments.append(try ChatAttachment.load(url)) } catch { fileError = error.localizedDescription }
+        }
+    }
+
+    /// Reads the reply aloud if that's on, then listens again when you were talking.
+    private func replyFinished() {
+        guard speaks, store.error == nil, let last = store.items.last(where: { $0.role == .assistant }) else { voiceTurn = false; return }
+        speaker.speak(last.text) {
+            guard voiceTurn, state.assistantOpen else { return }
+            Task { await dictation.start { heard in sendVoice(heard) } }
+        }
+    }
+
+    private func sendVoice(_ heard: String) {
+        guard !heard.isEmpty else { voiceTurn = false; return }
+        voiceTurn = true
+        send(heard)
     }
 
     private var header: some View {
@@ -57,6 +109,12 @@ struct AssistantPanel: View {
                 Text("Talks things through and sets things up for you").font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
             }
             Spacer()
+            Button {
+                speaks.toggle()
+                if !speaks { speaker.stop(); voiceTurn = false }
+            } label: { Image(systemName: speaks ? "speaker.wave.2.fill" : "speaker.slash") }
+                .buttonStyle(.plain).foregroundStyle(speaks ? Theme.ink : Theme.inkMuted)
+                .help(speaks ? "Reading replies aloud. Click to turn off." : "Read replies aloud")
             Button { store.newChat() } label: { Image(systemName: "square.and.pencil") }
                 .buttonStyle(.plain).help("New chat").disabled(store.busy)
             Button { withAnimation(.spring(response: 0.35)) { state.assistantOpen = false } } label: { Image(systemName: "xmark") }
@@ -113,12 +171,24 @@ struct AssistantPanel: View {
     private func row(_ item: ChatItem) -> some View {
         switch item.role {
         case .user:
-            HStack {
-                Spacer(minLength: 50)
-                Text(item.text).font(Theme.ui(14)).textSelection(.enabled)
-                    .foregroundStyle(Theme.onInverse)
-                    .padding(.horizontal, 14).padding(.vertical, 10)
-                    .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Theme.inverse))
+            VStack(alignment: .trailing, spacing: 6) {
+                if let files = item.files, !files.isEmpty {
+                    HStack(spacing: 6) {
+                        Spacer(minLength: 50)
+                        ForEach(files, id: \.self) { f in
+                            Label(f, systemImage: "paperclip").font(Theme.ui(11, weight: .medium)).lineLimit(1)
+                                .padding(.horizontal, 10).padding(.vertical, 5)
+                                .background(Capsule().fill(Theme.card))
+                        }
+                    }
+                }
+                HStack {
+                    Spacer(minLength: 50)
+                    Text(item.text).font(Theme.ui(14)).textSelection(.enabled)
+                        .foregroundStyle(Theme.onInverse)
+                        .padding(.horizontal, 14).padding(.vertical, 10)
+                        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Theme.inverse))
+                }
             }
         case .assistant:
             AssistantText(text: item.text)
@@ -141,17 +211,50 @@ struct AssistantPanel: View {
     }
 
     private var composer: some View {
-        HStack(spacing: 8) {
-            TextField("Message \(assistantName)…", text: $draft, axis: .vertical)
-                .textFieldStyle(.plain).font(Theme.ui(14)).lineLimit(1...6)
-                .focused($focused)
-                .onSubmit { send(draft) }
-            Button { send(draft) } label: {
-                Image(systemName: "arrow.up").font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.onInverse)
-                    .frame(width: 30, height: 30).background(Circle().fill(Theme.inverse))
+        VStack(alignment: .leading, spacing: 8) {
+            if !attachments.isEmpty {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 6) {
+                        ForEach(attachments) { a in
+                            HStack(spacing: 6) {
+                                Image(systemName: a.symbol)
+                                Text(a.name).lineLimit(1).frame(maxWidth: 160)
+                                Button { attachments.removeAll { $0.id == a.id } } label: { Image(systemName: "xmark") }.buttonStyle(.plain)
+                            }
+                            .font(Theme.ui(11, weight: .medium))
+                            .padding(.horizontal, 10).padding(.vertical, 6)
+                            .background(Capsule().fill(Theme.canvas))
+                        }
+                    }
+                }
+                .scrollIndicators(.never)
             }
-            .buttonStyle(.plain)
-            .disabled(store.busy || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            if let e = fileError ?? dictation.error {
+                Text(e).font(Theme.ui(11)).foregroundStyle(Theme.orange).fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 8) {
+                Button { picking = true } label: { Image(systemName: "paperclip").font(.system(size: 14, weight: .semibold)) }
+                    .buttonStyle(.plain).foregroundStyle(Theme.inkSecondary).help("Send a PDF, photo or document")
+                if dictation.listening {
+                    Text(dictation.text.isEmpty ? "Listening…" : dictation.text).font(Theme.ui(14))
+                        .foregroundStyle(dictation.text.isEmpty ? Theme.inkMuted : Theme.ink)
+                        .frame(maxWidth: .infinity, alignment: .leading).lineLimit(1...6)
+                } else {
+                    TextField(attachments.isEmpty ? "Message \(assistantName)…" : "Ask about \(attachments.count == 1 ? "this file" : "these files")…",
+                              text: $draft, axis: .vertical)
+                        .textFieldStyle(.plain).font(Theme.ui(14)).lineLimit(1...6)
+                        .focused($focused)
+                        .onSubmit { send(draft) }
+                }
+                MicButton { heard in sendVoice(heard) }
+                    .disabled(store.busy)
+                Button { send(draft) } label: {
+                    Image(systemName: "arrow.up").font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.onInverse)
+                        .frame(width: 30, height: 30).background(Circle().fill(Theme.inverse))
+                }
+                .buttonStyle(.plain)
+                .disabled(store.busy || (draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && attachments.isEmpty))
+            }
         }
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 16).fill(Theme.card))
@@ -160,9 +263,13 @@ struct AssistantPanel: View {
 
     private func send(_ text: String) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty, !store.busy else { return }
+        guard !t.isEmpty || !attachments.isEmpty, !store.busy else { return }
+        if !dictation.listening && t == draft.trimmingCharacters(in: .whitespacesAndNewlines) { voiceTurn = false }
         draft = ""
-        Task { await store.send(t, context: context, apple: apple) }
+        let files = attachments
+        attachments = []
+        speaker.stop()
+        Task { await store.send(t, attachments: files, context: context, apple: apple) }
     }
 
     private func sendSeed() {

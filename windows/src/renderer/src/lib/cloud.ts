@@ -18,6 +18,7 @@ const listeners = new Set<() => void>()
 
 export function configure(c: { url: string; key: string }): void { config = c }
 export function isConfigured(): boolean { return !!config.url && !!config.key }
+export function cloudConfig(): { url: string; key: string } { return config }
 
 export function getSession(): Session | null {
   try { return JSON.parse(localStorage.getItem(SESSION_KEY) ?? 'null') } catch { return null }

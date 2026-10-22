@@ -3,6 +3,7 @@ import { Sun, Calendar, ListChecks, Flame, Mountain, CreditCard, BookOpenText, L
 import * as cloud from '@/lib/cloud'
 import { store, useSetting } from '@/lib/store'
 import { demoRecords } from '@/lib/demo'
+import { syncVault } from '@/lib/vault'
 
 /** Open with ?demo to preview with sample data (used for screenshots; nothing is synced). */
 const DEMO = new URLSearchParams(location.search).has('demo')
@@ -43,7 +44,7 @@ export default function App() {
 
   useEffect(() => {
     if (!ready || DEMO) return
-    if (signedIn) store.start()
+    if (signedIn) store.start().then(() => syncVault()) // unlock keys synced from the Mac, if the passphrase is saved here
     else store.stop()
   }, [ready, signedIn])
 

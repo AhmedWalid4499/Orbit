@@ -2,6 +2,9 @@ import { app, BrowserWindow, ipcMain, shell, nativeTheme } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { join } from 'path'
 import { readFileSync } from 'fs'
+import { registerClaude } from './claude'
+import { registerGoogle } from './google'
+import { registerVault } from './vault'
 
 // Google sign-in (through Supabase) comes back to Orbit on this link, same as the Mac app.
 const PROTOCOL = 'com.personal.orbit'
@@ -98,6 +101,9 @@ ipcMain.handle('check-updates', async () => {
 ipcMain.handle('install-update', () => autoUpdater.quitAndInstall())
 
 app.whenReady().then(() => {
+  registerClaude()
+  registerGoogle()
+  registerVault()
   createWindow()
   if (canUpdate()) {
     autoUpdater.checkForUpdates().catch(() => {})

@@ -100,8 +100,8 @@ private struct TopBar: View {
             }
             .padding(.leading, 70) // traffic lights
             Spacer(minLength: 16)
-            // Shows the current tab's name when there's room, icons only when the window is narrow.
-            ViewThatFits(in: .horizontal) { NavDock(compact: false); NavDock(compact: true) }
+            // The current tab always shows its name; narrower windows get tighter spacing instead.
+            ViewThatFits(in: .horizontal) { NavDock(density: 0); NavDock(density: 1); NavDock(density: 2) }
             Spacer(minLength: 16)
             HStack(spacing: 10) {
                 ReadingTimerPill()
@@ -139,17 +139,18 @@ private struct TopBar: View {
 /// Compact navigation: icons in one capsule, the current tab expands to show its name.
 private struct NavDock: View {
     @EnvironmentObject private var state: AppState
-    let compact: Bool
+    /// 0 roomy, 1 tighter, 2 tightest.
+    let density: Int
     @Namespace private var ns
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: [4, 2, 0][density]) {
             ForEach(Array(Tab.groups.enumerated()), id: \.offset) { i, group in
                 if i > 0 {
-                    Capsule().fill(Theme.line).frame(width: 1.5, height: 22).padding(.horizontal, 4)
+                    Capsule().fill(Theme.line).frame(width: 1.5, height: 22).padding(.horizontal, density == 0 ? 4 : 2)
                 }
                 ForEach(group) { tab in
-                    DockItem(tab: tab, selected: state.tab == tab, showsTitle: !compact, ns: ns) {
+                    DockItem(tab: tab, selected: state.tab == tab, density: density, ns: ns) {
                         withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) { state.tab = tab }
                     }
                 }
@@ -163,7 +164,7 @@ private struct NavDock: View {
 private struct DockItem: View {
     let tab: Tab
     let selected: Bool
-    let showsTitle: Bool
+    let density: Int
     let ns: Namespace.ID
     let action: () -> Void
     @State private var hovering = false
@@ -172,13 +173,13 @@ private struct DockItem: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 Image(systemName: tab.symbol).font(.system(size: 14, weight: .semibold))
-                if selected && showsTitle {
-                    Text(tab.title).font(Theme.ui(14, weight: .semibold)).lineLimit(1).fixedSize()
+                if selected {
+                    Text(tab.title).font(Theme.ui(density == 2 ? 13 : 14, weight: .semibold)).lineLimit(1).fixedSize()
                 }
             }
             .foregroundStyle(selected ? Theme.onInverse : (hovering ? Theme.ink : Theme.inkSecondary))
-            .padding(.horizontal, selected && showsTitle ? 16 : 0)
-            .frame(minWidth: 40, minHeight: 40)
+            .padding(.horizontal, selected ? [16, 14, 12][density] : 0)
+            .frame(minWidth: [40, 36, 33][density], minHeight: 40)
             .background {
                 if selected {
                     Capsule().fill(Theme.inverse).matchedGeometryEffect(id: "dock", in: ns)

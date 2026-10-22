@@ -134,6 +134,13 @@ textarea.field { resize: none; }
 .dock button { height: 40px; min-width: 40px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; color: var(--ink2); font-weight: 600; font-size: 14px; }
 .dock button:hover { color: var(--ink); background: var(--card-hover); }
 .dock button.on { background: var(--inverse); color: var(--on-inverse); padding: 0 16px; }
+/* Narrow windows: tighter dock so the selected tab keeps its name */
+@media (max-width: 1360px) {
+  .dock, .dock > .row { gap: 1px !important; }
+  .dock .sep { margin: 0 2px; }
+  .dock button { min-width: 34px; }
+  .dock button.on { padding: 0 12px; font-size: 13px; }
+}
 .avatar { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--pink), var(--purple)); color: var(--sticker-ink); font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; }
 
 /* Button labels never wrap */

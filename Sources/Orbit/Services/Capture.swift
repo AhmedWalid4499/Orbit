@@ -57,19 +57,38 @@ enum CaptureEngine {
 
 // MARK: - Global hot key (⌥Space)
 
+/// System-wide shortcut with separate press and release callbacks.
+/// ⌥Space: tap to open quick capture, hold to talk (voice capture).
 final class HotKey {
-    private static var action: (() -> Void)?
+    private static var handlers: [UInt32: (press: () -> Void, release: (() -> Void)?)] = [:]
+    private static var installed = false
     private var ref: EventHotKeyRef?
 
-    init(keyCode: Int = kVK_Space, modifiers: Int = optionKey, action: @escaping () -> Void) {
-        HotKey.action = action
-        var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
-            DispatchQueue.main.async { HotKey.action?() }
+    init(id: UInt32 = 1, keyCode: Int = kVK_Space, modifiers: Int = optionKey,
+         onPress: @escaping () -> Void, onRelease: (() -> Void)? = nil) {
+        HotKey.installIfNeeded()
+        HotKey.handlers[id] = (onPress, onRelease)
+        let hotKeyID = EventHotKeyID(signature: OSType(0x4F524254), id: id) // 'ORBT'
+        RegisterEventHotKey(UInt32(keyCode), UInt32(modifiers), hotKeyID, GetApplicationEventTarget(), 0, &ref)
+    }
+
+    private static func installIfNeeded() {
+        guard !installed else { return }
+        installed = true
+        var specs = [EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed)),
+                     EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyReleased))]
+        InstallEventHandler(GetApplicationEventTarget(), { _, event, _ in
+            var hk = EventHotKeyID()
+            GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil,
+                              MemoryLayout<EventHotKeyID>.size, nil, &hk)
+            let pressed = GetEventKind(event) == UInt32(kEventHotKeyPressed)
+            let id = hk.id
+            DispatchQueue.main.async {
+                guard let h = HotKey.handlers[id] else { return }
+                if pressed { h.press() } else { h.release?() }
+            }
             return noErr
-        }, 1, &spec, nil, nil)
-        let id = EventHotKeyID(signature: OSType(0x4F524254), id: 1) // 'ORBT'
-        RegisterEventHotKey(UInt32(keyCode), UInt32(modifiers), id, GetApplicationEventTarget(), 0, &ref)
+        }, specs.count, &specs, nil, nil)
     }
 }
 

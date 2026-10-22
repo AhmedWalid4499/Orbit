@@ -125,3 +125,26 @@ export interface Bucket {
   doneAt: string | null
   createdAt: string | null
 }
+
+/** kind "readingSession": time spent reading (Mac reading timer). Same field names as the Mac encoder in CloudSync.swift. */
+export interface ReadingSession {
+  bookUUID: string
+  bookTitle: string
+  start: string
+  end: string | null
+  pagesRead: number
+}
+
+/** kind "highlight": a passage highlighted in a book (Kindle import or added by hand). */
+export interface Highlight {
+  bookUUID: string
+  bookTitle: string
+  author: string
+  text: string
+  note: string
+  location: string
+  createdAt: string
+  /** kindle-clippings, kindle-notebook, kindle-app, manual */
+  source: string
+  externalID: string
+}

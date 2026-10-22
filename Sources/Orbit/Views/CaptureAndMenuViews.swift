@@ -314,6 +314,9 @@ struct SettingsView: View {
 
             AccountSettings()
                 .tabItem { Label("Account", systemImage: "person.crop.circle") }
+
+            NotificationSettingsView()
+                .tabItem { Label("Notifications", systemImage: "bell") }
         }
         .formStyle(.grouped)
         .frame(width: 640, height: 640)

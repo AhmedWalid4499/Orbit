@@ -22,6 +22,12 @@ struct ReadingView: View {
     @State private var editing: Book?
     @State private var newCategory = false
     @State private var renaming: BookCategory?
+    @Query(sort: \Highlight.createdAt, order: .reverse) private var highlights: [Highlight]
+    @Query(sort: \ReadingSession.start, order: .reverse) private var sessions: [ReadingSession]
+    @ObservedObject private var timer = ReadingTimer.shared
+    @State private var importingHighlights = false
+    @State private var highlightMessage: String?
+    @State private var highlightQuery = ""
 
     private var year: Int { Calendar.current.component(.year, from: .now) }
     private var readThisYear: [Book] {
@@ -62,8 +68,12 @@ struct ReadingView: View {
                     header
                     statRow
                     libraryTabs
-                    if filter == .all && library == nil && query.isEmpty && !reading.isEmpty { currentlyReading }
-                    shelf
+                    if library == "highlights" {
+                        highlightsList
+                    } else {
+                        if filter == .all && library == nil && query.isEmpty && !reading.isEmpty { currentlyReading }
+                        shelf
+                    }
                 }
                 .padding(.bottom, 32)
             }
@@ -76,6 +86,21 @@ struct ReadingView: View {
         .sheet(item: $editing) { BookDetailSheet(book: $0) }
         .sheet(isPresented: $newCategory) { CategoryEditor(category: nil) }
         .sheet(item: $renaming) { CategoryEditor(category: $0) }
+        .sheet(item: Binding(get: { timer.justFinished }, set: { timer.justFinished = $0 })) { FinishedReadingSheet(session: $0) }
+        .fileImporter(isPresented: $importingHighlights, allowedContentTypes: [.plainText, .html, .text]) { result in
+            guard case .success(let url) = result else { return }
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            do {
+                let items = try KindleHighlights.parse(fileAt: url)
+                let source = url.pathExtension.lowercased() == "txt" ? "kindle-clippings" : "kindle-notebook"
+                let (added, skipped) = KindleHighlights.importHighlights(items, source: source, context: context)
+                highlightMessage = "Imported \(added) highlight\(added == 1 ? "" : "s")" + (skipped > 0 ? " (\(skipped) already here)." : ".")
+            } catch {
+                highlightMessage = error.localizedDescription
+            }
+        }
+        .onAppear { timer.restore(context: context) }
     }
 
     private var currentCategory: String? {
@@ -117,7 +142,9 @@ struct ReadingView: View {
             ReadingStat(value: "\(reading.count)", label: "Reading now", color: Theme.lime)
             ReadingStat(value: "\(books.filter { $0.status == .toRead }.count)", label: "To read", color: Theme.cyan)
             ReadingStat(value: "\(books.filter { $0.status == .read }.count)", label: "Read all time", color: Theme.purple)
-            ReadingStat(value: readThisYear.reduce(0) { $0 + $1.pageCount }.formatted(), label: "Pages in \(String(year))", color: Theme.orange)
+            ReadingStat(value: "\(ReadingTimer.minutes(sessions, since: Date.now.startOfWeek)) min",
+                        label: ReadingTimer.streak(sessions) > 1 ? "This week · \(ReadingTimer.streak(sessions))-day streak" : "Read this week",
+                        color: Theme.orange)
         }
     }
 
@@ -206,6 +233,13 @@ struct ReadingView: View {
                                     }
                                 }
                                 .frame(height: 6)
+                                if timer.active?.bookUUID == b.uuid && !b.uuid.isEmpty {
+                                    Button { timer.stop(context: context) } label: { Label("Stop", systemImage: "stop.fill") }
+                                        .buttonStyle(SoftButtonStyle())
+                                } else {
+                                    Button { timer.start(b, context: context) } label: { Label("Start reading", systemImage: "timer") }
+                                        .buttonStyle(SoftButtonStyle())
+                                }
                             }
                             .frame(width: 180)
                         }
@@ -262,6 +296,53 @@ struct ReadingView: View {
         }
     }
 
+    // MARK: Highlights
+
+    private var highlightsList: some View {
+        let filtered = highlights.filter {
+            highlightQuery.isEmpty || $0.text.localizedCaseInsensitiveContains(highlightQuery) || $0.bookTitle.localizedCaseInsensitiveContains(highlightQuery)
+        }
+        let grouped = Dictionary(grouping: filtered, by: \.bookTitle).sorted { $0.key.localizedCompare($1.key) == .orderedAscending }
+        return VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 10) {
+                Text("Highlights").font(Theme.display(22))
+                Text("\(highlights.count)").font(Theme.display(22, weight: .regular)).foregroundStyle(Theme.inkMuted)
+                Spacer()
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(Theme.inkMuted)
+                    TextField("Search highlights", text: $highlightQuery).textFieldStyle(.plain).frame(width: 160)
+                }
+                .padding(.horizontal, 12).padding(.vertical, 8).background(Capsule().fill(Theme.card))
+                Button { importingHighlights = true } label: { Label("Import Kindle highlights…", systemImage: "square.and.arrow.down") }
+                    .buttonStyle(SoftButtonStyle())
+            }
+            if let highlightMessage { Text(highlightMessage).font(Theme.ui(12, weight: .medium)) }
+            if highlights.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Bring in your Kindle highlights and notes:").font(Theme.ui(14, weight: .semibold))
+                    Text("• **Kindle e-reader:** plug it in with USB, open it in Finder, and import **documents › My Clippings.txt**.")
+                    Text("• **Kindle app on iPhone, iPad or Android:** open a book › Notebook › Share › **Export notebook**, send the file to your Mac, and import it.")
+                    Text("Orbit matches highlights to the books in your library and skips ones it already has.").foregroundStyle(Theme.inkMuted)
+                }
+                .font(Theme.ui(13)).padding(18).frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 16).fill(Theme.card))
+            }
+            ForEach(grouped, id: \.key) { title, items in
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Text(title).font(Theme.ui(16, weight: .semibold))
+                        if let a = items.first?.author, !a.isEmpty { Text(a).font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary) }
+                        Spacer()
+                        Text("\(items.count)").font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkMuted)
+                    }
+                    ForEach(items) { HighlightRow(highlight: $0) }
+                }
+                .padding(16)
+                .background(RoundedRectangle(cornerRadius: 18).fill(Theme.card))
+            }
+        }
+    }
+
     /// All · Goodreads · Kindle · Books · Added by me
     private var libraryTabs: some View {
         let tabs: [(String?, String, String, Color)] = [
@@ -270,14 +351,15 @@ struct ReadingView: View {
             ("kindle", "Kindle", "flame.fill", Theme.cyan),
             ("apple-books", "Books", "book.fill", Theme.orange),
             ("mine", "Added by me", "person.fill", Theme.mint),
+            ("highlights", "Highlights", "highlighter", Theme.lime),
         ]
         return HStack(spacing: 8) {
             ForEach(tabs, id: \.1) { key, title, symbol, color in
-                let count = key == nil ? books.count : books.filter { b in
+                let count = key == "highlights" ? highlights.count : key == nil ? books.count : books.filter { b in
                     key == "mine" ? !(b.sources.isEmpty ? [b.source] : b.sources).allSatisfy(BookLibrary.importedSources.contains)
                                   : (b.sources.contains(key!) || b.source == key!)
                 }.count
-                if key == nil || count > 0 {
+                if key == nil || key == "highlights" || count > 0 {
                     Button { withAnimation(.snappy) { library = key } } label: {
                         HStack(spacing: 7) {
                             Image(systemName: symbol).font(.system(size: 11, weight: .bold))
@@ -557,6 +639,33 @@ private struct BookDetailSheet: View {
     @Query(sort: \BookCategory.createdAt) private var categories: [BookCategory]
     @Bindable var book: Book
 
+    @Query(sort: \Highlight.createdAt) private var allHighlights: [Highlight]
+    @Query private var allSessions: [ReadingSession]
+    @ObservedObject private var timer = ReadingTimer.shared
+
+    /// Reading time, the timer button, and this book's highlights.
+    @ViewBuilder private var bookExtras: some View {
+        let mine = allHighlights.filter { (!book.uuid.isEmpty && $0.bookUUID == book.uuid) || $0.bookTitle.caseInsensitiveCompare(book.title) == .orderedSame }
+        let minutes = Int(allSessions.filter { !book.uuid.isEmpty && $0.bookUUID == book.uuid }.reduce(0) { $0 + $1.minutes })
+        HStack {
+            Label(minutes == 0 ? "No reading time yet" : minutes < 60 ? "\(minutes) min read" : String(format: "%.1f h read", Double(minutes) / 60),
+                  systemImage: "timer").font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
+            Spacer()
+            if timer.active?.bookUUID == book.uuid && !book.uuid.isEmpty {
+                Button { timer.stop(context: context) } label: { Label("Stop reading", systemImage: "stop.fill") }.buttonStyle(SoftButtonStyle())
+            } else {
+                Button { timer.start(book, context: context) } label: { Label("Start reading", systemImage: "timer") }.buttonStyle(SoftButtonStyle())
+            }
+        }
+        if !mine.isEmpty {
+            Text("Highlights (\(mine.count))").font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkMuted)
+            ScrollView {
+                VStack(spacing: 6) { ForEach(mine) { HighlightRow(highlight: $0) } }
+            }
+            .frame(maxHeight: 180)
+        }
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 26) {
             VStack(spacing: 12) {
@@ -614,7 +723,8 @@ private struct BookDetailSheet: View {
                     }
                 }
 
-                Text("Notes & highlights").font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkMuted)
+                bookExtras
+                Text("Notes").font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkMuted)
                 TextEditor(text: $book.notes)
                     .font(Theme.display(14, weight: .regular))
                     .scrollContentBackground(.hidden)
@@ -877,5 +987,35 @@ struct ReadingSourcesSheet: View {
         }
         .padding(16)
         .background(RoundedRectangle(cornerRadius: 16).fill(Theme.card))
+    }
+}
+
+struct HighlightRow: View {
+    @Environment(\.modelContext) private var context
+    let highlight: Highlight
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            RoundedRectangle(cornerRadius: 2).fill(Theme.lime).frame(width: 4)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(highlight.text).font(Theme.display(15, weight: .regular)).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                if !highlight.note.isEmpty {
+                    Label(highlight.note, systemImage: "note.text").font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
+                }
+                if !highlight.location.isEmpty {
+                    Text(highlight.location.capitalized).font(Theme.ui(10)).foregroundStyle(Theme.inkMuted)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Theme.canvas))
+        .contextMenu {
+            Button("Copy") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString("“\(highlight.text)” — \(highlight.bookTitle)", forType: .string)
+            }
+            Button("Delete", role: .destructive) { context.delete(highlight) }
+        }
     }
 }

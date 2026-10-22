@@ -3,6 +3,7 @@ import SwiftData
 
 struct RootView: View {
     @EnvironmentObject private var state: AppState
+    @EnvironmentObject private var apple: AppleSync
     @Environment(\.modelContext) private var context
     @AppStorage("userName") private var userName = NSFullUserName()
     @AppStorage("assistantName") private var assistantName = "Ask"
@@ -42,7 +43,24 @@ struct RootView: View {
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.9), value: state.assistantOpen)
         .sheet(isPresented: $state.searchOpen) { SearchView() }
+        .sheet(isPresented: $state.reviewOpen) { ReviewView() }
         .sheet(isPresented: Binding(get: { !onboarded && !Snapshot.isActive }, set: { if !$0 { onboarded = true } })) { WelcomeView() }
+        .task {
+            // Keep the next two days of notifications current.
+            while !Task.isCancelled {
+                await Reminders.shared.reschedule(context: context, apple: apple)
+                WidgetBridge.update(context: context, apple: apple)
+                try? await Task.sleep(for: .seconds(120))
+            }
+        }
+        .onReceive(Reminders.shared.$route.compactMap { $0 }) { route in
+            Reminders.shared.route = nil
+            switch route {
+            case "journal": state.openTodayJournal = true; state.tab = .notes
+            case "review": state.tab = .today; state.reviewOpen = true
+            default: if let t = Tab(rawValue: route) { state.tab = t }
+            }
+        }
         .task {
             // Sync with your Orbit account every two minutes while signed in.
             while !Task.isCancelled {
@@ -81,6 +99,7 @@ private struct TopBar: View {
                 .padding(.leading, 70) // traffic lights
                 Spacer()
                 HStack(spacing: 10) {
+                    ReadingTimerPill()
                     UpdatePill()
                     Button { state.assistantOpen.toggle() } label: {
                         HStack(spacing: 6) {

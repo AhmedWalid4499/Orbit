@@ -148,7 +148,14 @@ struct TodayView: View {
         HStack(alignment: .center, spacing: 20) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide))).font(Theme.display(32))
-                Text(headline).font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary).lineLimit(1)
+                HStack(spacing: 10) {
+                    Text(headline).font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary).lineLimit(1)
+                    Button { state.reviewOpen = true } label: {
+                        Label("Week in review", systemImage: "chart.line.uptrend.xyaxis").font(Theme.ui(12, weight: .semibold))
+                    }
+                    .buttonStyle(.plain).foregroundStyle(Theme.ink)
+                    .help("Your week, mood and patterns")
+                }
             }
             Spacer(minLength: 16)
             ClockWeather()

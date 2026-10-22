@@ -57,12 +57,28 @@ enum Snapshot {
             withDefault("calendarMode", "day") { render("calendar-day", tab: .calendar, appearance: .aqua) }
             withDefault("moneyMode", true) { render("money-calendar", tab: .money, appearance: .aqua) }
             render("assistant", tab: .today, appearance: .aqua) { $0.assistantOpen = true }
+            // Sheets don't show up offscreen, so render the review screens on their own.
+            for (name, insights) in [("review", false), ("insights", true)] {
+                let state = AppState()
+                let host = NSHostingView(rootView: ReviewView(startOnInsights: insights)
+                    .environmentObject(state).environmentObject(apple).modelContainer(container))
+                host.appearance = NSAppearance(named: .aqua)
+                host.frame = NSRect(x: 0, y: 0, width: 920, height: 740)
+                let window = NSWindow(contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+                window.contentView = host
+                host.layoutSubtreeIfNeeded()
+                RunLoop.main.run(until: .now + 0.6)
+                if let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
+                    host.cacheDisplay(in: host.bounds, to: rep)
+                    try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: dir).appending(path: "\(name).png"))
+                }
+            }
             NSApp.terminate(nil)
         }
     }
 
     static func demoContainer() -> ModelContainer {
-        let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self])
+        let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self, ReadingSession.self, Highlight.self])
         let c = try! ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true))
         let ctx = c.mainContext
         let cats = [("Philosophy", 3, "brain.head.profile"), ("Favourites", 0, "heart.fill"), ("Business", 4, "briefcase.fill")]
@@ -101,6 +117,28 @@ enum Snapshot {
         let done = BucketItem(title: "Climb Mount Sinai at sunrise", kind: .adventure, excitement: 3)
         done.isDone = true; done.doneAt = .now.adding(days: -40)
         ctx.insert(done)
+        // Two weeks of moods, reading sessions and a few highlights for the review and insights screens.
+        let gym = Habit(name: "Workout", symbol: "figure.run", area: .health, targetPerWeek: 4)
+        for d in 1...16 {
+            let day = Date.now.startOfDay.adding(days: -d)
+            let worked = d % 2 == 0
+            if worked { gym.doneDays.append(DayKey.key(day)) }
+            let n = Note(title: "Journal", body: "Day \(d)", isJournal: true, date: day.adding(minutes: 21 * 60))
+            n.mood = worked ? [4, 5, 4][d % 3] : [3, 2, 3][d % 3]
+            ctx.insert(n)
+            if d % 3 == 0 {
+                let s = ReadingSession(); s.bookTitle = "Atomic Habits"; s.start = day.adding(minutes: 22 * 60); s.end = s.start.adding(minutes: 25 + d)
+                ctx.insert(s)
+            }
+        }
+        ctx.insert(gym)
+        for (t, b) in [("You do not rise to the level of your goals. You fall to the level of your systems.", "Atomic Habits"),
+                       ("Every action you take is a vote for the type of person you wish to become.", "Atomic Habits"),
+                       ("You have power over your mind, not outside events. Realize this, and you will find strength.", "Meditations")] {
+            let h = Highlight(bookTitle: b, author: b == "Meditations" ? "Marcus Aurelius" : "James Clear", text: t, source: "kindle-clippings")
+            h.location = "Location \(t.count * 7)"
+            ctx.insert(h)
+        }
         let j = Note(title: Date.now.formatted(date: .complete, time: .omitted), isJournal: true)
         j.mood = 4
         j.chat = JournalChat(system: "", turns: [
@@ -118,12 +156,18 @@ enum Snapshot {
 @MainActor
 enum SyncTest {
     static func runIfRequested() {
-        guard ProcessInfo.processInfo.environment["ORBIT_SYNC_TEST"] != nil else { return }
+        guard ProcessInfo.processInfo.environment["ORBIT_SYNC_TEST"] != nil,
+              SupabaseConfig.url.hasPrefix("http://127.0.0.1") else { return }
         Task {
             var results: [String] = []
             func check(_ name: String, _ ok: Bool) { results.append("\(ok ? "PASS" : "FAIL")  \(name)") }
             let cloud = CloudSync.shared
-            let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self])
+            // Never touch the real key-sync setup: set it aside now and put it back at the end.
+            let realPassphrase = Keychain.read("sync-passphrase")
+            let realSession = Keychain.read("supabase-session")
+            let realKeySync = cloud.syncSecrets
+            cloud.syncSecrets = false
+            let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self, ReadingSession.self, Highlight.self])
             do {
                 // Keep the containers alive for the whole test; a context is only valid while its container exists.
                 let containerA = Snapshot.demoContainer()
@@ -142,7 +186,7 @@ enum SyncTest {
                 check("Mac B gets all books (\(count(Book.self, b))/\(count(Book.self, a)))", count(Book.self, a) == count(Book.self, b))
                 check("Mac B gets money (\(count(Transaction.self, b))/\(count(Transaction.self, a)))", count(Transaction.self, a) == count(Transaction.self, b))
                 check("Mac B gets bucket list (\(count(BucketItem.self, b))/\(count(BucketItem.self, a)))", count(BucketItem.self, a) == count(BucketItem.self, b))
-                let journalB = try b.fetch(FetchDescriptor<Note>()).first { $0.isJournal }
+                let journalB = try b.fetch(FetchDescriptor<Note>()).first { $0.isJournal && $0.chatData != nil }
                 check("Journal chat comes across", journalB?.chat?.turns.count == 4)
 
                 // Edit and delete on B, then let A catch up.
@@ -163,8 +207,6 @@ enum SyncTest {
                 check("Deletion reaches Mac A", !(try a.fetch(FetchDescriptor<Book>())).contains { $0.title == deletedTitle })
 
                 // Key sync: A turns it on, B must give the same passphrase; the server never sees a key in the clear.
-                let hadKeySync = cloud.syncSecrets
-                defer { Keychain.delete("sync-passphrase"); cloud.syncSecrets = hadKeySync }
                 let errA = await cloud.setPassphrase("test-pass-123", context: a)
                 check("Keys upload, encrypted (\(errA ?? "ok"))", errA == nil && cloud.vaultState == .on)
                 var req = URLRequest(url: URL(string: "\(SupabaseConfig.url)/rest/v1/orbit_records?select=data,kind")!)
@@ -187,6 +229,9 @@ enum SyncTest {
                 try? FileManager.default.removeItem(at: URL.applicationSupportDirectory.appending(path: "Orbit/sync-\(s.userID)\(tag).json")) } }
             cloud.signOut()
             cloud.deviceTag = ""
+            if let realPassphrase { Keychain.write(realPassphrase, account: "sync-passphrase") } else { Keychain.delete("sync-passphrase") }
+            if let realSession { Keychain.write(realSession, account: "supabase-session") }
+            cloud.syncSecrets = realKeySync
             print(results.joined(separator: "\n"))
             fflush(stdout)
             NSApp.terminate(nil)

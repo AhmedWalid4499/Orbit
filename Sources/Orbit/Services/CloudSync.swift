@@ -271,6 +271,24 @@ private let syncKinds: [SyncKind] = [
                  b.title = J.str(d["title"]); b.notes = J.str(d["notes"]); b.kindRaw = J.str(d["kind"]); b.targetDate = J.date(d["targetDate"])
                  b.excitement = J.int(d["excitement"]); b.isDone = J.bool(d["isDone"]); b.doneAt = J.date(d["doneAt"]); b.createdAt = J.date(d["createdAt"]) ?? b.createdAt },
              make: { let b = BucketItem(title: ""); $0.insert(b); return b }),
+    SyncKind(kind: "readingSession",
+             fetch: { (try? $0.fetch(FetchDescriptor<ReadingSession>())) ?? [] }, uuid: { ($0 as! ReadingSession).uuid },
+             encode: { m in let r = m as! ReadingSession
+                 return ["bookUUID": r.bookUUID, "bookTitle": r.bookTitle, "start": J.date(r.start), "end": J.date(r.end), "pagesRead": r.pagesRead] },
+             apply: { d, m in let r = m as! ReadingSession
+                 r.bookUUID = J.str(d["bookUUID"]); r.bookTitle = J.str(d["bookTitle"]); r.start = J.date(d["start"]) ?? r.start
+                 r.end = J.date(d["end"]); r.pagesRead = J.int(d["pagesRead"]) },
+             make: { let r = ReadingSession(); $0.insert(r); return r }),
+    SyncKind(kind: "highlight",
+             fetch: { (try? $0.fetch(FetchDescriptor<Highlight>())) ?? [] }, uuid: { ($0 as! Highlight).uuid },
+             encode: { m in let h = m as! Highlight
+                 return ["bookUUID": h.bookUUID, "bookTitle": h.bookTitle, "author": h.author, "text": h.text, "note": h.note,
+                         "location": h.location, "createdAt": J.date(h.createdAt), "source": h.source, "externalID": h.externalID] },
+             apply: { d, m in let h = m as! Highlight
+                 h.bookUUID = J.str(d["bookUUID"]); h.bookTitle = J.str(d["bookTitle"]); h.author = J.str(d["author"]); h.text = J.str(d["text"])
+                 h.note = J.str(d["note"]); h.location = J.str(d["location"]); h.createdAt = J.date(d["createdAt"]) ?? h.createdAt
+                 h.source = J.str(d["source"]); h.externalID = J.str(d["externalID"]) },
+             make: { let h = Highlight(bookTitle: "", author: "", text: ""); $0.insert(h); return h }),
 ]
 
 /// Preferences that follow you between Macs (API keys and sign-ins never leave the Keychain).
@@ -389,6 +407,8 @@ final class CloudSync: ObservableObject {
         case let x as Book: x.uuid = id
         case let x as BookCategory: x.uuid = id
         case let x as BucketItem: x.uuid = id
+        case let x as ReadingSession: x.uuid = id
+        case let x as Highlight: x.uuid = id
         default: break
         }
     }

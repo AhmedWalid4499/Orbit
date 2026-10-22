@@ -7,8 +7,11 @@ CONFIG="${1:-release}"
 swift build -c "$CONFIG"
 BIN="$(swift build -c "$CONFIG" --show-bin-path)/Orbit"
 
-APP="build/Orbit.app"
-rm -rf "$APP"
+# Assemble and sign in a temp folder, then copy into build/: an iCloud-synced Desktop adds file attributes
+# that make codesign refuse bundles with extensions inside.
+STAGE_DIR="$(mktemp -d)"
+trap 'rm -rf "$STAGE_DIR"' EXIT
+APP="$STAGE_DIR/Orbit.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Orbit"
 cp Support/Info.plist "$APP/Contents/Info.plist"
@@ -26,6 +29,8 @@ SHARED_GOOGLE="$HOME/Library/Application Support/Orbit/shared-google-client.json
 # Override with ORBIT_SIGN_IDENTITY; falls back to ad-hoc signing if no Apple Development certificate exists.
 IDENTITY="${ORBIT_SIGN_IDENTITY:-$(security find-identity -v -p codesigning | grep -m1 'Apple Development' | awk '{print $2}')}"
 xattr -cr "$APP" # Finder/quarantine attributes make codesign refuse the bundle
+# Desktop widgets live in a signed extension inside the app; it has to be signed before the app itself.
+scripts/build-widgets.sh "$APP" "${IDENTITY:--}"
 if [[ -n "$IDENTITY" ]]; then
   codesign --force --sign "$IDENTITY" --identifier com.personal.orbit "$APP"
   echo "Signed with $(codesign -dvv "$APP" 2>&1 | grep -m1 '^Authority=' | cut -d= -f2)"
@@ -33,4 +38,7 @@ else
   codesign --force --sign - "$APP"
   echo "No Apple Development certificate found; signed ad-hoc"
 fi
-echo "Built $APP (version $VERSION, build $BUILD)"
+rm -rf build/Orbit.app
+mkdir -p build
+ditto --norsrc --noextattr --noqtn "$APP" build/Orbit.app
+echo "Built build/Orbit.app (version $VERSION, build $BUILD)"

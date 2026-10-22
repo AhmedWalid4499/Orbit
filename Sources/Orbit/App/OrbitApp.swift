@@ -45,11 +45,16 @@ enum Tab: String, CaseIterable, Identifiable {
 
 @MainActor
 final class AppState: ObservableObject {
+    /// The window's state, for things that start outside a view (voice capture, notifications).
+    static weak var current: AppState?
+    init() { if AppState.current == nil { AppState.current = self } }
+
     @Published var tab: Tab = .today
     @Published var searchOpen = false
     @Published var settingsOpen = false
     @Published var openTodayJournal = false
     @Published var assistantOpen = false
+    @Published var reviewOpen = false
     /// A message to send as soon as the assistant opens (e.g. from "Discuss with Claude").
     @Published var assistantSeed: String?
 
@@ -70,13 +75,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func handleURL(_ event: NSAppleEventDescriptor, reply: NSAppleEventDescriptor) {
         guard let string = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue, let url = URL(string: string) else { return }
-        Task { @MainActor in CloudAuth.handleCallback(url) }
+        Task { @MainActor in
+            // Widgets open com.personal.orbit://open/<tab>; sign-in uses com.personal.orbit://auth-callback.
+            if url.host == "open" {
+                NSApp.activate(ignoringOtherApps: true)
+                NSApp.windows.first { $0.canBecomeMain }?.makeKeyAndOrderFront(nil)
+                Reminders.shared.route = url.lastPathComponent
+            } else {
+                CloudAuth.handleCallback(url)
+            }
+        }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.applicationIconImage = AppIcon.make()
-        hotKey = HotKey { CapturePanel.shared.toggle() }
+        // ⌥Space: a quick tap opens quick capture; holding it records your voice and Ask files what you said.
+        hotKey = HotKey(onPress: { VoiceCapture.shared.keyDown() }, onRelease: { VoiceCapture.shared.keyUp() })
+        _ = Reminders.shared // become the notification delegate before any notification is tapped
         // Testing hook: ORBIT_AUTO_UPDATE=1 installs any newer release without clicking.
         if ProcessInfo.processInfo.environment["ORBIT_AUTO_UPDATE"] != nil {
             Task { @MainActor in
@@ -110,7 +126,7 @@ struct OrbitApp: App {
         if UserDefaults.standard.string(forKey: "userName") == nil {
             UserDefaults.standard.set(NSFullUserName(), forKey: "userName")
         }
-        let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self])
+        let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self, ReadingSession.self, Highlight.self])
         let url = URL.applicationSupportDirectory.appending(path: "Orbit", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         let config = ModelConfiguration(schema: schema, url: url.appending(path: "Orbit.store"))

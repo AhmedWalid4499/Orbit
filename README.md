@@ -54,6 +54,18 @@ Click **Ask Claude** in the top bar, or press ⌘J, to open a chat panel. Claude
 
 Money has an **Overview** and a **Calendar**. The Calendar shows what you spent each day, plus bills and recurring payments that are coming due. The **Money coach** card gives savings tips based on your real spending, and **Discuss with Claude** opens a conversation about it.
 
+## Reminders, review and insights
+
+Orbit sends Mac notifications for tasks due, events about to start, bills due tomorrow, habits not done by the evening, a nightly journal check-in, and a Sunday **Week in review**. The review shows what you finished, habits kept, spending and mood, and Ask suggests three focus items for next week. **Insights** charts your mood over 90 days and finds patterns, such as mood on days you work out compared with days you don't. Set times in **Settings › Notifications**.
+
+## Voice capture
+
+Hold **⌥Space** and talk; let go and Ask files what you said as a task, event, expense or note. If it's a question, it goes to Ask instead. A quick tap still opens typed quick capture.
+
+## Widgets
+
+Right-click the desktop › **Edit Widgets** and search for Orbit to add **Orbit Today** (small, medium or large), **Orbit Habits**, or **Looking forward to**, a countdown to your next bucket-list date.
+
 ## Sync and backup
 
 Sign in under **Settings › Account** to back up Orbit online and keep several Macs in sync. Data is stored in Supabase (Postgres), where each person can only access their own rows. The database setup is in `supabase/schema.sql`. You can sign in with Google or with email. Use the same Google account everywhere and you're in the same Orbit account.
@@ -61,6 +73,9 @@ Sign in under **Settings › Account** to back up Orbit online and keep several 
 Turn on **Sync API keys and connections** to bring your Anthropic key, GitHub token and Google sign-ins to your other devices. They're encrypted on the device with your sync passphrase (PBKDF2-SHA256 and AES-256-GCM, see `VaultCrypto.swift`), so the server only stores ciphertext. Apple connections stay on each Mac.
 
 ## Reading
+
+**Highlights:** import your Kindle highlights and notes from **My Clippings.txt** (Kindle e-reader) or a notebook export from the Kindle app. **Reading timer:** press **Start reading** on a book to time the session, and Orbit tracks your minutes and your reading streak.
+
 
 The reading tab is where you track books: Reading, To read, Read and Didn't finish shelves, your own categories (each with a color and icon), a yearly goal, ratings, progress and notes. Use **Add book** to search Open Library. **Connect & import** brings in:
 

@@ -338,6 +338,56 @@ final class BookCategory {
     }
 }
 
+// MARK: - Reading sessions & highlights
+
+/// Time spent reading a book (started and stopped with the reading timer).
+@Model
+final class ReadingSession {
+    /// Permanent id used to sync this item between devices (assigned on first launch for older items).
+    var uuid: String = ""
+    var bookUUID: String = ""
+    var bookTitle: String = ""
+    var start: Date = Date.now
+    var end: Date? = nil
+    var pagesRead: Int = 0
+
+    init() {}
+
+    init(book: Book) {
+        self.bookUUID = book.uuid
+        self.bookTitle = book.title
+        self.start = .now
+    }
+
+    var minutes: Double { ((end ?? .now).timeIntervalSince(start)) / 60 }
+}
+
+/// A passage you highlighted (from Kindle or added by hand).
+@Model
+final class Highlight {
+    /// Permanent id used to sync this item between devices (assigned on first launch for older items).
+    var uuid: String = ""
+    var bookUUID: String = ""
+    var bookTitle: String = ""
+    var author: String = ""
+    var text: String = ""
+    var note: String = ""
+    var location: String = ""
+    var createdAt: Date = Date.now
+    /// kindle-clippings, kindle-notebook, kindle-app, manual
+    var source: String = "manual"
+    /// Stable key so re-importing doesn't duplicate highlights.
+    var externalID: String = ""
+
+    init(bookTitle: String, author: String, text: String, source: String = "manual") {
+        self.bookTitle = bookTitle
+        self.author = author
+        self.text = text
+        self.source = source
+        self.createdAt = .now
+    }
+}
+
 // MARK: - Bucket list
 
 enum BucketKind: String, CaseIterable, Identifiable {

@@ -2,12 +2,19 @@ import { useEffect, useMemo, useState, ReactNode } from 'react'
 import {
   Plus, ArrowLeft, ArrowRight, Target, ArrowUpRight, ArrowDownLeft, Mail, Repeat, UtensilsCrossed, Car, Zap,
   ShoppingBag, BriefcaseMedical, Drama, LayoutGrid, MoreHorizontal, Trash2, CreditCard, Check,
+  Sparkles, RefreshCw, MailPlus, MessagesSquare, MailX,
 } from 'lucide-react'
+import { structured, useKeys, useAssistantName } from '@/lib/ai'
+import { openAsk } from '@/lib/askBus'
+import { moneySummary } from '@/lib/snapshot'
+import {
+  emailExpensesState, onEmailExpensesChange, emailExpensesEnabled, startEmailExpensesTimer, syncEmailExpenses, rejectEmailExpense,
+} from '@/lib/emailExpenses'
 import { store, useRecords, useSetting, Rec } from '@/lib/store'
 import { Txn, Task, MONEY_CATEGORIES } from '@/lib/models'
 import {
   iso, parse, startOfDay, addDays, addMonths, sameDay, isToday, startOfMonth, daysInMonth, startOfWeek, dayKey,
-  relativeDay, fmtDay, fromInputs, toDateInput,
+  relativeDay, fmtDay, fromInputs, toDateInput, relativeTime,
 } from '@/lib/dates'
 import { Card, EmptyHint, Segmented, Modal, useMoney } from '@/components/ui'
 import './Money.css'
@@ -32,6 +39,7 @@ export default function Money() {
   const setMode = (m: Mode) => { setModeState(m); localStorage.setItem('orbit.moneyMode', m) }
   const [month, setMonth] = useState(() => startOfMonth(new Date()))
   const [adding, setAdding] = useState(false)
+  useEffect(() => { startEmailExpensesTimer() }, [])
 
   const monthEnd = addMonths(month, 1)
   const txns = useMemo(() => all.filter((t) => { const d = txnDate(t); return d >= month && d < monthEnd }), [all, month])
@@ -48,6 +56,7 @@ export default function Money() {
             <Segmented<Mode> options={[{ id: 'overview', label: 'Overview' }, { id: 'calendar', label: 'Calendar' }]} value={mode} onChange={setMode} />
           </span>
           <span className="spacer" />
+          <EmailChip />
           <button className="btn-soft" onClick={() => setAdding(true)}><Plus size={14} />Add transaction</button>
           <button className="icon-btn filled" style={{ width: 46, height: 46 }} onClick={() => setMonth(addMonths(month, -1))} title="Previous month"><ArrowLeft size={18} /></button>
           <button className="icon-btn filled" style={{ width: 46, height: 46 }} onClick={() => setMonth(addMonths(month, 1))} title="Next month"><ArrowRight size={18} /></button>
@@ -66,6 +75,7 @@ export default function Money() {
           <MoneyCalendar month={month} transactions={all} tasks={tasks} />
         ) : (
           <>
+            <MoneyCoachCard hasExpenses={all.some((t) => t.data.amount < 0)} />
             <div className="row" style={{ gap: 20, alignItems: 'flex-start' }}>
               <div style={{ flex: 1, minWidth: 0 }}><DailyChart month={month} txns={txns} /></div>
               <div style={{ width: 340, flex: 'none' }}><CategoryCard txns={txns} spent={spent} /></div>
@@ -276,6 +286,14 @@ function TxnMenu({ txn, at, onClose }: { txn: Rec<Txn>; at: { x: number; y: numb
         </button>
       ))}
       <div className="sep" />
+      {(t.source ?? '').startsWith('gmail:') && (
+        <>
+          <button onClick={act(() => rejectEmailExpense(txn.id))}><MailX size={13} />Not an expense</button>
+          <button onClick={act(() => { window.orbit.openExternal(`https://mail.google.com/mail/u/?authuser=${encodeURIComponent(t.source.slice(6))}#all/${t.sourceID}`) })}>
+            <Mail size={13} />Open email
+          </button>
+        </>
+      )}
       <button style={{ color: 'var(--critical)' }} onClick={act(() => store.remove(txn.id))}><Trash2 size={13} />Delete</button>
     </div>
   )
@@ -529,5 +547,133 @@ function NewTransaction({ open, onClose }: { open: boolean; onClose: () => void 
         </div>
       </div>
     </Modal>
+  )
+}
+
+// MARK: Money coach (Claude's savings tips, refreshed once a day)
+
+interface Tip { title: string; detail: string; monthly_saving: number }
+interface Advice { headline: string; tips: Tip[]; day: string }
+const COACH_KEY = 'orbit.moneyCoach'
+
+function MoneyCoachCard({ hasExpenses }: { hasExpenses: boolean }) {
+  const keys = useKeys()
+  const name = useAssistantName()
+  const money = useMoney()
+  const currency = useSetting<string>('currencyCode', 'USD')
+  const [advice, setAdvice] = useState<Advice | null>(() => { try { return JSON.parse(localStorage.getItem(COACH_KEY) ?? 'null') } catch { return null } })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const refresh = async (force = false) => {
+    if (loading || !keys.anthropic || !hasExpenses) return
+    if (!force && advice?.day === dayKey(new Date())) return
+    setLoading(true)
+    setError('')
+    try {
+      const system = `You are a practical, kind money coach inside a personal budgeting app. Look at the spending data and suggest specific ways to save.
+- headline: one short sentence on how this month is going compared with the budget and previous months.
+- tips: 3-4 concrete actions based on THIS data (name the merchants, categories and subscriptions involved), each with a realistic monthly_saving in the user's currency (${currency}). detail is 1-2 sentences. No generic advice like "make a budget".
+Don't shame; be encouraging. Plain text, no markdown.`
+      const schema = {
+        type: 'object',
+        properties: {
+          headline: { type: 'string' },
+          tips: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, detail: { type: 'string' }, monthly_saving: { type: 'number' } }, required: ['title', 'detail', 'monthly_saving'], additionalProperties: false } },
+        },
+        required: ['headline', 'tips'], additionalProperties: false,
+      }
+      const r = await structured<{ headline: string; tips: Tip[] }>(system, moneySummary(), schema, 'medium')
+      const a = { ...r, day: dayKey(new Date()) }
+      setAdvice(a)
+      localStorage.setItem(COACH_KEY, JSON.stringify(a))
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { refresh() }, [keys.anthropic, hasExpenses])
+
+  return (
+    <div className="card col" style={{ background: '#141416', color: '#f4f4f5', padding: 20, gap: 12 }}>
+      <div className="row" style={{ gap: 8 }}>
+        <Sparkles size={14} color="var(--lime)" />
+        <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.7 }}>Money coach</span>
+        <span className="spacer" />
+        {keys.anthropic && (
+          <button title="Refresh advice" disabled={loading} onClick={() => refresh(true)}
+            style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', color: '#f4f4f5', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+            <RefreshCw size={12} />
+          </button>
+        )}
+      </div>
+      {!keys.anthropic ? (
+        <span style={{ fontSize: 13, opacity: 0.8 }}>Add your Anthropic API key (or unlock your keys from the Mac) in Settings › AI to get savings advice.</span>
+      ) : advice && advice.tips?.length ? (
+        <>
+          <div className="display" style={{ fontSize: 20 }}>{advice.headline}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+            {advice.tips.map((t) => (
+              <div key={t.title} className="col" style={{ gap: 6, padding: 12, borderRadius: 14, background: 'rgba(255,255,255,0.07)' }}>
+                <div className="row" style={{ alignItems: 'flex-start', gap: 6 }}>
+                  <strong style={{ fontSize: 14, flex: 1 }}>{t.title}</strong>
+                  {t.monthly_saving > 0 && <span className="pill compact" style={{ background: 'var(--lime)', fontWeight: 700 }}>~{money(t.monthly_saving)}/mo</span>}
+                </div>
+                <span style={{ fontSize: 12, opacity: 0.8 }}>{t.detail}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : error ? (
+        <span style={{ fontSize: 12 }}>⚠️ {error}</span>
+      ) : loading ? (
+        <span className="display" style={{ fontSize: 18, fontWeight: 500 }}>{name} is looking at your spending…</span>
+      ) : (
+        <span style={{ fontSize: 13, opacity: 0.8 }}>Add a few expenses (or connect Gmail) and {name} will suggest where you can save.</span>
+      )}
+      {keys.anthropic && (
+        <button onClick={() => openAsk("Let's talk about my spending. Where is my money going, and what should I change?")}
+          className="row" style={{ alignSelf: 'flex-start', gap: 6, background: 'var(--lime)', color: 'var(--sticker-ink)', borderRadius: 999, padding: '8px 14px', fontWeight: 600, fontSize: 13 }}>
+          <MessagesSquare size={14} /> Discuss with {name}
+        </button>
+      )}
+    </div>
+  )
+}
+
+// MARK: Expenses from email (header chip + popover)
+
+function EmailChip() {
+  const keys = useKeys()
+  const name = useAssistantName()
+  const currency = useSetting<string>('currencyCode', 'USD')
+  const [, force] = useState(0)
+  const [open, setOpen] = useState(false)
+  useEffect(() => onEmailExpensesChange(() => force((n) => n + 1)), [])
+  const s = emailExpensesState()
+  if (!keys.gmail.length || !emailExpensesEnabled()) return null
+  return (
+    <span style={{ position: 'relative' }}>
+      <button className="btn-soft" onClick={() => setOpen(!open)}>
+        {s.running ? <RefreshCw size={13} /> : <MailPlus size={14} />}
+        {s.running ? 'Reading receipts…' : 'From email'}
+      </button>
+      {open && (
+        <div className="card col" onMouseLeave={() => setOpen(false)}
+          style={{ position: 'absolute', top: 44, right: 0, width: 340, zIndex: 20, background: 'var(--canvas)', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', gap: 10, padding: 20 }}>
+          <div className="display" style={{ fontSize: 20 }}>Expenses from email</div>
+          <span className="secondary" style={{ fontSize: 12 }}>
+            {name} checks your inboxes every few hours: anything under a payments, receipts, bank or orders label, plus receipts, invoices and
+            card-charge emails anywhere. Paid amounts are added here (converted to {currency}); bills still due become tasks.
+          </span>
+          {s.status && <span style={{ fontSize: 12, fontWeight: 500 }}>{s.status}</span>}
+          {s.lastSync > 0 && <span className="muted" style={{ fontSize: 11 }}>Last checked {relativeTime(new Date(s.lastSync))}</span>}
+          <span className="muted" style={{ fontSize: 11 }}>Wrong one? Right-click it › Not an expense, and it won't come back.</span>
+          <button className="btn-primary" disabled={s.running || !keys.anthropic} onClick={() => syncEmailExpenses()}>{s.running ? 'Checking…' : 'Check now'}</button>
+        </div>
+      )}
+    </span>
   )
 }

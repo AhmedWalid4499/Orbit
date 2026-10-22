@@ -1,9 +1,13 @@
 import { useEffect, useState, ReactNode } from 'react'
-import { Sun, Calendar, ListChecks, Flame, Mountain, CreditCard, BookOpenText, Library, Settings as Gear } from 'lucide-react'
+import { Sun, Calendar, ListChecks, Flame, Mountain, CreditCard, BookOpenText, Library, Settings as Gear, Sparkles } from 'lucide-react'
 import * as cloud from '@/lib/cloud'
 import { store, useSetting } from '@/lib/store'
 import { demoRecords } from '@/lib/demo'
 import { syncVault } from '@/lib/vault'
+import { startEmailExpensesTimer } from '@/lib/emailExpenses'
+import { onOpenAsk } from '@/lib/askBus'
+import { useAssistantName } from '@/lib/ai'
+import AskPanel from '@/components/AskPanel'
 
 /** Open with ?demo to preview with sample data (used for screenshots; nothing is synced). */
 const DEMO = new URLSearchParams(location.search).has('demo')
@@ -44,7 +48,7 @@ export default function App() {
 
   useEffect(() => {
     if (!ready || DEMO) return
-    if (signedIn) store.start().then(() => syncVault()) // unlock keys synced from the Mac, if the passphrase is saved here
+    if (signedIn) store.start().then(() => syncVault()).then(() => startEmailExpensesTimer()) // unlock keys synced from the Mac, if the passphrase is saved here
     else store.stop()
   }, [ready, signedIn])
 
@@ -71,6 +75,9 @@ function Shell({ platform }: { platform: string }) {
   const [tab, setTab] = useState<Tab>('today')
   const [settings, setSettings] = useState(false)
   const [journalRequest, setJournalRequest] = useState(0)
+  const [ask, setAsk] = useState<{ open: boolean; seed?: string }>({ open: false })
+  const assistant = useAssistantName()
+  useEffect(() => onOpenAsk((seed) => setAsk({ open: true, seed })), [])
   const userName = useSetting<string>('userName', '')
   const first = userName.split(' ')[0]
   const initials = userName.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'Me'
@@ -84,6 +91,7 @@ function Shell({ platform }: { platform: string }) {
       const n = Number(e.key)
       if (n >= 1 && n <= flat.length) { setTab(flat[n - 1].id); e.preventDefault() }
       if (e.key === ',') { setSettings(true); e.preventDefault() }
+      if (e.key.toLowerCase() === 'j') { setAsk((a) => ({ open: !a.open })); e.preventDefault() }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -109,11 +117,12 @@ function Shell({ platform }: { platform: string }) {
         </nav>
         <span className="spacer" />
         <div className="row">
+          <button className="btn-lime" title={`${assistant} (Ctrl+J)`} onClick={() => setAsk((a) => ({ open: !a.open }))}><Sparkles size={15} /> {assistant}</button>
           <button className="icon-btn" title="Settings (Ctrl+,)" onClick={() => setSettings(true)}><Gear size={17} /></button>
           <button className="avatar" title="Account & settings" onClick={() => setSettings(true)}>{initials}</button>
         </div>
       </div>
-      <main style={{ flex: 1, minHeight: 0 }}>
+      <main style={{ flex: 1, minHeight: 0, position: 'relative' }}>
         {tab === 'today' && <Today nav={nav} />}
         {tab === 'calendar' && <CalendarScreen />}
         {tab === 'tasks' && <Tasks />}
@@ -122,6 +131,7 @@ function Shell({ platform }: { platform: string }) {
         {tab === 'money' && <Money />}
         {tab === 'notes' && <Notes openJournalRequest={journalRequest} />}
         {tab === 'reading' && <Reading />}
+        {ask.open && <AskPanel seed={ask.seed} onSeedUsed={() => setAsk((a) => ({ ...a, seed: undefined }))} onClose={() => setAsk({ open: false })} />}
       </main>
       <SettingsModal open={settings} onClose={() => setSettings(false)} />
     </div>

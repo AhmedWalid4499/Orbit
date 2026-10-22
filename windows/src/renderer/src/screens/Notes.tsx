@@ -1,22 +1,11 @@
-// Notes and journal, like NotesView.swift on the Mac. The journal chat with the assistant is shown read-only.
+// Notes and journal, like NotesView.swift on the Mac, including the journal check-in with the assistant.
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Search, Pin, PinOff, Trash2, SquarePen, Sun, BookText } from 'lucide-react'
-import { store, useRecords, useSetting, Rec } from '@/lib/store'
+import { Search, Pin, PinOff, Trash2, SquarePen, Sun, BookText, Sparkles, ArrowUp, Wand2, AlertTriangle, MessagesSquare } from 'lucide-react'
+import { store, useRecords, Rec } from '@/lib/store'
 import { Note, MOOD_FACES, MOOD_WORDS } from '@/lib/models'
 import { iso, parse, isToday, relativeDay, fmtDay } from '@/lib/dates'
-
-type Chat = { system?: string; turns?: { role: string; text: string; hidden?: boolean }[] }
-
-function decodeChat(b64: string | null | undefined): Chat | null {
-  if (!b64) return null
-  try {
-    const bin = atob(b64)
-    const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0))
-    return JSON.parse(new TextDecoder().decode(bytes))
-  } catch {
-    return null
-  }
-}
+import { useKeys, useAssistantName } from '@/lib/ai'
+import { decodeChat, startChat, sendMessage, reply, writeEntry, Turn } from './journalChat'
 
 function newNote(journal: boolean): string {
   const now = new Date()
@@ -129,9 +118,6 @@ function Editor({ note, onDelete }: { note: Rec<Note>; onDelete: () => void }) {
   const [body, setBody] = useState(note.data.body ?? '')
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingPatch = useRef<Partial<Note>>({})
-  const assistant = useSetting<string>('assistantName', 'Ask') || 'Ask'
-  const chat = useMemo(() => decodeChat(note.data.chat), [note.data.chat])
-  const turns = (chat?.turns ?? []).filter((t) => !t.hidden)
 
   const flush = () => {
     if (timer.current) clearTimeout(timer.current)
@@ -147,6 +133,8 @@ function Editor({ note, onDelete }: { note: Rec<Note>; onDelete: () => void }) {
     timer.current = setTimeout(flush, 400)
   }
   useEffect(() => () => flush(), []) // save on switching notes
+  // Body rewritten elsewhere (e.g. "Write my entry"): show it unless the user is mid-edit.
+  useEffect(() => { if (!pendingPatch.current.body) setBody(note.data.body ?? '') }, [note.data.body])
 
   const setMood = (m: number) => {
     const mood = note.data.mood === m ? 0 : m
@@ -190,27 +178,167 @@ function Editor({ note, onDelete }: { note: Rec<Note>; onDelete: () => void }) {
           onChange={(e) => { setBody(e.target.value); edit({ body: e.target.value }) }} />
       </div>
 
-      {note.data.isJournal && turns.length > 0 && (
-        <div className="col" style={{ width: 360, flex: 'none', borderLeft: '1px solid var(--line)', padding: 16, gap: 10 }}>
-          <div>
-            <div style={{ fontWeight: 600, fontSize: 14 }}>Check-in with {assistant}</div>
-            <div className="muted" style={{ fontSize: 11 }}>Chatting with {assistant} is on the Mac for now</div>
-          </div>
-          <div className="scroll col" style={{ gap: 8, flex: 1 }}>
-            {turns.map((t, i) => {
-              const mine = t.role === 'user'
-              return (
-                <div key={i} style={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start' }}>
-                  <div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: 18, fontSize: 14, whiteSpace: 'pre-wrap', userSelect: 'text',
-                    background: mine ? 'var(--inverse)' : 'var(--canvas)', color: mine ? 'var(--on-inverse)' : 'var(--ink)' }}>
-                    {t.text}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
+      {note.data.isJournal && <CheckIn note={note} onBodyFlush={flush} />}
     </>
+  )
+}
+
+// MARK: - Check-in with the assistant
+
+function CheckIn({ note, onBodyFlush }: { note: Rec<Note>; onBodyFlush: () => void }) {
+  const keys = useKeys()
+  const assistant = useAssistantName()
+  const chat = useMemo(() => decodeChat(note.data.chat), [note.data.chat])
+  const allTurns = (chat?.turns ?? []).filter((t) => !t.hidden)
+  const [draft, setDraft] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [shown, setShown] = useState('')
+  const [revealing, setRevealing] = useState(false)
+  const [undoBody, setUndoBody] = useState<string | null>(null)
+  const received = useRef('')
+  const finished = useRef(true)
+  const streamStart = useRef(Infinity)
+  const bottom = useRef<HTMLDivElement>(null)
+  const input = useRef<HTMLTextAreaElement>(null)
+  const isTodayEntry = isToday(parse(note.data.createdAt) ?? new Date(0))
+
+  // While a reply is still being revealed, its saved turn stays hidden behind the live bubble.
+  const REF = 978307200
+  const turns = revealing && allTurns.length && allTurns[allTurns.length - 1].role === 'assistant'
+    && (allTurns[allTurns.length - 1].at + REF) * 1000 >= streamStart.current
+    ? allTurns.slice(0, -1) : allTurns
+
+  useEffect(() => { bottom.current?.scrollIntoView({ block: 'end' }) }, [turns.length, shown, busy])
+
+  /** Runs a streaming request and reveals the reply gently, a few characters at a time. */
+  const stream = (work: (onText: (t: string) => void) => Promise<void>) => {
+    setBusy(true); setError(null); setShown(''); setRevealing(true)
+    received.current = ''; finished.current = false; streamStart.current = Date.now() - 1000
+    let local = ''
+    ;(async () => {
+      while (!finished.current || local.length < received.current.length) {
+        if (local.length < received.current.length) {
+          const next = received.current.slice(local.length, local.length + 3)
+          local += next
+          setShown(local)
+          await new Promise((r) => setTimeout(r, /[.?!]/.test(next) ? 220 : 28))
+        } else {
+          await new Promise((r) => setTimeout(r, 40))
+        }
+      }
+      setRevealing(false); setBusy(false)
+      input.current?.focus()
+    })()
+    work((t) => { received.current = t })
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => { finished.current = true })
+  }
+
+  const run = (work: () => Promise<void>) => {
+    setBusy(true); setError(null)
+    work().catch((e) => setError(e instanceof Error ? e.message : String(e))).finally(() => setBusy(false))
+  }
+
+  const send = () => {
+    const text = draft.trim()
+    if (!text || busy) return
+    setDraft('')
+    stream((onText) => sendMessage(note.id, text, assistant, onText))
+  }
+
+  return (
+    <div className="col" style={{ width: 400, flex: 'none', borderLeft: '1px solid var(--line)', gap: 0, background: 'rgba(255,255,255,0.12)' }}>
+      <div className="row" style={{ padding: 16, gap: 8 }}>
+        <span style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--lime)', color: 'var(--sticker-ink)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Sparkles size={14} />
+        </span>
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>Check-in with {assistant}</div>
+          <div className="muted" style={{ fontSize: 11 }}>Talk it through, then turn it into your entry</div>
+        </div>
+      </div>
+
+      {!keys.anthropic ? (
+        <div className="col secondary" style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center', fontSize: 13 }}>
+          Add your Anthropic API key in Settings › AI, or unlock the keys synced from your Mac, to chat about your day.
+        </div>
+      ) : (
+        <>
+          <div className="scroll col" style={{ flex: 1, gap: 10, padding: '0 16px 12px' }}>
+            {turns.length === 0 && !busy && (
+              <div className="col" style={{ alignItems: 'center', gap: 14, paddingTop: 60, textAlign: 'center' }}>
+                <div className="display" style={{ fontSize: 22 }}>{isTodayEntry ? 'How was today?' : 'Look back on this day'}</div>
+                <div className="secondary" style={{ fontSize: 13 }}>{assistant} will ask about your mood and what you got up to, one question at a time.</div>
+                <button className="btn-primary" style={{ width: 200 }} onClick={() => { onBodyFlush(); stream((onText) => startChat(note.id, assistant, onText)) }}>
+                  <MessagesSquare size={14} /> Start check-in
+                </button>
+              </div>
+            )}
+            {turns.map((t) => <Bubble key={t.id} turn={t} />)}
+            {revealing && shown ? <Bubble turn={{ id: 'live', role: 'assistant', text: shown, hidden: false, at: 0 }} />
+              : busy ? <TypingDots /> : null}
+            {error && (
+              <div className="row" style={{ background: 'var(--canvas)', borderRadius: 10, padding: 10, gap: 6, fontSize: 12, alignItems: 'flex-start' }}>
+                <AlertTriangle size={14} color="var(--orange)" style={{ flex: 'none', marginTop: 1 }} />
+                <span style={{ flex: 1 }}>{error}</span>
+                <button style={{ fontWeight: 600 }} onClick={() => stream((onText) => reply(note.id, onText))}>Retry</button>
+              </div>
+            )}
+            <div ref={bottom} />
+          </div>
+
+          {allTurns.length > 0 && (
+            <div className="row" style={{ justifyContent: 'center', gap: 8, paddingBottom: 8 }}>
+              <button className="btn-soft" disabled={busy || !allTurns.some((t) => t.role === 'user')}
+                onClick={() => { onBodyFlush(); run(async () => { const r = await writeEntry(note.id); setUndoBody(r.previous) }) }}>
+                <Wand2 size={13} /> {note.data.body ? 'Update my entry' : 'Write my entry'}
+              </button>
+              {undoBody !== null && (
+                <button className="link" style={{ fontWeight: 600 }} onClick={() => { store.update<Note>(note.id, { body: undoBody, updatedAt: iso(new Date()) }); setUndoBody(null) }}>Undo</button>
+              )}
+            </div>
+          )}
+
+          <div className="row" style={{ margin: '0 14px 14px', background: 'var(--canvas)', borderRadius: 16, padding: 10, gap: 8, alignItems: 'flex-end' }}>
+            <textarea ref={input} className="plain" rows={1} placeholder="Reply…" value={draft} disabled={busy}
+              style={{ resize: 'none', fontSize: 14, maxHeight: 120 }}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }} />
+            <button onClick={send} disabled={busy || !draft.trim()}
+              style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--inverse)', color: 'var(--on-inverse)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
+              <ArrowUp size={14} strokeWidth={3} />
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+/** The assistant separates thoughts with a blank line; each becomes its own soft bubble. */
+function Bubble({ turn }: { turn: Turn }) {
+  const mine = turn.role === 'user'
+  const parts = mine ? [turn.text] : turn.text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean)
+  return (
+    <div className="col" style={{ gap: 6, alignItems: mine ? 'flex-end' : 'flex-start' }}>
+      {parts.map((p, i) => (
+        <div key={i} style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: 18, fontSize: 14, lineHeight: 1.45, whiteSpace: 'pre-wrap', userSelect: 'text',
+          background: mine ? 'var(--inverse)' : 'var(--canvas)', color: mine ? 'var(--on-inverse)' : 'var(--ink)' }}>
+          {p}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function TypingDots() {
+  return (
+    <div className="row" style={{ gap: 5, background: 'var(--canvas)', borderRadius: 18, padding: '12px 14px', alignSelf: 'flex-start' }}>
+      {[0, 1, 2].map((i) => (
+        <span key={i} style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--ink3)', animation: `orbitDot 1.2s ${i * 0.2}s infinite ease-in-out` }} />
+      ))}
+      <style>{'@keyframes orbitDot { 0%, 100% { opacity: 0.3 } 50% { opacity: 1 } }'}</style>
+    </div>
   )
 }

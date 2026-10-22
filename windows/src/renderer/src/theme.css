@@ -135,3 +135,6 @@ textarea.field { resize: none; }
 .dock button:hover { color: var(--ink); background: var(--card-hover); }
 .dock button.on { background: var(--inverse); color: var(--on-inverse); padding: 0 16px; }
 .avatar { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--pink), var(--purple)); color: var(--sticker-ink); font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; }
+
+/* Button labels never wrap */
+.btn-soft, .btn-primary, .btn-lime { white-space: nowrap; flex: none; }

@@ -163,3 +163,13 @@ textarea.field { resize: none; }
 .list-row:hover { background: var(--card-hover); }
 .timer-title { max-width: 120px; }
 @media (max-width: 1400px) { .timer-title { display: none; } }
+
+/* Focus button on task rows (shows on hover) */
+.task-row .focus-btn { width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--ink2); opacity: 0; flex: none; }
+.task-row:hover .focus-btn { opacity: 1; }
+.task-row .focus-btn:hover { background: var(--card); color: var(--ink); }
+
+/* Splash */
+.splash { position: fixed; inset: 0; z-index: 200; background: var(--canvas); display: flex; align-items: center; justify-content: center; transition: opacity 0.35s ease; }
+.splash.out { opacity: 0; pointer-events: none; }
+@media (max-width: 1360px) { .wide-only { display: none; } }

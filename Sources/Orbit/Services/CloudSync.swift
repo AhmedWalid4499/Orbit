@@ -316,6 +316,46 @@ private let syncKinds: [SyncKind] = [
                  x.notes = J.str(d["notes"]); x.source = J.str(d["source"]); x.sourceID = J.str(d["sourceID"])
                  x.createdAt = J.date(d["createdAt"]) ?? x.createdAt },
              make: { let x = DocItem(title: ""); $0.insert(x); return x }),
+    SyncKind(kind: "focusSession",
+             fetch: { (try? $0.fetch(FetchDescriptor<FocusSession>())) ?? [] }, uuid: { ($0 as! FocusSession).uuid },
+             encode: { m in let f = m as! FocusSession
+                 return ["taskUUID": f.taskUUID, "taskTitle": f.taskTitle, "start": J.date(f.start), "end": J.date(f.end),
+                         "plannedMinutes": f.plannedMinutes] },
+             apply: { d, m in let f = m as! FocusSession
+                 f.taskUUID = J.str(d["taskUUID"]); f.taskTitle = J.str(d["taskTitle"]); f.start = J.date(d["start"]) ?? f.start
+                 f.end = J.date(d["end"]); f.plannedMinutes = J.int(d["plannedMinutes"]) },
+             make: { let f = FocusSession(); $0.insert(f); return f }),
+    SyncKind(kind: "dayPlan",
+             fetch: { (try? $0.fetch(FetchDescriptor<DayPlan>())) ?? [] }, uuid: { ($0 as! DayPlan).uuid },
+             encode: { m in let p = m as! DayPlan
+                 return ["day": p.day, "top": p.top, "taskUUIDs": p.taskUUIDs, "note": p.note, "createdAt": J.date(p.createdAt)] },
+             apply: { d, m in let p = m as! DayPlan
+                 p.day = J.str(d["day"]); p.top = J.strings(d["top"]); p.taskUUIDs = J.strings(d["taskUUIDs"]); p.note = J.str(d["note"])
+                 p.createdAt = J.date(d["createdAt"]) ?? p.createdAt },
+             make: { let p = DayPlan(day: ""); $0.insert(p); return p }),
+    SyncKind(kind: "trip",
+             fetch: { (try? $0.fetch(FetchDescriptor<Trip>())) ?? [] }, uuid: { ($0 as! Trip).uuid },
+             encode: { m in let t = m as! Trip
+                 return ["title": t.title, "destination": t.destination, "start": J.date(t.start), "end": J.date(t.end),
+                         "bucketUUID": t.bucketUUID, "budget": t.budget, "notes": t.notes, "packing": t.packing, "packed": t.packed,
+                         "createdAt": J.date(t.createdAt)] },
+             apply: { d, m in let t = m as! Trip
+                 t.title = J.str(d["title"]); t.destination = J.str(d["destination"]); t.start = J.date(d["start"]); t.end = J.date(d["end"])
+                 t.bucketUUID = J.str(d["bucketUUID"]); t.budget = J.num(d["budget"]); t.notes = J.str(d["notes"])
+                 t.packing = J.strings(d["packing"]); t.packed = J.strings(d["packed"]); t.createdAt = J.date(d["createdAt"]) ?? t.createdAt },
+             make: { let t = Trip(title: ""); $0.insert(t); return t }),
+    SyncKind(kind: "booking",
+             fetch: { (try? $0.fetch(FetchDescriptor<Booking>())) ?? [] }, uuid: { ($0 as! Booking).uuid },
+             encode: { m in let b = m as! Booking
+                 return ["tripUUID": b.tripUUID, "kind": b.kindRaw, "title": b.title, "provider": b.provider, "confirmation": b.confirmation,
+                         "location": b.location, "start": J.date(b.start), "end": J.date(b.end), "amount": b.amount,
+                         "source": b.source, "sourceID": b.sourceID, "createdAt": J.date(b.createdAt)] },
+             apply: { d, m in let b = m as! Booking
+                 b.tripUUID = J.str(d["tripUUID"]); b.kindRaw = J.str(d["kind"]); b.title = J.str(d["title"]); b.provider = J.str(d["provider"])
+                 b.confirmation = J.str(d["confirmation"]); b.location = J.str(d["location"]); b.start = J.date(d["start"]); b.end = J.date(d["end"])
+                 b.amount = J.num(d["amount"]); b.source = J.str(d["source"]); b.sourceID = J.str(d["sourceID"])
+                 b.createdAt = J.date(d["createdAt"]) ?? b.createdAt },
+             make: { let b = Booking(title: ""); $0.insert(b); return b }),
 ]
 
 /// Preferences that follow you between Macs (API keys and sign-ins never leave the Keychain).
@@ -438,6 +478,10 @@ final class CloudSync: ObservableObject {
         case let x as Highlight: x.uuid = id
         case let x as Subscription: x.uuid = id
         case let x as DocItem: x.uuid = id
+        case let x as FocusSession: x.uuid = id
+        case let x as DayPlan: x.uuid = id
+        case let x as Trip: x.uuid = id
+        case let x as Booking: x.uuid = id
         default: break
         }
     }

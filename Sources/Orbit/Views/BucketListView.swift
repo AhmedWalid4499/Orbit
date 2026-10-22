@@ -25,6 +25,7 @@ struct BucketListView: View {
     @State private var kind: BucketKind?
     @State private var editing: BucketItem?
     @State private var adding = false
+    @State private var openTrip: Trip?
 
     private var upcoming: [BucketItem] {
         items.filter { !$0.isDone && ($0.targetDate ?? .distantPast) >= Date.now.startOfDay }.sorted { $0.targetDate! < $1.targetDate! }
@@ -40,12 +41,14 @@ struct BucketListView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 header
+                TripsSection(open: $openTrip)
                 if !upcoming.isEmpty { lookingForward }
                 filters
                 if visible.isEmpty { empty }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 250, maximum: 360), spacing: 16, alignment: .top)], spacing: 16) {
                     ForEach(visible) { item in
-                        BucketCard(item: item).onTapGesture { editing = item }
+                        BucketCard(item: item) { openTrip = TripStore.plan(from: item, context: context) }
+                            .onTapGesture { editing = item }
                     }
                 }
             }
@@ -54,6 +57,7 @@ struct BucketListView: View {
         .scrollIndicators(.never)
         .sheet(isPresented: $adding) { BucketEditor(item: nil) }
         .sheet(item: $editing) { BucketEditor(item: $0) }
+        .sheet(item: $openTrip) { TripSheet(trip: $0) }
     }
 
     private var header: some View {
@@ -150,6 +154,8 @@ struct BucketListView: View {
 
 private struct BucketCard: View {
     @Bindable var item: BucketItem
+    var onTrip: () -> Void = {}
+    @Query private var trips: [Trip]
     @State private var hovering = false
     @State private var celebrate = false
 
@@ -159,6 +165,16 @@ private struct BucketCard: View {
                 Image(systemName: item.kind.symbol).font(.system(size: 14, weight: .semibold))
                     .frame(width: 34, height: 34).background(Circle().fill(Color.white.opacity(0.5)))
                 Spacer()
+                if item.kind == .travel && !item.isDone {
+                    let planned = !item.uuid.isEmpty && trips.contains { $0.bucketUUID == item.uuid }
+                    Button(action: onTrip) {
+                        Label(planned ? "Trip" : "Plan trip", systemImage: "suitcase.fill")
+                            .font(Theme.ui(12, weight: .semibold)).lineLimit(1).fixedSize()
+                            .padding(.horizontal, 10).padding(.vertical, 5)
+                            .background(Capsule().fill(Color.white.opacity(0.55)))
+                    }
+                    .buttonStyle(.plain)
+                }
                 Text(String(repeating: "🔥", count: max(1, item.excitement))).font(.system(size: 12))
                     .help(["", "Nice to do", "Really want to", "Can't wait"][max(1, min(3, item.excitement))])
             }

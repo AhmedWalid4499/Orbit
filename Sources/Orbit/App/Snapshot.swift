@@ -70,28 +70,40 @@ enum Snapshot {
                 try? NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])?
                     .write(to: URL(fileURLWithPath: dir).appending(path: "card.png"))
             }
-            // Sheets don't show up offscreen, so render the review screens on their own.
-            for (name, insights) in [("review", false), ("insights", true)] {
-                let state = AppState()
-                let host = NSHostingView(rootView: ReviewView(startOnInsights: insights)
-                    .environmentObject(state).environmentObject(apple).modelContainer(container))
-                host.appearance = NSAppearance(named: .aqua)
-                host.frame = NSRect(x: 0, y: 0, width: 920, height: 740)
+            // Sheets don't show up offscreen, so render them on their own.
+            @MainActor func renderAlone(_ name: String, width: Double, height: Double, appearance: NSAppearance.Name = .aqua, wait: Double = 0.6, _ view: some View) {
+                let host = NSHostingView(rootView: view.environmentObject(AppState()).environmentObject(apple).modelContainer(container))
+                host.appearance = NSAppearance(named: appearance)
+                host.frame = NSRect(x: 0, y: 0, width: width, height: height)
                 let window = NSWindow(contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: false)
                 window.contentView = host
                 host.layoutSubtreeIfNeeded()
-                RunLoop.main.run(until: .now + 0.6)
+                RunLoop.main.run(until: .now + wait)
                 if let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
                     host.cacheDisplay(in: host.bounds, to: rep)
                     try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: dir).appending(path: "\(name).png"))
                 }
             }
+            renderAlone("review", width: 920, height: 740, ReviewView(startOnInsights: false))
+            renderAlone("insights", width: 920, height: 740, ReviewView(startOnInsights: true))
+            for (i, a) in [0.6, 2.2, 4.0].enumerated() { renderAlone("splash-\(i)", width: size.width, height: size.height, SplashView(angle: a)) }
+            renderAlone("plan-tomorrow", width: 640, height: 700, PlanTomorrowSheet())
+            if let trip = try? container.mainContext.fetch(FetchDescriptor<Trip>()).first {
+                renderAlone("trip", width: 820, height: 720, TripSheet(trip: trip))
+            }
+            if let csv = ProcessInfo.processInfo.environment["ORBIT_SNAPSHOT_STATEMENT"] {
+                renderAlone("statement", width: 860, height: 700, wait: 2.5, StatementImportSheet(url: URL(fileURLWithPath: csv)))
+            }
+            FocusTimer.shared.start(context: container.mainContext)
+            render("today-focus", tab: .today, appearance: .aqua)
+            FocusTimer.shared.stop(context: container.mainContext)
+            renderAlone("splash-dark", width: size.width, height: size.height, appearance: .darkAqua, SplashView(angle: 0.9))
             NSApp.terminate(nil)
         }
     }
 
     static func demoContainer() -> ModelContainer {
-        let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self, ReadingSession.self, Highlight.self, Subscription.self, DocItem.self])
+        let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self, ReadingSession.self, Highlight.self, Subscription.self, DocItem.self, FocusSession.self, DayPlan.self, Trip.self, Booking.self])
         let c = try! ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true))
         let ctx = c.mainContext
         let cats = [("Philosophy", 3, "brain.head.profile"), ("Favourites", 0, "heart.fill"), ("Business", 4, "briefcase.fill")]
@@ -182,6 +194,32 @@ enum Snapshot {
             ctx.insert(d)
         }
 
+        // Focus blocks this week, tomorrow's plan, and a trip with bookings.
+        for (dayBack, mins) in [(0, 25), (0, 50), (1, 25), (2, 25), (3, 50)] {
+            let f = FocusSession(); f.start = today.adding(days: -dayBack).adding(minutes: 9 * 60 + dayBack * 30); f.plannedMinutes = mins
+            f.end = f.plannedEnd; f.taskTitle = "Chapter 4 notes"
+            ctx.insert(f)
+        }
+        let plan = DayPlan(day: DayKey.key(today))
+        plan.top = ["Finish the budget review deck", "Call the landlord about the lease", "30 minutes of Spanish"]
+        plan.taskUUIDs = ["", "", ""]; plan.note = "Bring the charger"
+        ctx.insert(plan)
+        let trip = Trip(title: "Lisbon long weekend", destination: "Lisbon")
+        trip.uuid = "demo-trip"; trip.start = today.adding(days: 19); trip.end = today.adding(days: 23); trip.budget = 45000
+        trip.packing = ["Passport", "Phone charger", "Power adapter", "Sunglasses", "Light jacket", "Walking shoes", "3 T-shirts", "Camera"]
+        trip.packed = ["Passport", "Power adapter", "Camera"]
+        ctx.insert(trip)
+        for (t, k, prov, ref, dayIn, hour, amt) in [("Cairo → Lisbon, MS777", BookingKind.flight, "EgyptAir", "K7XQ2P", 19, 9, 18500.0),
+                                                     ("Hotel Avenida Palace", .hotel, "Booking.com", "4471902", 19, 15, 16800.0),
+                                                     ("Lisbon → Cairo, MS778", .flight, "EgyptAir", "K7XQ2P", 23, 18, 0.0)] {
+            let b = Booking(title: t, kind: k); b.tripUUID = "demo-trip"; b.provider = prov; b.confirmation = ref
+            b.start = today.adding(days: dayIn).adding(minutes: hour * 60); b.amount = amt; b.source = "email"
+            ctx.insert(b)
+        }
+        let loose = Booking(title: "Sintra palace tour", kind: .activity); loose.location = "Sintra"; loose.source = "email"
+        loose.start = today.adding(days: 40).adding(minutes: 10 * 60)
+        ctx.insert(loose)
+
         return c
     }
 }
@@ -201,7 +239,7 @@ enum SyncTest {
             let realSession = Keychain.read("supabase-session")
             let realKeySync = cloud.syncSecrets
             cloud.syncSecrets = false
-            let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self, ReadingSession.self, Highlight.self, Subscription.self, DocItem.self])
+            let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self, ReadingSession.self, Highlight.self, Subscription.self, DocItem.self, FocusSession.self, DayPlan.self, Trip.self, Booking.self])
             do {
                 // Keep the containers alive for the whole test; a context is only valid while its container exists.
                 let containerA = Snapshot.demoContainer()
@@ -222,6 +260,14 @@ enum SyncTest {
                 check("Mac B gets bucket list (\(count(BucketItem.self, b))/\(count(BucketItem.self, a)))", count(BucketItem.self, a) == count(BucketItem.self, b))
                 check("Mac B gets subscriptions (\(count(Subscription.self, b))/\(count(Subscription.self, a)))", count(Subscription.self, a) == count(Subscription.self, b))
                 check("Mac B gets documents (\(count(DocItem.self, b))/\(count(DocItem.self, a)))", count(DocItem.self, a) == count(DocItem.self, b))
+                check("Mac B gets focus sessions (\(count(FocusSession.self, b))/\(count(FocusSession.self, a)))", count(FocusSession.self, a) == count(FocusSession.self, b))
+                check("Mac B gets day plans (\(count(DayPlan.self, b))/\(count(DayPlan.self, a)))", count(DayPlan.self, a) == count(DayPlan.self, b))
+                check("Mac B gets trips and bookings (\(count(Trip.self, b))+\(count(Booking.self, b)))", count(Trip.self, a) == count(Trip.self, b) && count(Booking.self, a) == count(Booking.self, b))
+                let tripB = try b.fetch(FetchDescriptor<Trip>()).first
+                let bookingsB = try b.fetch(FetchDescriptor<Booking>()).filter { $0.tripUUID == tripB?.uuid }
+                check("Packing list and bookings stay linked (\(tripB?.packed.count ?? 0) packed, \(bookingsB.count) bookings)", tripB?.packed.count == 3 && bookingsB.count == 3)
+                let planB = try b.fetch(FetchDescriptor<DayPlan>()).first
+                check("Top 3 comes across", planB?.top.count == 3 && planB?.note == "Bring the charger")
                 let trialB = try b.fetch(FetchDescriptor<Subscription>()).first { $0.status == "trial" }
                 check("Trial end date comes across", trialB?.trialEnds != nil)
                 let journalB = try b.fetch(FetchDescriptor<Note>()).first { $0.isJournal && $0.chatData != nil }

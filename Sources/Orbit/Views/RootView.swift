@@ -8,6 +8,7 @@ struct RootView: View {
     @AppStorage("userName") private var userName = NSFullUserName()
     @AppStorage("assistantName") private var assistantName = "Ask"
     @AppStorage("onboarded") private var onboarded = false
+    @ObservedObject private var focus = FocusTimer.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -46,7 +47,11 @@ struct RootView: View {
         .sheet(isPresented: $state.searchOpen) { SearchView() }
         .sheet(isPresented: $state.reviewOpen) { ReviewView() }
         .sheet(isPresented: $state.cardOpen) { ProfileCardSheet() }
+        .sheet(isPresented: $state.planOpen) { PlanTomorrowSheet() }
         .sheet(isPresented: Binding(get: { !onboarded && !Snapshot.isActive }, set: { if !$0 { onboarded = true } })) { WelcomeView() }
+        .sheet(item: Binding(get: { focus.justFinished }, set: { focus.justFinished = $0 })) { FocusDoneSheet(session: $0) }
+        .modifier(SplashOverlay())
+        .task { focus.restore(context: context) }
         .task {
             // Keep the next two days of notifications current.
             while !Task.isCancelled {
@@ -60,6 +65,7 @@ struct RootView: View {
             switch route {
             case "journal": state.openTodayJournal = true; state.tab = .notes
             case "review": state.tab = .today; state.reviewOpen = true
+            case "plan": state.tab = .today; state.planOpen = true
             default: if let t = Tab(rawValue: route) { state.tab = t }
             }
         }
@@ -104,6 +110,7 @@ private struct TopBar: View {
             ViewThatFits(in: .horizontal) { NavDock(density: 0); NavDock(density: 1); NavDock(density: 2) }
             Spacer(minLength: 16)
             HStack(spacing: 10) {
+                FocusPill()
                 ReadingTimerPill()
                 UpdatePill()
                 Button { state.assistantOpen.toggle() } label: {
@@ -132,6 +139,7 @@ private struct TopBar: View {
                 .help("Settings")
                 ProfileMenu(name: userName)
             }
+            .fixedSize()
         }
     }
 }

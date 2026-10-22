@@ -16,6 +16,7 @@ struct WeekStats {
     let moods: [(day: Date, mood: Int)]
     let booksFinished: [String]
     let readingMinutes: Int
+    let focusMinutes: Int
     let events: Int
     let bucketDone: [String]
 
@@ -31,6 +32,7 @@ struct WeekStats {
         let notes = (try? context.fetch(FetchDescriptor<Note>(predicate: #Predicate { $0.isJournal }))) ?? []
         let books = (try? context.fetch(FetchDescriptor<Book>())) ?? []
         let sessions = (try? context.fetch(FetchDescriptor<ReadingSession>())) ?? []
+        let focus = (try? context.fetch(FetchDescriptor<FocusSession>())) ?? []
         let bucket = (try? context.fetch(FetchDescriptor<BucketItem>())) ?? []
         let events = (try? context.fetch(FetchDescriptor<EventItem>())) ?? []
         func inWeek(_ d: Date?) -> Bool { d.map { $0 >= start && $0 < end } ?? false }
@@ -50,6 +52,7 @@ struct WeekStats {
             moods: notes.filter { $0.mood > 0 && inWeek($0.createdAt) }.map { ($0.createdAt.startOfDay, $0.mood) }.sorted { $0.0 < $1.0 },
             booksFinished: books.filter { $0.status == .read && inWeek($0.finishedAt) }.map(\.title),
             readingMinutes: Int(sessions.filter { inWeek($0.start) }.reduce(0) { $0 + $1.minutes }),
+            focusMinutes: FocusTimer.minutes(focus, since: start, until: end),
             events: events.filter { inWeek($0.start) }.count + apple.events(from: start, to: end).count
                 + GoogleCalendarStore.shared.events(from: start, to: end).count,
             bucketDone: bucket.filter { $0.isDone && inWeek($0.doneAt) }.map(\.title))
@@ -63,6 +66,7 @@ struct WeekStats {
         l.append("Spent this week: \(Fmt.money(spent)); top: \(topCategories.map { "\($0.0) \(Fmt.money($0.1))" }.joined(separator: ", "))")
         l.append("Month so far: \(Fmt.money(monthSpent)) of \(Fmt.money(budget)) budget")
         l.append("Mood (1-5) by day: " + (moods.isEmpty ? "not recorded" : moods.map { "\($0.day.formatted(.dateTime.weekday())) \($0.mood)" }.joined(separator: ", ")))
+        l.append("Focused work: \(focusMinutes) min")
         l.append("Reading: \(readingMinutes) min; finished: \(booksFinished.isEmpty ? "none" : booksFinished.joined(separator: ", "))")
         l.append("Events: \(events). Bucket list ticked off: \(bucketDone.isEmpty ? "none" : bucketDone.joined(separator: ", "))")
         return l.joined(separator: "\n")

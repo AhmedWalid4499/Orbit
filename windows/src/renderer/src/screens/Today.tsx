@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { TrendingUp, Sun, Flame, CreditCard, Library, Check, Plus, MessagesSquare, Mountain, Sparkles, RefreshCw, Mail, ArrowUpRight, AlertCircle } from 'lucide-react'
+import { Timer, Moon, TrendingUp, Sun, Flame, CreditCard, Library, Check, Plus, MessagesSquare, Mountain, Sparkles, RefreshCw, Mail, ArrowUpRight, AlertCircle } from 'lucide-react'
 import type { Nav } from '@/App'
 import { store, useRecords, useSetting, Rec } from '@/lib/store'
-import { Task, CalEvent, Habit, Txn, Note, Book, Bucket, AREA_COLOR, areaOf, bucketKind, MOOD_FACES, MOOD_WORDS, AREAS, Area } from '@/lib/models'
+import { FocusSession, DayPlan, Task, CalEvent, Habit, Txn, Note, Book, Bucket, AREA_COLOR, areaOf, bucketKind, MOOD_FACES, MOOD_WORDS, AREAS, Area } from '@/lib/models'
 import { iso, parse, startOfDay, addDays, isToday, sameDay, dayKey, startOfWeek, startOfMonth, fmtTime, fmtDay, daysBetween, relativeTime } from '@/lib/dates'
 import { fetchWeather, describe, Weather } from '@/lib/weather'
 import { Card, SectionHeader, StatTile, EmptyHint, AreaPill, useMoney } from '@/components/ui'
@@ -11,6 +11,9 @@ import { BookCover } from '@/screens/Reading'
 import { structured, useKeys, useAssistantName } from '@/lib/ai'
 import { useBrief } from '@/lib/brief'
 import { useInbox, mailLink, MailItem, Digest } from '@/lib/inbox'
+import { openFocus, focusToday } from '@/lib/focus'
+import { planFor, todayKey } from '@/lib/dayPlan'
+import { TopThreeCard, PlanTomorrowCard } from '@/screens/PlanTomorrow'
 
 /** The dashboard: everything for today on one screen, no scrolling. */
 export default function Today({ nav }: { nav: Nav }) {
@@ -21,6 +24,9 @@ export default function Today({ nav }: { nav: Nav }) {
   const notes = useRecords<Note>('note')
   const books = useRecords<Book>('book')
   const dreams = useRecords<Bucket>('bucket')
+  const focus = useRecords<FocusSession>('focusSession')
+  const plans = useRecords<DayPlan>('dayPlan')
+  const todayPlan = planFor(todayKey(), plans)
   const userName = useSetting<string>('userName', '')
   const budget = useSetting<number>('monthlyBudget', 2000)
   const goal = useSetting<number>('readingGoal', 24)
@@ -61,6 +67,12 @@ export default function Today({ nav }: { nav: Nav }) {
             <button className="row" style={{ gap: 5, fontSize: 12, fontWeight: 600, flex: 'none' }} title="Your week, mood and patterns" onClick={nav.openReview}>
               <TrendingUp size={13} />Week in review
             </button>
+            <button className="row" style={{ gap: 5, fontSize: 12, fontWeight: 600, flex: 'none' }} title="Leftovers, tomorrow's calendar and your top 3" onClick={nav.openPlan}>
+              <Moon size={13} />Plan tomorrow
+            </button>
+            <button className="row" style={{ gap: 5, fontSize: 12, fontWeight: 600, flex: 'none' }} title="Start a focus timer" onClick={() => openFocus(null)}>
+              <Timer size={13} />Focus{focusToday(focus) > 0 && <span className="muted" style={{ fontWeight: 500 }}> · Focus today: {focusToday(focus)} min</span>}
+            </button>
           </div>
         </div>
         <span className="spacer" />
@@ -96,11 +108,12 @@ export default function Today({ nav }: { nav: Nav }) {
         </div>
 
         {/* Column 2: tasks, habits, looking forward */}
-        <div className="col" style={{ flex: 1, minWidth: 0, gap: 14 }}>
-          <Card className="col" padding={16}>
+        <div className="col" style={{ flex: 1, minWidth: 0, minHeight: 0, gap: 14 }}>
+          {todayPlan && todayPlan.data.top.length > 0 && <TopThreeCard plan={todayPlan} onPlan={nav.openPlan} />}
+          <Card className="col" padding={16} style={{ flex: '1.4 1 0', minHeight: 150 }}>
             <SectionHeader title="Due today" trailing="All tasks" onTrailing={() => nav.go('tasks')} />
             <AddTaskInline />
-            <div className="scroll col" style={{ gap: 6, maxHeight: 190 }}>
+            <div className="scroll col" style={{ gap: 6, flex: 1 }}>
               {dueToday.length === 0 && <EmptyHint text="Nothing due. Nice." />}
               {dueToday.map((t) => <TaskRow key={t.id} rec={t} showDue={parse(t.data.due)! < today} />)}
             </div>
@@ -113,10 +126,12 @@ export default function Today({ nav }: { nav: Nav }) {
               </div>
             )}
           </Card>
-          <Card className="col" style={{ flex: 1, minHeight: 0 }} padding={14}>
-            <SectionHeader title="Looking forward to" trailing="Bucket list" onTrailing={() => nav.go('bucket')} />
-            <LookingForward dreams={dreams} />
-          </Card>
+          {hour >= 17 ? <PlanTomorrowCard onPlan={nav.openPlan} /> : !(todayPlan && todayPlan.data.top.length > 0) && (
+            <Card className="col" style={{ flex: '1 1 0', minHeight: 64, overflow: 'hidden' }} padding={14}>
+              <SectionHeader title="Looking forward to" trailing="Bucket list" onTrailing={() => nav.go('bucket')} />
+              <LookingForward dreams={dreams} />
+            </Card>
+          )}
         </div>
 
         {/* Column 3: reading, money, mood */}

@@ -54,6 +54,8 @@ struct TodayView: View {
     @Query(sort: \Note.createdAt, order: .reverse) private var notes: [Note]
     @Query(sort: \Book.addedAt, order: .reverse) private var books: [Book]
     @Query(filter: #Predicate<BucketItem> { !$0.isDone }) private var dreams: [BucketItem]
+    @Query private var plans: [DayPlan]
+    @Query private var focusSessions: [FocusSession]
 
     @ObservedObject private var inbox = InboxStore.shared
     @ObservedObject private var gh = GitHubStore.shared
@@ -70,6 +72,10 @@ struct TodayView: View {
     @State private var newTask = ""
 
     private var today: Date { .now.startOfDay }
+    private var isEvening: Bool { Calendar.current.component(.hour, from: .now) >= 17 }
+    private var todaysPlan: DayPlan? { plans.filter { $0.day == DayKey.key(today) && !$0.top.isEmpty }.max { $0.createdAt < $1.createdAt } }
+    private var planForTomorrow: Bool { plans.contains { $0.day == DayKey.key(today.adding(days: 1)) && !$0.top.isEmpty } }
+    private var focusToday: Int { FocusTimer.minutes(focusSessions, since: today) }
 
     private var openToday: [TaskItem] {
         tasks.filter { !$0.isDone && ($0.due.map { $0 < today.adding(days: 1) } ?? false) }
@@ -144,17 +150,44 @@ struct TodayView: View {
 
     // MARK: Header + capture
 
+    /// Week in review, Focus and Plan tomorrow. `short`: 0 full labels, 1 short labels, 2 icons only.
+    private func headerActions(short: Int) -> some View {
+        let planHighlight = isEvening && !planForTomorrow
+        func label(_ full: String, _ brief: String, _ symbol: String) -> some View {
+            Group {
+                if short == 2 { Image(systemName: symbol) } else { Label(short == 0 ? full : brief, systemImage: symbol) }
+            }
+            .font(Theme.ui(12, weight: .semibold)).lineLimit(1).fixedSize()
+        }
+        return HStack(spacing: 12) {
+            Button { state.reviewOpen = true } label: { label("Week in review", "Review", "chart.line.uptrend.xyaxis") }
+                .buttonStyle(.plain).foregroundStyle(Theme.ink)
+                .help("Your week, mood and patterns")
+            FocusMenu { label(focusToday > 0 ? "Focus · \(focusToday) min today" : "Focus", focusToday > 0 ? "\(focusToday) min" : "Focus", "timer") }
+                .foregroundStyle(Theme.ink)
+                .help(focusToday > 0 ? "\(focusToday) minutes of focus today. Start another block." : "Start a focus block")
+            Button { state.planOpen = true } label: {
+                label(planForTomorrow ? "Tomorrow planned" : "Plan tomorrow", planForTomorrow ? "Planned" : "Plan", planForTomorrow ? "checkmark.circle.fill" : "moon.stars.fill")
+                    .padding(.horizontal, planHighlight ? 10 : 0).padding(.vertical, planHighlight ? 4 : 0)
+                    .background(Capsule().fill(planHighlight ? Theme.lime : .clear))
+            }
+            .buttonStyle(.plain).foregroundStyle(planHighlight ? Theme.stickerInk : Theme.ink)
+            .help("Clear today, pick tomorrow's top 3")
+        }
+    }
+
     private var header: some View {
         HStack(alignment: .center, spacing: 20) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide))).font(Theme.display(32))
                 HStack(spacing: 10) {
                     Text(headline).font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary).lineLimit(1)
-                    Button { state.reviewOpen = true } label: {
-                        Label("Week in review", systemImage: "chart.line.uptrend.xyaxis").font(Theme.ui(12, weight: .semibold))
+                    ViewThatFits(in: .horizontal) {
+                        headerActions(short: 0)
+                        headerActions(short: 1)
+                        headerActions(short: 2)
                     }
-                    .buttonStyle(.plain).foregroundStyle(Theme.ink)
-                    .help("Your week, mood and patterns")
+                    .layoutPriority(1)
                 }
             }
             Spacer(minLength: 16)
@@ -257,6 +290,7 @@ struct TodayView: View {
         Card(padding: 16) {
             VStack(alignment: .leading, spacing: 10) {
                 SectionHeader(title: "Due today", trailing: "All tasks") { state.tab = .tasks }
+                if let todaysPlan { TopThreeList(plan: todaysPlan) }
                 HStack(spacing: 8) {
                     Image(systemName: "plus").foregroundStyle(Theme.inkMuted)
                     TextField("Add a task for today", text: $newTask)
@@ -624,6 +658,10 @@ struct TaskRow: View {
     @Bindable var task: TaskItem
     var showDue = true
     var onSelect: (() -> Void)? = nil
+    @State private var hovering = false
+    @ObservedObject private var focus = FocusTimer.shared
+
+    private var focusing: Bool { focus.active != nil && focus.active?.taskUUID == task.uuid && !task.uuid.isEmpty }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -652,6 +690,14 @@ struct TaskRow: View {
                 .labelStyle(.titleAndIcon)
             }
             Spacer()
+            if focusing {
+                Image(systemName: "timer").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.orange).help("Focusing on this")
+            } else if hovering && !task.isDone {
+                FocusMenu(task: task) {
+                    Image(systemName: "timer").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
+                }
+                .help("Focus on this task")
+            }
             if task.priority > 0 {
                 Text(String(repeating: "!", count: task.priority))
                     .font(Theme.ui(13, weight: .heavy))
@@ -663,8 +709,13 @@ struct TaskRow: View {
         .padding(.horizontal, 12)
         .background(RoundedRectangle(cornerRadius: 12).fill(Theme.canvas))
         .contentShape(Rectangle())
+        .onHover { hovering = $0 }
         .onTapGesture { onSelect?() }
         .contextMenu {
+            if !task.isDone {
+                Button("Focus for \(focus.length) minutes") { focus.start(task: task, context: context) }
+                Divider()
+            }
             Menu("Area") { ForEach(Area.allCases) { a in Button(a.title) { task.area = a } } }
             Menu("Priority") {
                 ForEach(0..<4) { p in Button(p == 0 ? "None" : String(repeating: "!", count: p)) { task.priority = p } }

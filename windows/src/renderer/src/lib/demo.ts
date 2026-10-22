@@ -22,6 +22,7 @@ export function demoRecords(): Rec[] {
   const out: Rec[] = []
   let workoutDays = new Set<string>()
   const bookIDs: Record<string, string> = {}
+  const taskIDs: Record<string, string> = {}
   for (const [title, day, h, len, area] of [['Team sync', 0, 10, 60, 'work'], ['Gym', 0, 18, 90, 'health'], ['Dinner with Sara', 1, 20, 120, 'social'],
     ['Dentist', 2, 15, 45, 'health'], ['Planning session', off + 1, 9, 60, 'work'], ['Reading club', 3, 19, 60, 'study']] as const) {
     out.push(rec('event', { title, start: iso(at(day, h)), end: iso(new Date(at(day, h).getTime() + len * 60000)), area, location: '', notes: '' }))
@@ -29,8 +30,18 @@ export function demoRecords(): Rec[] {
   for (const [title, area, day, pr, done] of [['Pay electricity bill', 'money', 0, 3, false], ['Book dentist appointment', 'health', 0, 2, false],
     ['Reply to landlord', 'home', -1, 2, false], ['Prepare slides for Thursday', 'work', 2, 2, false], ['Call grandma', 'social', 1, 0, false],
     ['Renew passport', 'personal', 9, 1, false], ['Weekly review', 'personal', -1, 0, true]] as const) {
-    out.push(rec('task', { title, notes: '', area, due: iso(addDays(t, day)), priority: pr, isDone: done, completedAt: done ? iso(addDays(t, -1)) : null, createdAt: iso(t), repeat: 'none' }))
+    const r = rec('task', { title, notes: '', area, due: iso(addDays(t, day)), priority: pr, isDone: done, completedAt: done ? iso(addDays(t, -1)) : null, createdAt: iso(t), repeat: 'none' })
+    taskIDs[title] = r.id
+    out.push(r)
   }
+
+  // Focus sessions (today and earlier this week) and last night's plan for today.
+  const ago = (min: number) => { const d = new Date(Date.now() - min * 60000); return d < t ? t : d }
+  for (const [start, min, task] of [[ago(40), 25, 'Pay electricity bill'], [at(-1, 10), 50, 'Prepare slides for Thursday'], [at(-1, 15), 25, ''], [at(-2, 15), 50, 'Prepare slides for Thursday']] as const) {
+    out.push(rec('focusSession', { taskUUID: task ? taskIDs[task] : '', taskTitle: task, start: iso(start), end: iso(new Date(start.getTime() + min * 60000)), plannedMinutes: min }))
+  }
+  out.push(rec('dayPlan', { day: dayKey(t), top: ['Prepare slides for Thursday', 'Pay electricity bill', 'Stretch for 10 minutes'],
+    taskUUIDs: [taskIDs['Prepare slides for Thursday'], taskIDs['Pay electricity bill'], ''], note: 'Slides first, before email.', createdAt: iso(at(-1, 21)) }))
   for (const [name, symbol, area, target, rate] of [['Workout', 'figure.run', 'health', 5, 0.7], ['Read 20 pages', 'book.fill', 'study', 7, 0.8], ['Drink 2L water', 'drop.fill', 'health', 7, 0.9]] as const) {
     const days: string[] = []
     for (let d = 1; d < 120; d++) if (d < 4 || ((d * 37 + name.length * 13) % 100) / 100 < rate) days.push(dayKey(addDays(t, -d)))
@@ -96,7 +107,22 @@ export function demoRecords(): Rec[] {
   }
   out.push(rec('bookCategory', { name: 'Philosophy', colorIndex: 3, symbol: 'brain.head.profile', createdAt: iso(t) }))
   for (const [title, kind, day, ex] of [['See the northern lights in Norway', 'travel', 23, 3], ['Concert with friends', 'people', 6, 3], ['Learn to surf', 'adventure', null, 2]] as const) {
-    out.push(rec('bucket', { title, notes: '', kind, targetDate: day === null ? null : iso(addDays(t, day)), excitement: ex, isDone: false, doneAt: null, createdAt: iso(t) }))
+    const b = rec('bucket', { title, notes: '', kind, targetDate: day === null ? null : iso(addDays(t, day)), excitement: ex, isDone: false, doneAt: null, createdAt: iso(t) })
+    out.push(b)
+    if (kind === 'travel') {
+      // A trip planned from this dream, with bookings (one found in email) and a half-packed list.
+      const trip = rec('trip', { title: 'Northern lights, Tromsø', destination: 'Tromsø, Norway', start: iso(at(day!, 12)), end: iso(at(day! + 5, 12)), bucketUUID: b.id,
+        budget: 2500, notes: 'Aurora tour on the second night.', packing: ['Passport', 'Thermal layers', 'Wool socks', 'Camera + tripod', 'Hand warmers', 'Power bank'],
+        packed: ['Passport', 'Wool socks'], createdAt: iso(t) })
+      out.push(trip)
+      for (const [kind, title, provider, conf, startDay, h, amount, source] of [['flight', 'Cairo → Tromsø', 'SAS', 'K7Q2LM', day!, 7, 780, 'email'],
+        ['hotel', 'Clarion Hotel The Edge', 'Booking.com', '448812', day!, 15, 640, 'manual'], ['activity', 'Aurora chase tour', 'Arctic Guides', 'AG-2231', day! + 1, 20, 160, 'email']] as const) {
+        out.push(rec('booking', { tripUUID: trip.id, kind, title, provider, confirmation: conf, location: 'Tromsø', start: iso(at(startDay, h)), end: null, amount, source,
+          sourceID: source === 'email' ? `demo-${conf}` : '', createdAt: iso(t) }))
+      }
+    }
   }
+  out.push(rec('booking', { tripUUID: '', kind: 'train', title: 'Cairo → Alexandria', provider: 'Egyptian National Railways', confirmation: 'EN-90211', location: 'Alexandria',
+    start: iso(at(12, 8)), end: iso(at(12, 11)), amount: 35, source: 'email', sourceID: 'demo-train', createdAt: iso(t) }))
   return out
 }

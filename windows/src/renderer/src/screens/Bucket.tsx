@@ -1,8 +1,9 @@
 // Bucket list, like BucketListView.swift on the Mac.
 import { useEffect, useMemo, useState } from 'react'
-import { Plane, Sparkles, Mountain, GraduationCap, Paintbrush, Users, Star, Plus, Calendar, CheckCircle2, Circle, BadgeCheck } from 'lucide-react'
+import { Luggage, Plane, Sparkles, Mountain, GraduationCap, Paintbrush, Users, Star, Plus, Calendar, CheckCircle2, Circle, BadgeCheck } from 'lucide-react'
 import { store, useRecords, Rec } from '@/lib/store'
-import { Bucket as BucketItem, BucketKind, BUCKET_KINDS, bucketKind } from '@/lib/models'
+import { Bucket as BucketItem, BucketKind, BUCKET_KINDS, bucketKind, Trip } from '@/lib/models'
+import { TripsSection, newTripFromBucket } from './Trips'
 import { iso, parse, startOfDay, daysBetween, toDateInput, fromInputs, addDays } from '@/lib/dates'
 import { Modal, Segmented } from '@/components/ui'
 
@@ -23,6 +24,8 @@ export default function Bucket() {
   const [kind, setKind] = useState<BucketKind | null>(null)
   const [editing, setEditing] = useState<Rec<BucketItem> | null>(null)
   const [adding, setAdding] = useState(false)
+  const [openTrip, setOpenTrip] = useState<string | null>(null)
+  const trips = useRecords<Trip>('trip')
 
   const done = items.filter((i) => i.data.isDone).length
   const today = startOfDay(new Date())
@@ -52,6 +55,8 @@ export default function Bucket() {
           {items.length > 0 && <Ring done={done} total={items.length} />}
           <button className="btn-soft" onClick={() => setAdding(true)}><Plus size={14} />Add dream</button>
         </div>
+
+        <TripsSection openTrip={openTrip} onOpen={setOpenTrip} />
 
         {upcoming.length > 0 && (
           <div className="col" style={{ gap: 12 }}>
@@ -109,7 +114,11 @@ export default function Bucket() {
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 16, alignItems: 'start' }}>
-          {visible.map((i) => <BucketCard key={i.id} item={i} onOpen={() => setEditing(i)} />)}
+          {visible.map((i) => {
+            const trip = trips.find((t) => t.data.bucketUUID === i.id)
+            const plan = i.data.kind === 'travel' && !i.data.isDone ? () => setOpenTrip(trip ? trip.id : newTripFromBucket(i)) : undefined
+            return <BucketCard key={i.id} item={i} onOpen={() => setEditing(i)} onPlanTrip={plan} hasTrip={!!trip} />
+          })}
         </div>
       </div>
 
@@ -133,7 +142,7 @@ function Ring({ done, total }: { done: number; total: number }) {
   )
 }
 
-function BucketCard({ item, onOpen }: { item: Rec<BucketItem>; onOpen: () => void }) {
+function BucketCard({ item, onOpen, onPlanTrip, hasTrip }: { item: Rec<BucketItem>; onOpen: () => void; onPlanTrip?: () => void; hasTrip?: boolean }) {
   const [celebrate, setCelebrate] = useState(false)
   const [hover, setHover] = useState(false)
   const k = bucketKind(item.data.kind)
@@ -169,13 +178,19 @@ function BucketCard({ item, onOpen }: { item: Rec<BucketItem>; onOpen: () => voi
       </div>
       <div className="display" style={{ fontSize: 20, lineHeight: 1.2 }}>{item.data.title}</div>
       {item.data.notes && <div className="clamp2" style={{ fontSize: 12, opacity: 0.75 }}>{item.data.notes}</div>}
-      <div className="row" style={{ fontSize: 11, fontWeight: 600 }}>
+      <div className="row" style={{ fontSize: 11, fontWeight: 600, flexWrap: 'wrap', rowGap: 6, whiteSpace: 'nowrap' }}>
         {item.data.isDone && doneAt
           ? <span className="row" style={{ gap: 4 }}><BadgeCheck size={13} />Done {doneAt.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}</span>
           : target
             ? <span className="row" style={{ gap: 4 }}><Calendar size={12} />{target.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
             : <span style={{ opacity: 0.6 }}>Someday</span>}
         <span className="spacer" />
+        {onPlanTrip && (
+          <button onClick={(e) => { e.stopPropagation(); onPlanTrip() }} className="row"
+            style={{ gap: 5, padding: '5px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: 600, color: 'var(--sticker-ink)' }}>
+            <Luggage size={13} />{hasTrip ? 'Open trip' : 'Plan trip'}
+          </button>
+        )}
         <button onClick={toggle} className="row"
           style={{ gap: 5, padding: '5px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: 600, color: 'var(--sticker-ink)' }}>
           {item.data.isDone ? <CheckCircle2 size={13} /> : <Circle size={13} />}

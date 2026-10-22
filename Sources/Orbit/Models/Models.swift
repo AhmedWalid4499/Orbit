@@ -514,6 +514,136 @@ final class DocItem {
     }
 }
 
+// MARK: - Focus
+
+/// A focus (Pomodoro) block, optionally on a task. An open block has no end; it survives restarts.
+@Model
+final class FocusSession {
+    /// Permanent id used to sync this item between devices.
+    var uuid: String = ""
+    var taskUUID: String = ""
+    var taskTitle: String = ""
+    var start: Date = Date.now
+    var end: Date? = nil
+    var plannedMinutes: Int = 25
+
+    init() {}
+
+    init(task: TaskItem?, minutes: Int) {
+        self.taskUUID = task?.uuid ?? ""
+        self.taskTitle = task?.title ?? ""
+        self.start = .now
+        self.plannedMinutes = minutes
+    }
+
+    var plannedEnd: Date { start.addingTimeInterval(Double(plannedMinutes) * 60) }
+    var minutes: Double { ((end ?? .now).timeIntervalSince(start)) / 60 }
+}
+
+// MARK: - Evening plan
+
+/// Tomorrow's top three, chosen the evening before. `day` is yyyy-MM-dd of the day it's for.
+@Model
+final class DayPlan {
+    /// Permanent id used to sync this item between devices.
+    var uuid: String = ""
+    var day: String = ""
+    /// Up to three priorities, in order.
+    var top: [String] = []
+    /// The task each priority came from ("" for one typed in).
+    var taskUUIDs: [String] = []
+    var note: String = ""
+    var createdAt: Date = Date.now
+
+    init(day: String) {
+        self.day = day
+        self.createdAt = .now
+    }
+}
+
+// MARK: - Trips
+
+/// A trip, often from a travel item on the bucket list.
+@Model
+final class Trip {
+    /// Permanent id used to sync this item between devices.
+    var uuid: String = ""
+    var title: String = ""
+    var destination: String = ""
+    var start: Date? = nil
+    var end: Date? = nil
+    /// The bucket-list item this trip makes happen ("" if none).
+    var bucketUUID: String = ""
+    /// Budget in the home currency (0 = none).
+    var budget: Double = 0
+    var notes: String = ""
+    var packing: [String] = []
+    /// Items from `packing` that are packed.
+    var packed: [String] = []
+    var createdAt: Date = Date.now
+
+    init(title: String, destination: String = "") {
+        self.title = title
+        self.destination = destination
+        self.createdAt = .now
+    }
+
+    var nights: Int? {
+        guard let start, let end else { return nil }
+        return Calendar.current.dateComponents([.day], from: start.startOfDay, to: end.startOfDay).day
+    }
+}
+
+enum BookingKind: String, CaseIterable, Identifiable {
+    case flight, hotel, train, car, activity, other
+    var id: String { rawValue }
+    var title: String { rawValue.capitalized }
+    var symbol: String {
+        switch self {
+        case .flight: "airplane"
+        case .hotel: "bed.double.fill"
+        case .train: "tram.fill"
+        case .car: "car.fill"
+        case .activity: "ticket.fill"
+        case .other: "suitcase.fill"
+        }
+    }
+}
+
+/// A flight, hotel or other booking, added by hand or found in email.
+@Model
+final class Booking {
+    /// Permanent id used to sync this item between devices.
+    var uuid: String = ""
+    /// The trip it belongs to ("" while unassigned).
+    var tripUUID: String = ""
+    var kindRaw: String = BookingKind.other.rawValue
+    var title: String = ""
+    var provider: String = ""
+    var confirmation: String = ""
+    var location: String = ""
+    var start: Date? = nil
+    var end: Date? = nil
+    /// Cost in the home currency (positive).
+    var amount: Double = 0
+    /// manual or email
+    var source: String = "manual"
+    /// Gmail message id for bookings found in email.
+    var sourceID: String = ""
+    var createdAt: Date = Date.now
+
+    init(title: String, kind: BookingKind = .other) {
+        self.title = title
+        self.kindRaw = kind.rawValue
+        self.createdAt = .now
+    }
+
+    var kind: BookingKind {
+        get { BookingKind(rawValue: kindRaw) ?? .other }
+        set { kindRaw = newValue.rawValue }
+    }
+}
+
 // MARK: - Bucket list
 
 enum BucketKind: String, CaseIterable, Identifiable {

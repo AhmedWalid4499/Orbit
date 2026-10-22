@@ -9,6 +9,9 @@ import { onOpenAsk } from '@/lib/askBus'
 import { useAssistantName } from '@/lib/ai'
 import AskPanel from '@/components/AskPanel'
 import { ReadingTimerPill, FinishedReading } from '@/components/ReadingTimer'
+import { FocusPill, FocusStartSheet, FocusDoneDialog } from '@/components/Focus'
+import Splash from '@/components/Splash'
+import { PlanTomorrowSheet } from '@/screens/PlanTomorrow'
 import { useProfilePhoto, chooseProfilePhoto, removeProfilePhoto } from '@/lib/profileCard'
 
 /** Open with ?demo to preview with sample data (used for screenshots; nothing is synced). */
@@ -30,12 +33,14 @@ import MyCard from '@/screens/MyCard'
 export type Tab = 'today' | 'calendar' | 'tasks' | 'habits' | 'bucket' | 'money' | 'notes' | 'reading' | 'documents'
 
 /** Lets any screen switch tabs (e.g. "Open calendar" on Today). */
-export interface Nav { go: (t: Tab) => void; openJournal: () => void; openReview: () => void }
+export interface Nav { go: (t: Tab) => void; openJournal: () => void; openReview: () => void; openPlan: () => void }
 
 export default function App() {
   const [ready, setReady] = useState(false)
   const [signedIn, setSignedIn] = useState(!!cloud.getSession())
   const [platform, setPlatform] = useState('win32')
+  // ?demo&nosplash skips the launch animation (for screenshots).
+  const [splash, setSplash] = useState(() => !(DEMO && new URLSearchParams(location.search).has('nosplash')))
 
   useEffect(() => {
     if (DEMO) {
@@ -57,8 +62,12 @@ export default function App() {
     else store.stop()
   }, [ready, signedIn])
 
-  if (!ready) return null
-  return signedIn ? <Shell platform={platform} /> : <SignIn platform={platform} />
+  return (
+    <>
+      {ready && (signedIn ? <Shell platform={platform} /> : <SignIn platform={platform} />)}
+      {splash && <Splash onDone={() => setSplash(false)} />}
+    </>
+  )
 }
 
 const TABS: { id: Tab; title: string; icon: ReactNode }[][] = [
@@ -81,6 +90,7 @@ function Shell({ platform }: { platform: string }) {
   const [tab, setTab] = useState<Tab>('today')
   const [settings, setSettings] = useState(false)
   const [review, setReview] = useState(false)
+  const [plan, setPlan] = useState(false)
   const [card, setCard] = useState(false)
   const [journalRequest, setJournalRequest] = useState(0)
   const [ask, setAsk] = useState<{ open: boolean; seed?: string }>({ open: false })
@@ -89,7 +99,7 @@ function Shell({ platform }: { platform: string }) {
   const userName = useSetting<string>('userName', '')
   const first = userName.split(' ')[0]
   const initials = userName.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'Me'
-  const nav: Nav = { go: setTab, openJournal: () => { setJournalRequest((n) => n + 1); setTab('notes') }, openReview: () => setReview(true) }
+  const nav: Nav = { go: setTab, openJournal: () => { setJournalRequest((n) => n + 1); setTab('notes') }, openReview: () => setReview(true), openPlan: () => setPlan(true) }
 
   // Ctrl/Cmd + 1…8 switches tabs, like ⌘1…⌘9 on the Mac.
   useEffect(() => {
@@ -124,6 +134,7 @@ function Shell({ platform }: { platform: string }) {
           ))}
         </nav>
         <div className="row">
+          <FocusPill />
           <ReadingTimerPill onOpen={() => setTab('reading')} />
           <button className="btn-lime" title={`${assistant} (Ctrl+J)`} onClick={() => setAsk((a) => ({ open: !a.open }))}><Sparkles size={15} /> {assistant}</button>
           <button className="icon-btn" title="Settings (Ctrl+,)" onClick={() => setSettings(true)}><Gear size={17} /></button>
@@ -146,6 +157,9 @@ function Shell({ platform }: { platform: string }) {
       <Review open={review} onClose={() => setReview(false)} />
       <MyCard open={card} onClose={() => setCard(false)} />
       <FinishedReading />
+      <PlanTomorrowSheet open={plan} onClose={() => setPlan(false)} />
+      <FocusStartSheet />
+      <FocusDoneDialog />
     </div>
   )
 }

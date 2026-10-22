@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { CalendarDays, Repeat as RepeatIcon, Trash2 } from 'lucide-react'
+import { CalendarDays, Repeat as RepeatIcon, Trash2, Timer } from 'lucide-react'
+import { openFocus } from '@/lib/focus'
 import { store, Rec } from '@/lib/store'
 import { Task, Repeat, areaOf, cap } from '@/lib/models'
 import { iso, parse, startOfDay, addDays, addMonths, relativeDay, toDateInput, fromInputs } from '@/lib/dates'
@@ -39,7 +40,7 @@ export function TaskRow({ rec, showDue = true }: { rec: Rec<Task>; showDue?: boo
 
   return (
     <>
-      <div className="inner row" style={{ gap: 12, padding: '8px 12px' }}
+      <div className="inner row task-row" style={{ gap: 12, padding: '8px 12px' }}
         onContextMenu={(e) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }) }}>
         <CheckCircle on={t.isDone} onClick={() => toggleTask(rec)} />
         <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => setEditing(true)}>
@@ -60,6 +61,7 @@ export function TaskRow({ rec, showDue = true }: { rec: Rec<Task>; showDue?: boo
         {t.priority > 0 && (
           <span style={{ fontWeight: 800, fontSize: 13, color: t.priority === 3 ? 'var(--critical)' : 'var(--ink2)' }}>{'!'.repeat(t.priority)}</span>
         )}
+        {!t.isDone && <button className="focus-btn" title="Focus on this" onClick={() => openFocus(rec)}><Timer size={13} /></button>}
         <AreaPill area={areaOf(t.area)} compact />
       </div>
       {menu && (
@@ -67,6 +69,7 @@ export function TaskRow({ rec, showDue = true }: { rec: Rec<Task>; showDue?: boo
           <div className="card" style={{ position: 'fixed', left: menu.x, top: menu.y, padding: 6, boxShadow: '0 10px 30px rgba(0,0,0,.2)', background: 'var(--canvas)' }}
             onMouseDown={(e) => e.stopPropagation()}>
             <MenuItem label="Edit…" onClick={() => { setMenu(null); setEditing(true) }} />
+            {!t.isDone && <MenuItem label="Focus…" onClick={() => { setMenu(null); openFocus(rec) }} />}
             <MenuItem label="Due today" onClick={() => { store.update<Task>(rec.id, { due: iso(startOfDay(new Date())) }); setMenu(null) }} />
             <MenuItem label="Due tomorrow" onClick={() => { store.update<Task>(rec.id, { due: iso(addDays(startOfDay(new Date()), 1)) }); setMenu(null) }} />
             <MenuItem label="No date" onClick={() => { store.update<Task>(rec.id, { due: null }); setMenu(null) }} />

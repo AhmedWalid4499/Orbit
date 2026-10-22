@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { structured } from './ai'
 import { daySnapshot } from './snapshot'
 import { dayKey } from './dates'
+import { planText } from './dayPlan'
 
 export interface Brief { headline: string; summary: string; focus: string[]; heads_up: string; day: string; generatedAt: string }
 
@@ -12,6 +13,7 @@ Use only the data provided; never invent events, tasks or numbers. Write like a 
 - headline: at most 8 words capturing the shape of the day.
 - summary: 2-3 sentences covering what's on today and anything time-sensitive.
 - focus: up to 3 specific, doable suggestions for today, drawn from the tasks, habits, and money data. Each under 14 words.
+  If the user made a plan last night, start focus from that plan (its items first, in order, skipping any already done).
 - heads_up: one thing that could slip (overdue task, budget pace, broken streak), or an empty string if nothing stands out.
 Plain text only, no markdown.`
 const SCHEMA = {
@@ -35,7 +37,7 @@ export function useBrief(enabled: boolean): { brief: Brief | null; loading: bool
     if (!force && c?.day === dayKey(new Date())) { setBrief(c); return }
     setBusy(true)
     setError('')
-    loading = structured<Omit<Brief, 'day' | 'generatedAt'>>(SYSTEM, daySnapshot(), SCHEMA, 'medium')
+    loading = structured<Omit<Brief, 'day' | 'generatedAt'>>(SYSTEM, [daySnapshot(), planText()].filter(Boolean).join('\n\n'), SCHEMA, 'medium')
       .then((b) => {
         const full: Brief = { ...b, day: dayKey(new Date()), generatedAt: new Date().toISOString() }
         localStorage.setItem(KEY, JSON.stringify(full))

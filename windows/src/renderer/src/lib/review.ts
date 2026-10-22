@@ -3,7 +3,8 @@
 import { store } from './store'
 import { structured } from './ai'
 import { moneyFmt } from './snapshot'
-import { Task, Habit, Txn, Note, Book, ReadingSession, Bucket, CalEvent, AREAS, sessionMinutes } from './models'
+import { Task, Habit, Txn, Note, Book, ReadingSession, Bucket, CalEvent, FocusSession, AREAS, sessionMinutes } from './models'
+import { focusMinutes } from './focus'
 import { parse, startOfDay, startOfWeek, startOfMonth, addDays, dayKey, sameDay } from './dates'
 
 export interface WeekStats {
@@ -19,6 +20,7 @@ export interface WeekStats {
   moods: { day: Date; mood: number }[]
   booksFinished: string[]
   readingMinutes: number
+  focusMinutes: number
   events: number
   bucketDone: string[]
 }
@@ -57,6 +59,7 @@ export function computeWeek(weekContaining: Date = new Date()): WeekStats {
       .sort((a, b) => a.day.getTime() - b.day.getTime()),
     booksFinished: books.filter((b) => b.data.status === 'read' && inWeek(b.data.finishedAt)).map((b) => b.data.title),
     readingMinutes: Math.floor(sessions.filter((s) => inWeek(s.data.start)).reduce((n, s) => n + sessionMinutes(s.data), 0)),
+    focusMinutes: Math.floor(store.list<FocusSession>('focusSession').filter((s) => inWeek(s.data.start)).reduce((n, s) => n + focusMinutes(s.data), 0)),
     events: events.filter((e) => inWeek(e.data.start)).length,
     bucketDone: bucket.filter((b) => b.data.isDone && inWeek(b.data.doneAt)).map((b) => b.data.title),
   }
@@ -72,6 +75,7 @@ export function weekAsText(s: WeekStats): string {
     `Spent this week: ${moneyFmt(s.spent)}; top: ${s.topCategories.map(([c, v]) => `${c} ${moneyFmt(v)}`).join(', ')}`,
     `Month so far: ${moneyFmt(s.monthSpent)} of ${moneyFmt(s.budget)} budget`,
     `Mood (1-5) by day: ${s.moods.length ? s.moods.map((m) => `${wd(m.day)} ${m.mood}`).join(', ') : 'not recorded'}`,
+    `Focus time: ${s.focusMinutes} min`,
     `Reading: ${s.readingMinutes} min; finished: ${s.booksFinished.length ? s.booksFinished.join(', ') : 'none'}`,
     `Events: ${s.events}. Bucket list ticked off: ${s.bucketDone.length ? s.bucketDone.join(', ') : 'none'}`,
   ].join('\n')

@@ -19,6 +19,8 @@ final class Reminders: NSObject, ObservableObject, UNUserNotificationCenterDeleg
     @AppStorage("notify.review") var review = true
     @AppStorage("notify.subscriptions") var subscriptions = true
     @AppStorage("notify.documents") var documents = true
+    @AppStorage("notify.evening") var evening = true
+    @AppStorage("notify.trips") var trips = true
     @AppStorage("notify.morningHour") var morningHour = 9
     @AppStorage("notify.habitHour") var habitHour = 20
     @AppStorage("notify.journalHour") var journalHour = 21
@@ -175,6 +177,37 @@ final class Reminders: NSObject, ObservableObject, UNUserNotificationCenterDeleg
             }
         }
 
+        if trips {
+            let allTrips = (try? context.fetch(FetchDescriptor<Trip>())) ?? []
+            for t in allTrips {
+                guard let start = t.start else { continue }
+                let eve = at(start.adding(days: -1), 19)
+                let left = t.packing.count - t.packed.count
+                if within(eve) {
+                    add("pack-\(t.uuid.isEmpty ? t.title : t.uuid)", "\(t.title) is tomorrow ✈️",
+                        left > 0 ? "\(left) thing\(left == 1 ? "" : "s") left to pack." : "All packed. Have a great trip!", at: eve, route: "bucket")
+                }
+            }
+            let flights = ((try? context.fetch(FetchDescriptor<Booking>())) ?? []).filter { $0.kind == .flight }
+            for f in flights {
+                guard let dep = f.start else { continue }
+                let when = dep.addingTimeInterval(-3 * 3600)
+                if within(when) {
+                    add("flight-\(f.uuid.isEmpty ? f.title : f.uuid)", "Flight in 3 hours", "\(f.title)\(f.confirmation.isEmpty ? "" : " · ref \(f.confirmation)")",
+                        at: when, route: "bucket")
+                }
+            }
+        }
+
+        if evening {
+            // 8:30 pm: plan tomorrow, unless it's already planned.
+            for day in [today, today.adding(days: 1)] {
+                let when = cal.date(bySettingHour: 20, minute: 30, second: 0, of: day)!
+                guard within(when), DayPlanner.plan(for: day.adding(days: 1), context: context) == nil else { continue }
+                add("plan-\(DayKey.key(day))", "Plan tomorrow", "Two minutes: clear what's left and pick tomorrow's top 3.", at: when, route: "plan")
+            }
+        }
+
         if review {
             // Next Sunday at 6 pm.
             var next = today
@@ -242,6 +275,8 @@ struct NotificationSettingsView: View {
                 Toggle("Weekly review on Sunday evening", isOn: $r.review)
                 Toggle("Free trials ending and yearly renewals", isOn: $r.subscriptions)
                 Toggle("Documents and warranties about to expire", isOn: $r.documents)
+                Toggle("Evening nudge to plan tomorrow", isOn: $r.evening)
+                Toggle("Trips: packing and flights", isOn: $r.trips)
             }
             Section("Times") {
                 Picker("Morning summary", selection: $r.morningHour) { ForEach(5..<13) { Text("\($0):00").tag($0) } }

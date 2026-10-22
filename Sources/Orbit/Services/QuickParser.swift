@@ -104,9 +104,11 @@ struct QuickParser {
     static func guessCategory(_ title: String) -> String {
         let t = title.lowercased()
         let map: [(String, [String])] = [
-            ("Food", ["lunch", "dinner", "breakfast", "coffee", "grocer", "food", "restaurant", "snack"]),
-            ("Transport", ["uber", "taxi", "fuel", "gas", "metro", "bus", "train", "careem", "parking"]),
-            ("Bills", ["rent", "electric", "water", "internet", "phone", "bill"]),
+            ("Income", ["salary", "payroll"]),
+            ("Food", ["lunch", "dinner", "breakfast", "coffee", "grocer", "food", "restaurant", "snack", "carrefour", "seoudi", "spinneys",
+                      "talabat", "supermarket", "hypermarket", "bakery", "starbucks", "mcdonald", "kfc", "elmenus", "breadfast", "rabbit"]),
+            ("Transport", ["uber", "taxi", "fuel", "gas", "metro", "bus", "train", "careem", "parking", "indrive", "swvl", "petrol", "wataniya"]),
+            ("Bills", ["rent", "electric", "water", "internet", "phone", "bill", "vodafone", "etisalat", "orange", "telecom egypt", "fawry"]),
             ("Subscriptions", ["netflix", "spotify", "icloud", "subscription", "youtube", "claude", "gym membership"]),
             ("Health", ["pharmacy", "doctor", "dentist", "gym", "medicine"]),
             ("Fun", ["cinema", "movie", "game", "concert", "bar"]),

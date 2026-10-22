@@ -285,7 +285,7 @@ private final class GoodreadsRSSParser: NSObject, XMLParserDelegate {
 
 enum CSV {
     /// RFC 4180-ish parser: quoted fields, escaped quotes, newlines inside quotes.
-    static func parse(_ text: String) -> [[String]] {
+    static func parse(_ text: String, delimiter: Unicode.Scalar = ",") -> [[String]] {
         var rows: [[String]] = [], row: [String] = [], field = ""
         var inQuotes = false
         var chars = Array(text.unicodeScalars)[...]
@@ -297,7 +297,7 @@ enum CSV {
             } else {
                 switch c {
                 case "\"": inQuotes = true
-                case ",": row.append(field); field = ""
+                case delimiter: row.append(field); field = ""
                 case "\n", "\r":
                     if c == "\r", chars.first == "\n" { chars.removeFirst() }
                     row.append(field); field = ""
@@ -309,6 +309,15 @@ enum CSV {
         }
         if !field.isEmpty || !row.isEmpty { row.append(field); rows.append(row) }
         return rows
+    }
+
+    /// Picks comma, semicolon or tab, whichever splits the first lines most consistently.
+    static func guessDelimiter(_ text: String) -> Unicode.Scalar {
+        let lines = text.split(whereSeparator: \.isNewline).prefix(20)
+        let scores: [(Unicode.Scalar, Int)] = [",", ";", "\t"].map { d in
+            (d, lines.map { $0.unicodeScalars.filter { $0 == d }.count }.filter { $0 > 0 }.count)
+        }
+        return scores.max { $0.1 < $1.1 }?.0 ?? ","
     }
 }
 

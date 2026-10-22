@@ -54,11 +54,25 @@ Click **Ask Claude** in the top bar, or press ⌘J, to open a chat panel. Claude
 
 Money has an **Overview**, a **Calendar** and **Subscriptions**. The Calendar shows what you spent each day, plus bills and recurring payments that are coming due. The **Money coach** card gives savings tips based on your real spending, and **Discuss with Claude** opens a conversation about it.
 
+**Import statement** reads the CSV or PDF statement you download from your bank: it finds the columns (including separate debit and credit columns, Arabic headers and day-first dates), sorts lines into categories, and skips anything already in Orbit. PDFs are read by Claude, so they need your API key.
+
 **Subscriptions** lists every recurring charge with the monthly and yearly total. Orbit finds them in your transactions and in receipt emails, flags price increases, and reminds you two days before a free trial turns into a paid plan. **Which can I cut?** asks Claude to go through them with you.
 
 ## Documents
 
 Keep your passport, ID, driving licence, car registration, insurance, memberships and warranties in one place. Orbit reminds you before each one expires (a month by default, six months for passports and visas). Warranties are added by themselves from order emails that mention one.
+
+## Focus
+
+Hover over a task and click the timer, or use **Focus** on Today, to start a 15, 25 or 50-minute block. The countdown shows in the top bar and in the menu bar, a notification tells you when to take a break, and your focus time shows on Today and in the Week in review.
+
+## Plan tomorrow
+
+In the evening, **Plan tomorrow** on Today (or the 8:30 pm reminder) walks you through what's left today (done, move to tomorrow, or no date), shows tomorrow's calendar, and asks for your top 3. They appear at the top of Today the next morning, and the morning brief starts from them.
+
+## Trips
+
+Trips live at the top of the Bucket list. **Plan trip** on a travel dream starts one, with dates, a budget, bookings and a packing list (**Suggest** asks Claude what to bring for the destination and season). Flight, hotel and other booking emails are added by themselves and filed under the right trip. Orbit reminds you to pack the evening before and three hours before each flight.
 
 ## Siri and Shortcuts
 
@@ -111,7 +125,7 @@ Today's journal entry has a chat with Claude next to it. Claude asks about your 
 
 ## Project layout
 
-- `Sources/Orbit/Models`: SwiftData models (tasks, events, habits, transactions, notes, books, subscriptions, documents)
+- `Sources/Orbit/Models`: SwiftData models (tasks, events, habits, transactions, notes, books, subscriptions, documents, focus sessions, day plans, trips and bookings)
 - `Sources/Orbit/Design`: theme (colors, type, pills, cards)
 - `Sources/Orbit/Services`: Claude, Gmail, GitHub, reading sources, Apple Calendar/Reminders, quick capture, updater
 - `Sources/Orbit/Views`: one file per screen

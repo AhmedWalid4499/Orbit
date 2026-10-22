@@ -18,6 +18,7 @@ import {
 } from '@/lib/dates'
 import { Card, EmptyHint, Segmented, Modal, useMoney } from '@/components/ui'
 import SubscriptionsView from './Subscriptions'
+import { ImportStatementButton } from './StatementImport'
 import './Money.css'
 
 type Mode = 'overview' | 'calendar' | 'subscriptions'
@@ -52,12 +53,13 @@ export default function Money() {
     <div className="page">
       <div className="col" style={{ gap: 22 }}>
         <div className="row" style={{ gap: 12 }}>
-          <h1 className="page-title">{mode === 'subscriptions' ? 'Subscriptions' : month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</h1>
+          <h1 className="page-title" style={{ whiteSpace: 'nowrap' }}>{mode === 'subscriptions' ? 'Subscriptions' : month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</h1>
           <span style={{ marginLeft: 8 }}>
             <Segmented<Mode> options={[{ id: 'overview', label: 'Overview' }, { id: 'calendar', label: 'Calendar' }, { id: 'subscriptions', label: 'Subscriptions' }]} value={mode} onChange={setMode} />
           </span>
           <span className="spacer" />
           <EmailChip />
+          <ImportStatementButton />
           <button className="btn-soft" onClick={() => setAdding(true)}><Plus size={14} />Add transaction</button>
           {mode !== 'subscriptions' && <>
           <button className="icon-btn filled" style={{ width: 46, height: 46 }} onClick={() => setMonth(addMonths(month, -1))} title="Previous month"><ArrowLeft size={18} /></button>

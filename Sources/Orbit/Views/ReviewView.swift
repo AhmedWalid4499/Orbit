@@ -68,6 +68,7 @@ struct ReviewView: View {
                 tile(Fmt.money(s.spent), "Spent this week", Theme.cyan)
                 tile(avgMood.map { "\(Mood.faces[Int($0.rounded())]) \(String(format: "%.1f", $0))" } ?? "—", "Average mood", Theme.peach)
                 tile("\(s.readingMinutes) min", s.booksFinished.isEmpty ? "Reading" : "Read · \(s.booksFinished.count) finished", Theme.purple)
+                tile("\(s.focusMinutes) min", "Focused", Theme.orange)
             }
 
             moodStrip(s)

@@ -105,6 +105,7 @@ function WeekView({ onClose }: { onClose: () => void }) {
         <Tile value={habitPct === null ? '—' : `${habitPct}%`} label="Habits kept" color="var(--lime)" />
         <Tile value={money(s.spent)} label="Spent this week" color="var(--cyan)" />
         <Tile value={avgMood === null ? '—' : `${MOOD_FACES[Math.round(avgMood)]} ${avgMood.toFixed(1)}`} label="Average mood" color="var(--peach)" />
+        <Tile value={`${s.focusMinutes} min`} label="Focus time" color="var(--orange)" />
         <Tile value={`${s.readingMinutes} min`} label={s.booksFinished.length ? `Read · ${s.booksFinished.length} finished` : 'Reading'} color="var(--purple)" />
       </div>
 

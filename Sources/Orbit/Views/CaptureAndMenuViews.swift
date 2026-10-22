@@ -130,6 +130,8 @@ struct MenuBarView: View {
                 }
             }
             Divider()
+            MenuFocusRow(tasks: dueToday)
+            Divider()
             HStack {
                 Button("Quick capture") { CapturePanel.shared.show() }.buttonStyle(SoftButtonStyle())
                 Spacer()
@@ -142,6 +144,38 @@ struct MenuBarView: View {
         }
         .padding(18)
         .frame(width: 300)
+    }
+}
+
+/// Focus controls in the menu bar: the countdown while running, otherwise start on a task due today.
+private struct MenuFocusRow: View {
+    @Environment(\.modelContext) private var context
+    @ObservedObject private var timer = FocusTimer.shared
+    let tasks: [TaskItem]
+
+    var body: some View {
+        if let s = timer.active {
+            HStack(spacing: 10) {
+                Image(systemName: "timer").foregroundStyle(Theme.orange)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(FocusTimer.clock(timer.remaining(at: timer.now))) left").font(Theme.ui(14, weight: .semibold)).monospacedDigit()
+                    if !s.taskTitle.isEmpty { Text(s.taskTitle).font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary).lineLimit(1) }
+                }
+                Spacer()
+                Button("Stop") { timer.stop(context: context) }.buttonStyle(SoftButtonStyle())
+            }
+        } else {
+            HStack {
+                Text("Focus").font(Theme.ui(13, weight: .semibold))
+                Spacer()
+                Menu("Start \(timer.length) min") {
+                    Button("Without a task") { timer.start(context: context) }
+                    if !tasks.isEmpty { Divider() }
+                    ForEach(tasks.prefix(8)) { t in Button(t.title) { timer.start(task: t, context: context) } }
+                }
+                .fixedSize()
+            }
+        }
     }
 }
 
@@ -303,7 +337,7 @@ struct SettingsView: View {
                     }
                 }
                 Section("Coming next — need something from you") {
-                    PlannedRow(name: "Bank accounts", detail: "Auto-import spending. Plaid account, or CSV import from your bank.", symbol: "building.columns")
+                    PlannedRow(name: "Bank accounts", detail: "Automatic bank sync is coming. For now, use Money › Import statement with your bank’s CSV or PDF.", symbol: "building.columns")
                     PlannedRow(name: "Apple Health", detail: "Sleep, steps, workouts. Needs an iPhone companion app.", symbol: "heart")
                 }
             }

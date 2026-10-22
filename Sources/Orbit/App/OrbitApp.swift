@@ -60,6 +60,7 @@ final class AppState: ObservableObject {
     @Published var assistantOpen = false
     @Published var reviewOpen = false
     @Published var cardOpen = false
+    @Published var planOpen = false
     /// A message to send as soon as the assistant opens (e.g. from "Discuss with Claude").
     @Published var assistantSeed: String?
 
@@ -131,7 +132,7 @@ struct OrbitApp: App {
         if UserDefaults.standard.string(forKey: "userName") == nil {
             UserDefaults.standard.set(NSFullUserName(), forKey: "userName")
         }
-        let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self, ReadingSession.self, Highlight.self, Subscription.self, DocItem.self])
+        let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self, ReadingSession.self, Highlight.self, Subscription.self, DocItem.self, FocusSession.self, DayPlan.self, Trip.self, Booking.self])
         let url = URL.applicationSupportDirectory.appending(path: "Orbit", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         let config = ModelConfiguration(schema: schema, url: url.appending(path: "Orbit.store"))
@@ -193,7 +194,7 @@ struct OrbitApp: App {
                 .environmentObject(apple)
                 .modelContainer(container)
         } label: {
-            Image(systemName: "circle.circle.fill")
+            MenuBarLabel()
         }
         .menuBarExtraStyle(.window)
     }

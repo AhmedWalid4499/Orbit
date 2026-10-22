@@ -111,6 +111,7 @@ final class AIAssistant: ObservableObject {
         - headline: at most 8 words capturing the shape of the day.
         - summary: 2-3 sentences covering what's on today and anything time-sensitive.
         - focus: up to 3 specific, doable suggestions for today, drawn from the tasks, habits, and money data. Each under 14 words.
+          If the user made a plan last night, start from their top priorities, in their order (light rewording only), before adding anything else.
         - heads_up: one thing that could slip (overdue task, budget pace, broken streak), or an empty string if nothing stands out.
         Plain text only, no markdown.
         """
@@ -173,6 +174,8 @@ final class AIAssistant: ObservableObject {
         let dayOfMonth = Calendar.current.component(.day, from: now)
         let daysInMonth = Calendar.current.range(of: .day, in: .month, for: now)!.count
         lines.append("\nMoney this month: spent \(Fmt.money(spent)) of \(Fmt.money(budget)) budget; day \(dayOfMonth) of \(daysInMonth).")
+
+        lines += DayPlanner.briefLines(context: context)
 
         if let journal = notes.filter({ $0.isJournal && $0.createdAt >= today.adding(days: -1) && $0.createdAt < today }).first,
            !journal.body.isEmpty {

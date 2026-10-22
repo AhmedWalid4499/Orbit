@@ -12,6 +12,8 @@ struct MoneyView: View {
     @State private var hoveredDay: Date?
     /// overview, calendar or subscriptions
     @AppStorage("moneyTab") private var mode = "overview"
+    @State private var pickingStatement = false
+    @State private var statement: StatementFile?
 
     private var monthEnd: Date { Calendar.current.date(byAdding: .month, value: 1, to: month)! }
     private var txns: [Transaction] { all.filter { $0.date >= month && $0.date < monthEnd } }
@@ -79,6 +81,10 @@ struct MoneyView: View {
         }
         .scrollIndicators(.never)
         .sheet(isPresented: $adding) { NewTransactionSheet() }
+        .fileImporter(isPresented: $pickingStatement, allowedContentTypes: [.commaSeparatedText, .plainText, .pdf, .text]) { result in
+            if case .success(let url) = result { statement = StatementFile(url: url) }
+        }
+        .sheet(item: $statement) { StatementImportSheet(url: $0.url) }
     }
 
     private var header: some View {
@@ -99,6 +105,8 @@ struct MoneyView: View {
             .padding(.leading, 8)
             Spacer()
             EmailExpensesChip()
+            Button { pickingStatement = true } label: { Label("Import statement", systemImage: "doc.text.magnifyingglass") }
+                .buttonStyle(SoftButtonStyle()).help("Add transactions from your bank's CSV or PDF statement")
             Button { adding = true } label: { Label("Add transaction", systemImage: "plus") }.buttonStyle(SoftButtonStyle())
             CircleIconButton(symbol: "arrow.left", filled: true, size: 46) {
                 month = Calendar.current.date(byAdding: .month, value: -1, to: month)!
@@ -339,7 +347,7 @@ private struct NewTransactionSheet: View {
         .font(Theme.ui(13))
         .padding(28)
         .frame(width: 420)
-        .onChange(of: title) { _, t in if !isIncome { category = QuickParser.guessCategory(t) == "General" ? category : QuickParser.guessCategory(t) } }
+        .onChange(of: title) { _, t in if !isIncome { category = ["General", "Income"].contains(QuickParser.guessCategory(t)) ? category : QuickParser.guessCategory(t) } }
     }
 
     private func field(_ label: String, text: Binding<String>, prompt: String) -> some View {
@@ -390,4 +398,10 @@ private struct EmailExpensesChip: View {
             }
         }
     }
+}
+
+/// A picked statement file, for `.sheet(item:)`.
+struct StatementFile: Identifiable {
+    let url: URL
+    var id: URL { url }
 }

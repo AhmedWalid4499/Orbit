@@ -229,3 +229,74 @@ export interface Doc {
   sourceID: string
   createdAt: string | null
 }
+
+// MARK: Focus, plans, trips
+
+/** kind "focusSession": a focus timer run (Mac FocusSession). `end` is null while it's running. */
+export interface FocusSession {
+  /** Id of the task record being focused on, or "" for none. */
+  taskUUID: string
+  taskTitle: string
+  start: string
+  end: string | null
+  plannedMinutes: number
+}
+
+/** kind "dayPlan": the evening plan for a day (Mac DayPlan). */
+export interface DayPlan {
+  /** "yyyy-MM-dd": the day the plan is for (tomorrow, when made in the evening). */
+  day: string
+  /** Up to 3 top priorities, in order. */
+  top: string[]
+  /** Parallel to `top`: the linked task's id, or "" for a typed-in item. */
+  taskUUIDs: string[]
+  note: string
+  createdAt: string | null
+}
+
+/** kind "trip": a planned trip (Mac Trip). */
+export interface Trip {
+  title: string
+  destination: string
+  start: string | null
+  end: string | null
+  /** Id of the `bucket` record it came from, or "". */
+  bucketUUID: string
+  /** Home currency; 0 = no budget. */
+  budget: number
+  notes: string
+  packing: string[]
+  /** The subset of `packing` that's packed. */
+  packed: string[]
+  createdAt: string | null
+}
+
+export type BookingKind = 'flight' | 'hotel' | 'train' | 'car' | 'activity' | 'other'
+export const BOOKING_KINDS: { id: BookingKind; title: string; color: string }[] = [
+  { id: 'flight', title: 'Flight', color: 'var(--cyan)' },
+  { id: 'hotel', title: 'Hotel', color: 'var(--purple)' },
+  { id: 'train', title: 'Train', color: 'var(--orange)' },
+  { id: 'car', title: 'Car', color: 'var(--peach)' },
+  { id: 'activity', title: 'Activity', color: 'var(--pink)' },
+  { id: 'other', title: 'Other', color: 'var(--mint)' },
+]
+export const bookingKind = (k: string) => BOOKING_KINDS.find((b) => b.id === k) ?? BOOKING_KINDS[BOOKING_KINDS.length - 1]
+
+/** kind "booking": a flight, hotel, train… (Mac Booking). Found in email by the Mac or added by hand. */
+export interface Booking {
+  /** Id of the `trip` record, or "" when not assigned yet. */
+  tripUUID: string
+  kind: BookingKind
+  title: string
+  provider: string
+  confirmation: string
+  location: string
+  start: string | null
+  end: string | null
+  /** Positive, home currency. */
+  amount: number
+  /** manual, email */
+  source: string
+  sourceID: string
+  createdAt: string | null
+}

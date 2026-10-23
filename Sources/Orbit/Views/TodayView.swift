@@ -72,7 +72,24 @@ struct TodayView: View {
 
     @Query private var readingSessions: [ReadingSession]
 
+    /// Below this height the dashboard scrolls instead of squeezing (or pushing the top bar out of the window).
+    private let comfortableHeight: CGFloat = 780
+
     var body: some View {
+        GeometryReader { g in
+            if g.size.height >= comfortableHeight {
+                dashboard
+            } else {
+                ScrollView { dashboard.frame(height: comfortableHeight) }.scrollIndicators(.automatic)
+            }
+        }
+        .task {
+            if gh.isConnected, gh.lastRefresh == nil { await gh.refresh() }
+            await inbox.refreshIfDue(context: context)
+        }
+    }
+
+    private var dashboard: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
             statRow
@@ -105,10 +122,6 @@ struct TodayView: View {
         .padding(.horizontal, 32)
         .padding(.top, 4)
         .padding(.bottom, 22)
-        .task {
-            if gh.isConnected, gh.lastRefresh == nil { await gh.refresh() }
-            await inbox.refreshIfDue(context: context)
-        }
     }
 
     // MARK: Header + capture

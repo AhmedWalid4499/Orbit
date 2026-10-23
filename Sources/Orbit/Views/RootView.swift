@@ -36,9 +36,12 @@ struct RootView: View {
                 case .github: GitHubView()
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Content that's taller than the window is cut at the bottom, never pushing the top bar out of view.
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .clipped()
             .transition(.opacity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Theme.canvas)
         .foregroundStyle(Theme.ink)
         .animation(.easeOut(duration: 0.15), value: state.tab)

@@ -61,6 +61,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { _ in
             Task { @MainActor in Self.fitWindowsToScreen() }
         }
+        // Testing hook: `-windowHeight 600` resizes the main window, to check small screens.
+        if let i = ProcessInfo.processInfo.arguments.firstIndex(of: "-windowHeight"), i + 1 < ProcessInfo.processInfo.arguments.count,
+           let h = Double(ProcessInfo.processInfo.arguments[i + 1]) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                if let w = NSApp.windows.first(where: { $0.canBecomeMain }) { var f = w.frame; f.size.height = h; w.setFrame(f, display: true) }
+            }
+        }
         // Testing hook: `-fullscreen` opens the main window in full screen.
         if ProcessInfo.processInfo.arguments.contains("-fullscreen") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { NSApp.windows.first { $0.canBecomeMain }?.toggleFullScreen(nil) }

@@ -31,21 +31,24 @@ struct PhoneBankSetup: View {
                     }
 
                     guide("Apple Pay", symbol: "wave.3.right", color: Theme.lime, steps: [
-                        "Open **Shortcuts** › **Automation** › **+** › **Wallet**.",
-                        "Pick your cards, choose **Run Immediately**, then **Next**.",
-                        "Tap **New Blank Automation** › **Add Action**, search **Orbit** and pick **Log Card Payment**.",
-                        "Tap **Amount** › **Shortcut Input**, then tap the blue Shortcut Input and choose **Amount**. Do the same for **Merchant** (Merchant) and **Card** (Card).",
-                        "Tap **Done**. Every Apple Pay tap now lands in Money.",
+                        "Open **Shortcuts** › **Automation** tab › **+** (top right) › **Wallet**.",
+                        "Pick your cards (or leave all selected), choose **Run Immediately**, then tap **Next**.",
+                        "Tap **Create New Shortcut** (not the Orbit tiles, they can't receive the payment details).",
+                        "In **Search Actions**, type **Log Card**, tap **Log Card Payment**.",
+                        "Tap **Amount** › **Select Variable** › tap **Shortcut Input** (above the action). Tap the new Shortcut Input bubble and choose **Amount**.",
+                        "Do the same for **Merchant** (choose Merchant) and **Card** (choose Card or Name). Tap **✓** (top right).",
                     ])
 
                     banksCard
 
                     guide("Bank text messages", symbol: "message.fill", color: Theme.cyan, steps: [
-                        "Open **Shortcuts** › **Automation** › **+** › **Message**.",
-                        "Tap **Message Contains**, type **EGP**, and leave **Sender** empty. Choose **Run Immediately**, then **Next**.",
-                        "Tap **New Blank Automation** › **Add Action**, search **Orbit** and pick **Log Bank Message**.",
-                        "Tap **Message** › **Shortcut Input**, then tap it and choose **Content**. Tap **Sender** › **Shortcut Input**, then choose **Sender**.",
-                        "Tap **Done**. Orbit keeps texts from the banks you picked above and ignores the rest. Codes, declined payments and balance updates are always ignored.",
+                        "Open **Shortcuts** › **Automation** tab › **+** (top right) › **Message**.",
+                        "Tap **Message Contains**, type **EGP**, tap **Done**. Leave **Sender** empty.",
+                        "Choose **Run Immediately**, then tap **Next**.",
+                        "Tap **Create New Shortcut** (not the Orbit tiles, they can't receive the message).",
+                        "In **Search Actions**, type **Log Bank**, tap **Log Bank Message**.",
+                        "Tap **Message** › **Select Variable** › tap **Shortcut Input** (above the action). Tap the new Shortcut Input bubble and choose **Content**.",
+                        "Tap **Sender** › **Select Variable** › **Shortcut Input**, then tap it and choose **Sender**. Tap **✓** (top right).",
                     ])
                     Text("Bank texts you in Arabic? Make the same automation once more with **جنيه** instead of EGP.")
                         .font(Theme.ui(12)).foregroundStyle(Theme.inkMuted)

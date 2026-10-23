@@ -205,11 +205,27 @@ struct TaskEditor: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Bindable var task: TaskItem
+    /// Opened from + : the task is new, Cancel throws it away, and Quick add is offered.
+    var isNew = false
+    var onQuickAdd: (() -> Void)? = nil
     @State private var hasDue = false
+    @State private var saved = false
+    @FocusState private var titleFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            TextField("Title", text: $task.title).textFieldStyle(.plain).font(Theme.display(26))
+            if isNew {
+                HStack {
+                    Text("New task").font(Theme.ui(13, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
+                    Spacer()
+                    if let onQuickAdd {
+                        Button { discard(); onQuickAdd() } label: { Label("Quick add", systemImage: "sparkles") }
+                            .buttonStyle(.orbitLink).font(Theme.ui(13))
+                    }
+                }
+            }
+            TextField(isNew ? "What do you need to do?" : "Title", text: $task.title).textFieldStyle(.plain).font(Theme.display(26))
+                .focused($titleFocused)
             AreaPicker(selection: $task.area)
             Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 12) {
                 GridRow {
@@ -247,14 +263,53 @@ struct TaskEditor: View {
                 .background(RoundedRectangle(cornerRadius: 12).fill(Theme.card))
                 .frame(height: 120)
             HStack {
-                Button("Delete", role: .destructive) { context.delete(task); dismiss() }.buttonStyle(SoftButtonStyle())
+                if isNew {
+                    Button("Cancel") { discard(); dismiss() }.buttonStyle(SoftButtonStyle()).keyboardShortcut(.cancelAction)
+                } else {
+                    Button("Delete", role: .destructive) { context.delete(task); dismiss() }.buttonStyle(SoftButtonStyle())
+                }
                 Spacer()
-                Button("Done") { dismiss() }.buttonStyle(PrimaryButtonStyle()).frame(width: 120).keyboardShortcut(.defaultAction)
+                Button(isNew ? "Add task" : "Done") { saved = true; finish(); dismiss() }
+                    .buttonStyle(PrimaryButtonStyle()).frame(width: 120).keyboardShortcut(.defaultAction)
+                    .disabled(isNew && task.title.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
         .padding(28)
         .sheetFrame(width: 520)
-        .onAppear { hasDue = task.due != nil }
+        .onAppear { hasDue = task.due != nil; if isNew { titleFocused = true } }
+        // Swiped away or closed without adding: a new, empty task isn't kept.
+        .onDisappear { if isNew && !saved && task.title.trimmingCharacters(in: .whitespaces).isEmpty { discard() } else { finish() } }
         .onChange(of: hasDue) { _, on in task.due = on ? (task.due ?? .now.startOfDay) : nil }
+    }
+
+    private func discard() {
+        if isNew { context.delete(task); try? context.save(); saved = true }
+    }
+
+    /// Saves and schedules any reminder right away.
+    private func finish() {
+        try? context.save()
+        if task.remindAt != nil || task.hasPlaceReminder {
+            Task { await Reminders.shared.reschedule(context: context, apple: AppleSync()) }
+        }
+    }
+}
+
+/// + : a new task with dates, priority and reminders (Quick add is one tap away inside).
+struct NewTaskSheet: View {
+    @Environment(\.modelContext) private var context
+    var onQuickAdd: (() -> Void)?
+    @State private var task: TaskItem?
+
+    var body: some View {
+        Group {
+            if let task { TaskEditor(task: task, isNew: true, onQuickAdd: onQuickAdd) }
+        }
+        .onAppear {
+            guard task == nil else { return }
+            let t = TaskItem(title: "", due: .now.startOfDay)
+            context.insert(t)
+            task = t
+        }
     }
 }

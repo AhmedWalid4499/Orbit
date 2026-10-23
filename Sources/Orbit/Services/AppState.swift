@@ -99,6 +99,8 @@ final class AppState: ObservableObject {
     @Published var planOpen = false
     /// iPhone: the quick-add sheet.
     @Published var captureOpen = false
+    /// + opens a full new task (with reminders); Quick add is inside it.
+    @Published var newTaskOpen = false
     /// A message to send as soon as the assistant opens (e.g. from "Discuss with Claude").
     @Published var assistantSeed: String?
 

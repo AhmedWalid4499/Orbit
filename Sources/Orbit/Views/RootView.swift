@@ -61,6 +61,9 @@ struct RootView: View {
             if tourSeen { WelcomeView() } else { TourView { tourSeen = true } }
         }
         .sheet(isPresented: $state.tourOpen) { TourView { state.tourOpen = false } }
+        .sheet(isPresented: $state.newTaskOpen) {
+            NewTaskSheet { state.newTaskOpen = false; DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { CapturePanel.shared.show() } }
+        }
         .task { if ProcessInfo.processInfo.arguments.contains("-tour") { state.tourOpen = true } }
         .sheet(item: Binding(get: { focus.justFinished }, set: { focus.justFinished = $0 })) { FocusDoneSheet(session: $0) }
         .modifier(SplashOverlay())
@@ -153,8 +156,8 @@ struct TopBar: View {
                 .help("\(assistantName) (⌘J)")
                 CircleIconButton(symbol: "magnifyingglass", size: 42) { state.searchOpen = true }
                     .help("Search (⌘K)")
-                CircleIconButton(symbol: "plus", size: 42) { CapturePanel.shared.show() }
-                    .help("Quick capture (⌥Space)")
+                CircleIconButton(symbol: "plus", size: 42) { state.newTaskOpen = true }
+                    .help("New task (Quick add: ⌥Space)")
                 SettingsLink {
                     Image(systemName: "gearshape")
                         .font(.system(size: 16, weight: .semibold))

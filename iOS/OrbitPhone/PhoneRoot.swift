@@ -37,6 +37,12 @@ struct PhoneRoot: View {
         .sheet(isPresented: $state.cardOpen) { PhoneCardSheet() }
         .sheet(isPresented: $state.planOpen) { PlanTomorrowSheet() }
         .sheet(isPresented: $state.captureOpen) { PhoneCapture().presentationDetents([.medium, .large]) }
+        .sheet(isPresented: $state.newTaskOpen) {
+            ScrollView {
+                NewTaskSheet { state.newTaskOpen = false; DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { state.captureOpen = true } }
+            }
+            .presentationDragIndicator(.visible)
+        }
         .sheet(item: Binding(get: { focus.justFinished }, set: { focus.justFinished = $0 })) { FocusDoneSheet(session: $0).presentationDetents([.medium]) }
         .sheet(item: Binding(get: { reading.justFinished }, set: { reading.justFinished = $0 })) { FinishedReadingSheet(session: $0).presentationDetents([.medium]) }
         .onChange(of: state.tab) { _, t in show(t) }
@@ -186,7 +192,7 @@ struct PhoneChrome: ViewModifier {
             }
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    Button { state.captureOpen = true } label: { Image(systemName: "plus") }
+                    Button { state.newTaskOpen = true } label: { Image(systemName: "plus") }
                         .accessibilityLabel("Quick add")
                     Button { state.openAssistant() } label: {
                         Image(systemName: "sparkles").font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.stickerInk)

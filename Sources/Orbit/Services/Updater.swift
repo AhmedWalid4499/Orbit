@@ -80,14 +80,14 @@ final class Updater: ObservableObject {
         let alert = NSAlert()
         switch state {
         case .available(let r):
-            alert.messageText = "Orbit \(r.version) is available"
-            alert.informativeText = (r.notes.isEmpty ? "" : r.notes + "\n\n") + "You have \(currentVersion). Orbit will restart to finish."
+            alert.messageText = "A new version of Orbit is available"
+            alert.informativeText = (r.notes.isEmpty ? "" : r.notes + "\n\n") + "Orbit will restart to finish."
             alert.addButton(withTitle: "Install Now")
             alert.addButton(withTitle: "Later")
             if alert.runModal() == .alertFirstButtonReturn { await install() }
         case .upToDate:
             alert.messageText = "You're up to date"
-            alert.informativeText = "Orbit \(currentVersion) is the latest version."
+            alert.informativeText = "You have the latest version of Orbit."
             alert.runModal()
         case .failed(let message):
             alert.messageText = "Couldn't check for updates"
@@ -246,7 +246,7 @@ struct UpdatePill: View {
     var body: some View {
         if let release = updater.available {
             Button { showing = true } label: {
-                Label("Update to \(release.version)", systemImage: "arrow.down.circle.fill")
+                Label("New version available", systemImage: "arrow.down.circle.fill")
                     .font(Theme.ui(12, weight: .semibold))
                     .foregroundStyle(Theme.stickerInk)
                     .padding(.horizontal, 12).padding(.vertical, 8)
@@ -269,10 +269,7 @@ struct UpdatePanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Orbit \(updater.currentVersion)").font(.headline)
-                    Text("Build \(updater.currentBuild)").font(.caption).foregroundStyle(.secondary)
-                }
+                Text(updater.available == nil ? "Orbit" : "A new version is available").font(.headline)
                 Spacer()
                 switch updater.state {
                 case .checking:
@@ -282,7 +279,7 @@ struct UpdatePanel: View {
                 case .installing:
                     Text("Installing…").font(.caption)
                 case .available(let r):
-                    Button("Download & install \(r.version)") { Task { await updater.install() } }
+                    Button("Update now") { _ = r; Task { await updater.install() } }
                         .buttonStyle(.borderedProminent)
                 default:
                     Button("Check for Updates") { Task { await updater.check(userInitiated: true) } }
@@ -296,7 +293,7 @@ struct UpdatePanel: View {
                 Label(message, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(Theme.critical)
             case .available(let r):
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("What's new in \(r.version)").font(.subheadline.weight(.semibold))
+                    Text("What's new").font(.subheadline.weight(.semibold))
                     ScrollView {
                         Text(r.notes.isEmpty ? "Improvements and fixes." : r.notes)
                             .font(.caption).frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled)

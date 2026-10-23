@@ -13,7 +13,7 @@ struct TodayView: View {
     @Query(sort: \Transaction.date, order: .reverse) private var transactions: [Transaction]
     @Query(sort: \Note.createdAt, order: .reverse) private var notes: [Note]
     @Query(sort: \Book.addedAt, order: .reverse) private var books: [Book]
-    @Query(filter: #Predicate<BucketItem> { !$0.isDone }) private var dreams: [BucketItem]
+    @Query(filter: #Predicate<BucketItem> { !$0.isDone && $0.kindRaw != "place" }) private var dreams: [BucketItem]
     @Query private var plans: [DayPlan]
     @Query private var focusSessions: [FocusSession]
 
@@ -76,6 +76,7 @@ struct TodayView: View {
             statRow
             HStack(alignment: .top, spacing: 14) {
                 VStack(spacing: 14) {
+                    DaySummaryCard()
                     BriefCard()
                     agendaCard.frame(minHeight: 150, maxHeight: .infinity)
                 }

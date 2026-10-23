@@ -213,40 +213,94 @@ final class Speaker: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
         synth.delegate = self
     }
 
+    private var pending = 0
+
     func speak(_ text: String, then: (() -> Void)? = nil) {
         stop()
         let clean = text
             .replacingOccurrences(of: #"\[([^\]]+)\]\([^)]+\)"#, with: "$1", options: .regularExpression) // links → their text
-            .replacingOccurrences(of: #"[*_`#>•]"#, with: "", options: .regularExpression)
-        guard !clean.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { then?(); return }
-        let u = AVSpeechUtterance(string: clean)
-        u.voice = Self.bestVoice(for: clean)
-        u.rate = AVSpeechUtteranceDefaultSpeechRate * 1.02
+            .replacingOccurrences(of: #"https?://\S+"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"[*_`#>]"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: "•", with: "\n")
+        let sentences = Self.sentences(clean)
+        guard !sentences.isEmpty else { then?(); return }
+        let voice = Self.voice(for: clean)
         onDone = then
         speaking = true
         #if os(iOS)
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
         try? AVAudioSession.sharedInstance().setActive(true)
         #endif
-        synth.speak(u)
+        // One utterance per sentence, with a breath in between and a little variation, so it sounds like someone talking
+        // rather than a block of text being read out.
+        pending = sentences.count
+        for (i, sentence) in sentences.enumerated() {
+            let u = AVSpeechUtterance(string: sentence)
+            u.voice = voice
+            let question = sentence.hasSuffix("?")
+            u.rate = AVSpeechUtteranceDefaultSpeechRate * (sentence.count < 40 ? 0.98 : 1.03)
+            u.pitchMultiplier = question ? 1.04 : (i == 0 ? 1.02 : 1.0)
+            u.preUtteranceDelay = i == 0 ? 0.05 : 0
+            u.postUtteranceDelay = sentence.hasSuffix(",") || sentence.hasSuffix(":") ? 0.08 : 0.22
+            synth.speak(u)
+        }
     }
 
     func stop() {
         onDone = nil
+        pending = 0
         if synth.isSpeaking { synth.stopSpeaking(at: .immediate) }
         speaking = false
     }
 
-    /// Premium or enhanced voices sound far more natural than the defaults, when installed.
+    /// Splits text into sentences (and list lines), keeping the punctuation.
+    static func sentences(_ text: String) -> [String] {
+        var out: [String] = []
+        for line in text.components(separatedBy: .newlines) {
+            let l = line.trimmingCharacters(in: .whitespaces)
+            guard !l.isEmpty else { continue }
+            var parts: [String] = []
+            l.enumerateSubstrings(in: l.startIndex..., options: .bySentences) { sub, _, _, _ in
+                if let s = sub?.trimmingCharacters(in: .whitespaces), !s.isEmpty { parts.append(s) }
+            }
+            out += parts.isEmpty ? [l] : parts
+        }
+        return out
+    }
+
+    /// The voice picked in Settings › AI, or the most natural one installed.
+    static func voice(for text: String) -> AVSpeechSynthesisVoice? {
+        let arabic = text.unicodeScalars.contains { (0x0600...0x06FF).contains($0.value) }
+        if !arabic, let id = UserDefaults.standard.string(forKey: "assistantVoice"), let v = AVSpeechSynthesisVoice(identifier: id) { return v }
+        return bestVoice(for: text)
+    }
+
+    /// Voices that sound like a person: premium first, then enhanced; the robotic Eloquence and novelty voices are left out.
+    static func naturalVoices(language: String) -> [AVSpeechSynthesisVoice] {
+        let region = Locale.current.region?.identifier ?? ""
+        return AVSpeechSynthesisVoice.speechVoices()
+            .filter { $0.language.hasPrefix(language) && !$0.identifier.contains("eloquence") && !$0.identifier.contains("speech.synthesis.voice")
+                && !$0.voiceTraits.contains(.isNoveltyVoice) }
+            .sorted {
+                if $0.quality != $1.quality { return $0.quality.rawValue > $1.quality.rawValue }
+                let r0 = $0.language.hasSuffix(region), r1 = $1.language.hasSuffix(region)
+                if r0 != r1 { return r0 }
+                let us0 = $0.language == "en-US", us1 = $1.language == "en-US"
+                if us0 != us1 { return us0 }
+                return $0.name < $1.name
+            }
+    }
+
     static func bestVoice(for text: String) -> AVSpeechSynthesisVoice? {
         let arabic = text.unicodeScalars.contains { (0x0600...0x06FF).contains($0.value) }
         let lang = arabic ? "ar" : (Locale.current.language.languageCode?.identifier ?? "en")
-        let voices = AVSpeechSynthesisVoice.speechVoices().filter { $0.language.hasPrefix(lang) }
-        return voices.max { $0.quality.rawValue < $1.quality.rawValue } ?? AVSpeechSynthesisVoice(language: arabic ? "ar-SA" : nil)
+        return naturalVoices(language: lang).first ?? AVSpeechSynthesisVoice(language: arabic ? "ar-SA" : nil)
     }
 
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         Task { @MainActor in
+            self.pending -= 1
+            guard self.pending <= 0 else { return }
             self.speaking = false
             let done = self.onDone
             self.onDone = nil

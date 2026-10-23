@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 import SwiftData
 
 // MARK: - Settings
@@ -219,6 +220,7 @@ struct AISettings: View {
                 Text("What you call your AI around Orbit: the top-bar button, the journal and the morning brief. It's “Ask” unless you rename it.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            VoiceSection()
             Section("Features") {
                 Toggle(isOn: $ai.smartCaptureEnabled) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -481,6 +483,40 @@ struct KeySyncSection: View {
                 Text("Your Anthropic key, GitHub token, Google sign-ins for Gmail and Calendar, and their settings arrive on every device you sign in to, with nothing to type. They're stored encrypted in your account.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+        }
+    }
+}
+
+/// Settings › AI › Voice: which voice reads replies aloud, with a preview.
+struct VoiceSection: View {
+    @AppStorage("assistantSpeaks") private var speaks = false
+    @AppStorage("assistantVoice") private var voiceID = ""
+    @ObservedObject private var speaker = Speaker.shared
+
+    private var voices: [AVSpeechSynthesisVoice] {
+        Speaker.naturalVoices(language: Locale.current.language.languageCode?.identifier ?? "en")
+    }
+    private var hasPremium: Bool { voices.contains { $0.quality == .premium } }
+
+    var body: some View {
+        Section {
+            Toggle("Read replies aloud", isOn: $speaks)
+            Picker("Voice", selection: $voiceID) {
+                Text("Most natural (\(Speaker.bestVoice(for: "Hi")?.name ?? "default"))").tag("")
+                ForEach(voices, id: \.identifier) { v in
+                    Text("\(v.name)\(v.quality == .premium ? " · Premium" : v.quality == .enhanced ? " · Enhanced" : "") (\(v.language))").tag(v.identifier)
+                }
+            }
+            Button(speaker.speaking ? "Stop" : "Preview") {
+                if speaker.speaking { speaker.stop() }
+                else { speaker.speak("Hey! I had a look at your day. You've got two things this afternoon, so maybe grab lunch early? Let me know if you want me to move anything.") }
+            }
+        } header: {
+            Text("Voice")
+        } footer: {
+            Text(hasPremium
+                 ? "Premium voices sound the most like a person."
+                 : "For a much more human voice, download a Premium one (free): \(Platform.isPhone ? "Settings › Accessibility › Spoken Content › Voices › English" : "System Settings › Accessibility › Spoken Content › System voice › Manage Voices"), then pick e.g. Zoe, Ava or Evan (Premium). It shows up here.")
         }
     }
 }

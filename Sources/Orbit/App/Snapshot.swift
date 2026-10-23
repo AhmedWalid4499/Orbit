@@ -12,6 +12,14 @@ extension Snapshot {
            let brief = try? JSONDecoder().decode(MorningBrief.self, from: data) {
             AIAssistant.shared.previewBrief(brief)
         }
+        if ProcessInfo.processInfo.environment["ORBIT_SNAPSHOT_DEMO"] != nil {
+            DaySummaryStore.shared.preview(DaySummary(line: "A calm afternoon, and you're ahead on tasks.", tiles: [
+                .init(kind: "money", title: "Spent today", value: "EGP 350", detail: "Mostly Carrefour; month on pace"),
+                .init(kind: "reading", title: "Reading", value: "42% · Atomic Habits", detail: "15 min today, 4-day streak"),
+                .init(kind: "tasks", title: "Tasks", value: "3 of 5 done", detail: "Next: call the landlord"),
+                .init(kind: "calendar", title: "Next up", value: "Gym · 7:00 PM", detail: "Then nothing else tonight"),
+            ], nudge: "Twenty minutes of reading before the gym keeps your streak going."))
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             // Demo data lives in memory only, so screenshots never touch the real store.
             let container = ProcessInfo.processInfo.environment["ORBIT_SNAPSHOT_DEMO"] != nil ? demoContainer() : container

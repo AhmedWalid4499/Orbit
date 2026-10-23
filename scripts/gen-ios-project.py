@@ -81,6 +81,7 @@ app = {
     "INFOPLIST_KEY_NSMicrophoneUsageDescription": "Orbit listens when you tap the mic, so you can talk to your assistant and plan by voice.",
     "INFOPLIST_KEY_NSSpeechRecognitionUsageDescription": "Orbit turns what you say into text on your iPhone, so your assistant can understand you.",
     "INFOPLIST_KEY_NSCameraUsageDescription": "Take a photo of a receipt or document to send to your assistant.",
+    "INFOPLIST_KEY_NSLocationWhenInUseUsageDescription": "Orbit uses your location when you ask for food or places nearby, to find what's close to you.",
     "INFOPLIST_KEY_UIApplicationSceneManifest_Generation": "YES",
     "INFOPLIST_KEY_UILaunchScreen_Generation": "YES",
     "INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone": "UIInterfaceOrientationPortrait",

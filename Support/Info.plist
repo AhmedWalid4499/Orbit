@@ -22,6 +22,8 @@
     <key>NSHighResolutionCapable</key><true/>
     <key>NSCalendarsFullAccessUsageDescription</key><string>Orbit shows your calendar events alongside your tasks and plans.</string>
     <key>NSCalendarsUsageDescription</key><string>Orbit shows your calendar events alongside your tasks and plans.</string>
+    <key>NSLocationUsageDescription</key><string>Orbit uses your location when you ask for food or places nearby, to find what's close to you.</string>
+    <key>NSLocationWhenInUseUsageDescription</key><string>Orbit uses your location when you ask for food or places nearby, to find what's close to you.</string>
     <key>NSMicrophoneUsageDescription</key><string>Orbit listens when you hold ⌥Space or tap the mic, so you can talk to your assistant and plan by voice.</string>
     <key>NSSpeechRecognitionUsageDescription</key><string>Orbit turns what you say into text on your Mac, so your assistant can understand you and file what you said.</string>
     <key>NSRemindersFullAccessUsageDescription</key><string>Orbit shows and completes your Apple Reminders next to your tasks.</string>

@@ -45,7 +45,9 @@ enum BankMessages {
         guard let found = amountAndCurrency(in: amount) ?? Double(amount.filter { "0123456789.".contains($0) }).map({ ($0, "") }),
               found.0 > 0 else { return "Couldn't read the amount “\(amount)”." }
         let (value, currency) = found
-        let name = merchant.trimmingCharacters(in: .whitespacesAndNewlines)
+        var name = merchant.trimmingCharacters(in: .whitespacesAndNewlines)
+        // A whole transaction passed as text: pick the shop out of it.
+        if name.count > 40 || name == amount { name = BankMessages.merchant(in: name) }
         let p = Parsed(kind: .expense, amount: value, currency: currency, merchant: name.isEmpty ? (card.isEmpty ? "Card payment" : card) : name,
                        category: QuickParser.guessCategory(name))
         let minute = Int(Date.now.timeIntervalSince1970 / 60)

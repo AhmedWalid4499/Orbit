@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		C017D2919C0386AA2299BA02 /* Supabase.json in Resources */ = {isa = PBXBuildFile; fileRef = 77750F7AF45EE6CFDA2C270F; };
+		927110F77524B8AC7D63938E /* Shortcuts in Resources */ = {isa = PBXBuildFile; fileRef = B84465C1E9C07D3CEAAF2E22; };
 		085706BCEDADEDE7CAD25515 /* OrbitWidgets.appex */ = {isa = PBXBuildFile; fileRef = 93096A8554F87E20FFED0946; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -30,6 +31,7 @@
 /* End PBXTargetDependency section */
 
 /* Begin PBXFileReference section */
+		B84465C1E9C07D3CEAAF2E22 /* Shortcuts */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Shortcuts; path = Support/Shortcuts; sourceTree = SOURCE_ROOT; };
 		77750F7AF45EE6CFDA2C270F /* Supabase.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = Supabase.json; path = ../Support/Supabase.json; sourceTree = SOURCE_ROOT; };
 		996AD237BC284D463E664FFE /* Orbit.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Orbit.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		93096A8554F87E20FFED0946 /* OrbitWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = OrbitWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -92,6 +94,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C017D2919C0386AA2299BA02 /* Supabase.json in Resources */,
+				927110F77524B8AC7D63938E /* Shortcuts in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -140,6 +143,7 @@
 				E0F3E530424CA91708A81DDB /* Views */,
 				4B317CD147FD1A4E63DD8E1F /* Widgets */,
 				77750F7AF45EE6CFDA2C270F /* Supabase.json */,
+				B84465C1E9C07D3CEAAF2E22 /* Shortcuts */,
 				113236722DEE1DC96F378B9D /* Products */,
 			);
 			sourceTree = "<group>";
@@ -291,7 +295,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.16.0;
+				MARKETING_VERSION = 1.16.1;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -323,7 +327,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.16.0;
+				MARKETING_VERSION = 1.16.1;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -355,7 +359,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.16.0;
+				MARKETING_VERSION = 1.16.1;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -377,7 +381,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.16.0;
+				MARKETING_VERSION = 1.16.1;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;

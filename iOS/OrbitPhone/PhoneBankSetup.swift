@@ -22,7 +22,7 @@ struct PhoneBankSetup: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    Text("Card and Apple Pay spending never reaches your inbox. Two automations in the Shortcuts app send it to Orbit as it happens: iPhone doesn't let apps read your messages themselves, so you choose exactly which ones Orbit sees.")
+                    Text("Card and Apple Pay spending never reaches your inbox. Orbit's shortcuts send it here as it happens. iPhone only lets you, not apps, turn on automations, so it takes one minute in the Shortcuts app.")
                         .font(Theme.ui(14)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
 
                     if !logged.isEmpty {
@@ -30,28 +30,23 @@ struct PhoneBankSetup: View {
                             .font(Theme.ui(13, weight: .semibold)).foregroundStyle(Theme.good)
                     }
 
-                    guide("Apple Pay", symbol: "wave.3.right", color: Theme.lime, steps: [
-                        "Open **Shortcuts** › **Automation** tab › **+** (top right) › **Wallet**.",
-                        "Pick your cards (or leave all selected), choose **Run Immediately**, then tap **Next**.",
-                        "Tap **Create New Shortcut** (not the Orbit tiles, they can't receive the payment details).",
-                        "In **Search Actions**, type **Log Card**, tap **Log Card Payment**.",
-                        "Tap **Amount** › **Select Variable** › tap **Shortcut Input** (above the action). Tap the new Shortcut Input bubble and choose **Amount**.",
-                        "Do the same for **Merchant** (choose Merchant) and **Card** (choose Card or Name). Tap **✓** (top right).",
-                    ])
-
                     banksCard
 
                     guide("Bank text messages", symbol: "message.fill", color: Theme.cyan, steps: [
-                        "Open **Shortcuts** › **Automation** tab › **+** (top right) › **Message**.",
-                        "Tap **Message Contains**, type **EGP**, tap **Done**. Leave **Sender** empty.",
-                        "Choose **Run Immediately**, then tap **Next**.",
-                        "Tap **Create New Shortcut** (not the Orbit tiles, they can't receive the message).",
-                        "In **Search Actions**, type **Log Bank**, tap **Log Bank Message**.",
-                        "Tap **Message** › **Select Variable** › tap **Shortcut Input** (above the action). Tap the new Shortcut Input bubble and choose **Content**.",
-                        "Tap **Sender** › **Select Variable** › **Shortcut Input**, then tap it and choose **Sender**. Tap **✓** (top right).",
-                    ])
-                    Text("Bank texts you in Arabic? Make the same automation once more with **جنيه** instead of EGP.")
+                        "Tap **Add to Shortcuts** below, choose **Shortcuts** in the share sheet, then **Add Shortcut**.",
+                        "In Shortcuts: **Automation** tab › **+** › **Message**.",
+                        "Tap **Message Contains**, type **EGP**, tap **Done**. Leave Sender empty.",
+                        "Choose **Run Immediately**, tap **Next**, then tap the red **Orbit Bank Message** tile in the top row (swipe the row sideways if you don't see it). That's it.",
+                    ], file: "Orbit Bank Message")
+                    Text("Bank texts you in Arabic? Add a second Message automation with **جنيه** instead of EGP, running the same shortcut.")
                         .font(Theme.ui(12)).foregroundStyle(Theme.inkMuted)
+
+                    guide("Apple Pay", symbol: "wave.3.right", color: Theme.lime, steps: [
+                        "Tap **Add to Shortcuts** below, choose **Shortcuts** in the share sheet, then **Add Shortcut**.",
+                        "In Shortcuts: **Automation** tab › **+** › **Wallet**.",
+                        "Pick your cards, choose **Run Immediately**, tap **Next**.",
+                        "Tap the green **Orbit Card Payment** tile in the top row. That's it.",
+                    ], file: "Orbit Card Payment")
 
                     Button { Platform.open(URL(string: "shortcuts://")!) } label: {
                         Label("Open Shortcuts", systemImage: "square.2.layers.3d").frame(maxWidth: .infinity)
@@ -115,7 +110,7 @@ struct PhoneBankSetup: View {
         .onChange(of: extra) { _, v in EgyptBanks.extraSenders = v }
     }
 
-    private func guide(_ title: String, symbol: String, color: Color, steps: [String]) -> some View {
+    private func guide(_ title: String, symbol: String, color: Color, steps: [String], file: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Image(systemName: symbol).font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.stickerInk)
@@ -128,6 +123,12 @@ struct PhoneBankSetup: View {
                         .background(Circle().fill(Theme.canvas))
                     Text(.init(step)).font(Theme.ui(14)).fixedSize(horizontal: false, vertical: true)
                 }
+            }
+            if let url = Bundle.main.url(forResource: file, withExtension: "shortcut", subdirectory: "Shortcuts") {
+                ShareLink(item: url) {
+                    Label("Add to Shortcuts", systemImage: "square.and.arrow.down").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(PrimaryButtonStyle())
             }
         }
         .padding(16)

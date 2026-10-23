@@ -115,7 +115,9 @@ struct LogBankMessageIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
-        let result = await BankMessages.log(message: message, sender: sender, context: try orbitContext())
+        // If Shortcuts couldn't read the sender it hands over the whole message instead: treat it as unknown.
+        let from = sender.count > 40 || sender == message ? "" : sender
+        let result = await BankMessages.log(message: message, sender: from, context: try orbitContext())
         return .result(value: result, dialog: IntentDialog(stringLiteral: result))
     }
 }

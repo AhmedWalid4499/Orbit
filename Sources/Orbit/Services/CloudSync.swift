@@ -86,9 +86,9 @@ enum CloudAuth {
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
             pending = (verifier, cont)
             Task { @MainActor in
-                // On iPhone the sign-in sheet hands back the redirect itself; on the Mac it arrives through the URL scheme.
+                // The sign-in window hands the redirect straight back (no reliance on which app owns the link scheme).
                 if let back = await Platform.webAuth(comps.url!, callbackScheme: "com.personal.orbit") { handleCallback(back) }
-                else if Platform.isPhone, let p = pending { pending = nil; p.continuation.resume(throwing: CloudError("Google sign-in was cancelled.")) }
+                else if let p = pending { pending = nil; p.continuation.resume(throwing: CloudError("Google sign-in was cancelled.")) }
             }
         }
     }

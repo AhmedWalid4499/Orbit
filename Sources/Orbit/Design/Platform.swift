@@ -1,12 +1,12 @@
 import SwiftUI
 import ImageIO
 import UniformTypeIdentifiers
+import AuthenticationServices
 #if os(macOS)
 import AppKit
 typealias PlatformImage = NSImage
 #else
 import UIKit
-import AuthenticationServices
 typealias PlatformImage = UIImage
 #endif
 
@@ -50,18 +50,17 @@ enum Platform {
         #endif
     }
 
-    #if os(iOS)
     private static var session: ASWebAuthenticationSession?
     private static let anchor = AuthAnchor()
-    #endif
 
-    /// Opens a sign-in page. On the Mac it's the browser and the result comes back through Orbit's URL scheme or a
-    /// loopback server; on iPhone it's an in-app browser sheet, and a redirect to `callbackScheme` is returned here.
+    /// Opens a sign-in page in the system's sign-in window and returns the redirect to `callbackScheme`.
+    /// The redirect comes straight back to this app, so it works even if another app (an old copy, or the Windows
+    /// version's Electron build) has claimed Orbit's link scheme. Without a scheme (loopback sign-ins), the Mac opens
+    /// the browser and the caller's loopback server gets the result.
     static func webAuth(_ url: URL, callbackScheme: String?) async -> URL? {
         #if os(macOS)
-        NSWorkspace.shared.open(url)
-        return nil
-        #else
+        guard callbackScheme != nil else { NSWorkspace.shared.open(url); return nil }
+        #endif
         return await withCheckedContinuation { (c: CheckedContinuation<URL?, Never>) in
             let s = ASWebAuthenticationSession(url: url, callbackURLScheme: callbackScheme ?? "orbit-loopback") { callback, _ in
                 Task { @MainActor in session = nil }
@@ -72,7 +71,6 @@ enum Platform {
             session = s
             s.start()
         }
-        #endif
     }
 
     static func copy(_ text: String) {
@@ -95,22 +93,22 @@ enum Platform {
 
     /// Closes the iPhone sign-in sheet once a loopback server has the result.
     static func endWebAuth() {
-        #if os(iOS)
         session?.cancel()
         session = nil
-        #endif
     }
 }
 
-#if os(iOS)
 private final class AuthAnchor: NSObject, ASWebAuthenticationPresentationContextProviding {
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
         MainActor.assumeIsolated {
+            #if os(macOS)
+            NSApp.keyWindow ?? NSApp.windows.first { $0.canBecomeMain } ?? ASPresentationAnchor()
+            #else
             UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.first ?? ASPresentationAnchor()
+            #endif
         }
     }
 }
-#endif
 
 // MARK: - Images
 

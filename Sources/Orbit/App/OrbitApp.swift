@@ -9,6 +9,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
         NSAppleEventManager.shared().setEventHandler(self, andSelector: #selector(handleURL(_:reply:)),
                                                      forEventClass: AEEventClass(kInternetEventClass), andEventID: AEEventID(kAEGetURL))
+        reclaimLinkScheme()
+    }
+
+    /// Makes the installed Orbit the app that opens com.personal.orbit:// links again, if something else took them
+    /// (the Windows version's Electron build does when it's run on this Mac). Only the copy in Applications does this.
+    private func reclaimLinkScheme() {
+        guard !Snapshot.isActive, Bundle.main.bundlePath.hasPrefix("/Applications/"),
+              let probe = URL(string: "com.personal.orbit://check") else { return }
+        if NSWorkspace.shared.urlForApplication(toOpen: probe)?.standardizedFileURL == Bundle.main.bundleURL.standardizedFileURL { return }
+        NSWorkspace.shared.setDefaultApplication(at: Bundle.main.bundleURL, toOpenURLsWithScheme: "com.personal.orbit") { _ in }
     }
 
     @objc private func handleURL(_ event: NSAppleEventDescriptor, reply: NSAppleEventDescriptor) {

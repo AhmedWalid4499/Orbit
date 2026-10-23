@@ -134,6 +134,15 @@ enum SyncTest {
     static func runIfRequested() {
         guard ProcessInfo.processInfo.environment["ORBIT_SYNC_TEST"] != nil,
               SupabaseConfig.url.hasPrefix("http://127.0.0.1") else { return }
+        if NSWorkspace.shared.runningApplications.contains(where: {
+            $0.bundleIdentifier == Bundle.main.bundleIdentifier && $0.processIdentifier != ProcessInfo.processInfo.processIdentifier
+        }) {
+            // The test borrows the keychain the real app uses; running both could leave the real app signed out.
+            print("FAIL  Quit Orbit before running the sync test.")
+            fflush(stdout)
+            NSApp.terminate(nil)
+            return
+        }
         Task {
             var results: [String] = []
             func check(_ name: String, _ ok: Bool) { results.append("\(ok ? "PASS" : "FAIL")  \(name)") }

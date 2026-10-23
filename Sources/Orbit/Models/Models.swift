@@ -251,7 +251,7 @@ enum ReadingStatus: String, CaseIterable, Codable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .reading: "Reading"
+        case .reading: "Currently reading"
         case .toRead: "To read"
         case .read: "Read"
         case .dnf: "Didn't finish"

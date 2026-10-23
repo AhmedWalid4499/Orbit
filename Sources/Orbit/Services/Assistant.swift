@@ -1,4 +1,5 @@
 import Foundation
+import CoreLocation
 import SwiftUI
 import SwiftData
 
@@ -59,14 +60,14 @@ final class AssistantStore: ObservableObject {
         error = nil
         defer { busy = false; save() }
 
-        for _ in 0..<8 {
+        for _ in 0..<12 {
             received = ""
             revealed = ""
             streamDone = false
             let reveal = Task { await revealLoop() }
             let turn: ClaudeClient.Turn
             do {
-                turn = try await client.streamTurn(system: system, messages: messages, tools: AssistantTools.definitions,
+                turn = try await client.streamTurn(system: system, messages: messages, tools: AssistantTools.definitions + AssistantTools.serverTools,
                                                    effort: "medium") { [weak self] t in self?.received = t }
             } catch {
                 streamDone = true
@@ -79,10 +80,20 @@ final class AssistantStore: ObservableObject {
             await reveal.value
             revealed = ""
             messages.append(["role": "assistant", "content": turn.replayBlocks])
+            for b in turn.blocks where b["type"] as? String == "server_tool_use" {
+                let input = b["input"] as? [String: Any] ?? [:]
+                if b["name"] as? String == "web_search", let q = input["query"] as? String {
+                    items.append(ChatItem(role: .action, text: "Searched the web: “\(q)”", symbol: "globe"))
+                } else if b["name"] as? String == "web_fetch", let u = input["url"] as? String {
+                    items.append(ChatItem(role: .action, text: "Read \(URL(string: u)?.host ?? u)", symbol: "doc.text.magnifyingglass"))
+                }
+            }
             if !turn.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 items.append(ChatItem(role: .assistant, text: turn.text.trimmingCharacters(in: .whitespacesAndNewlines)))
             }
 
+            // A long web search pauses the turn; sending the conversation back as it is lets it carry on.
+            if turn.stopReason == "pause_turn" { save(); continue }
             let calls = turn.toolCalls
             guard turn.stopReason == "tool_use", !calls.isEmpty else {
                 if turn.stopReason == "max_tokens" { error = "\(AssistantName.current)'s reply was cut off. Ask it to continue." }
@@ -174,7 +185,11 @@ final class AssistantStore: ObservableObject {
         - When they're talking about a struggle ("I can't read every day"), first acknowledge it, then suggest something small and realistic and set it up (e.g. a habit with a modest weekly target, maybe a reminder task), unless they only want to talk.
         - Book recommendations: suggest 3-5 real, well-known books with one line each on why, and add them to their To read list under a category that fits the topic (e.g. "Japanese culture"), unless they ask only for ideas. Check list_books first so you don't recommend books they already have.
         - Bucket list: when they mention something they dream of doing someday (travel, experiences, skills), offer to add it, or add it if they ask.
-        - Hungry or looking for somewhere ("I'm hungry", "where can I get coffee", "any good sushi near me"): use find_nearby, then recommend 2-4 places like a local friend would: why each one, how far, and a link to each. If they've said what they're in the mood for, search for that. Offer to save one to Go to. Don't list everything you found.
+        - Looking for somewhere or something nearby (hungry, coffee, a gym, a barber, where to buy a charger, something to do tonight): use find_nearby for what's close, then web_search the best 2-4 for prices, menus, ratings and opening hours (e.g. "Zooba Zamalek menu prices"). Recommend like a local friend: why each one, rough price per person or price of the item (say where the price came from and that it may have changed), rating if found, how far, open now or not, and a link to each. Offer to save one to Go to. Don't list everything you found.
+        - Web: use web_search for anything current or that you'd otherwise guess: prices, exchange rates, product comparisons, news, opening hours, reviews, how-tos. Mention sources briefly. Use web_fetch to read a page the user links.
+        - What to wear: call get_weather, then suggest a concrete outfit for their plans today (check get_overview for events like the gym, a dinner, a flight): layers, shoes, umbrella, sunscreen, a jacket for the evening. Short and practical.
+        - Doing tasks: you can calculate (splitting bills, tips, budgets, unit conversions, loan or savings maths, dates and ages; work it out step by step and give the answer first), write and rewrite (emails, messages, posts, summaries, translations), explain, plan and compare. Just do the task; don't tell them how they could do it.
+        - Reviewing documents: when they send a file, read all of it. If they ask for a review, give the main points first, then what's unclear, risky or missing (for contracts: obligations, dates, fees, cancellation terms), and what you'd change. Quote the exact lines that matter.
         - Places: when they mention a restaurant, café, shop, museum or any spot they liked or want to try, save it with add_place (Go to list).
         - Notes: when they ask you to write notes, a summary, a plan, a study sheet or a list, write the real, useful content yourself and save it with create_note; then tell them in a line or two what's in it. Don't save their request as the note. To add to or change an existing note, use list_notes, then update_note.
         - Use get_overview or get_money_summary when you need their current data instead of guessing.
@@ -224,6 +239,16 @@ enum AssistantTools {
         ]
     }
 
+    /// Anthropic-run tools: searching the web (prices, menus, ratings, opening hours, news) and reading pages.
+    static var serverTools: [[String: Any]] {
+        var location: [String: Any] = ["type": "approximate", "timezone": TimeZone.current.identifier, "city": WeatherStore.shared.effectiveCity]
+        if let region = Locale.current.region?.identifier { location["country"] = region }
+        return [
+            ["type": "web_search_20260209", "name": "web_search", "max_uses": 6, "user_location": location],
+            ["type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 4],
+        ]
+    }
+
     static var definitions: [[String: Any]] {
         let areas = Area.allCases.map(\.rawValue)
         return [
@@ -265,7 +290,10 @@ enum AssistantTools {
             tool("update_note", "Change an existing note, found by its title. mode \"append\" adds body at the end; \"replace\" rewrites the whole note (only when asked to rewrite, restructure or improve it).", [
                 "title": ["type": "string"], "body": ["type": "string"], "mode": ["type": "string", "enum": ["append", "replace"]],
             ]),
-            tool("find_nearby", "Find places near the user right now with Apple Maps (uses their location). query is what they want: \"food\" when they're just hungry, or a cuisine or kind of place (\"sushi\", \"coffee\", \"shawarma\", \"pharmacy\", \"bookshop\"). radius_meters: 1500 for walking distance, up to 8000 if they'll drive or nothing is close.", [
+            tool("get_weather", "Hour-by-hour weather for today and tomorrow where the user is (or a city they name): temperature, feels-like, rain chance, wind, UV. Use for what to wear, whether to take an umbrella or sunscreen, or planning outdoor plans.", [
+                "city": ["type": "string", "description": "empty for where the user is now"],
+            ]),
+            tool("find_nearby", "Find any kind of place near the user right now with Apple Maps (uses their location): food, coffee, a gym, a pharmacy, a barber, a phone repair shop, a mall, a bookshop, a park, somewhere to buy a specific thing… query is what they want (\"food\" when they're just hungry). radius_meters: 1500 for walking distance, up to 8000 if they'll drive or nothing is close.", [
                 "query": ["type": "string"], "radius_meters": ["type": "integer"],
             ]),
             tool("add_place", "Save a place to the Go to list in the bucket list (a restaurant, café, shop, museum… the user liked or wants to try). place is its name with the area or city, or a Google/Apple Maps link. Orbit finds it on the map.", [
@@ -431,6 +459,23 @@ enum AssistantTools {
             n.body = str("mode") == "replace" ? str("body") : n.body.trimmingCharacters(in: .whitespacesAndNewlines) + "\n\n" + str("body")
             n.updatedAt = .now
             return Outcome(result: "Updated note.", action: ChatItem(role: .action, text: "Updated note “\(n.title)”", symbol: "doc.text"))
+
+        case "get_weather":
+            let city = str("city")
+            var lat = 0.0, lon = 0.0, place = city
+            if city.isEmpty {
+                switch await NearbyFinder.shared.locate() {
+                case .here(let l): lat = l.coordinate.latitude; lon = l.coordinate.longitude; place = "the user's current location (\(WeatherStore.shared.now?.place ?? WeatherStore.shared.effectiveCity) area)"
+                case .city(let l, let c): lat = l.coordinate.latitude; lon = l.coordinate.longitude; place = c
+                case .unknown(let why): return Outcome(result: "\(why). Ask which city they're in.", isError: true)
+                }
+            } else if let p = try? await CLGeocoder().geocodeAddressString(city).first, let l = p.location {
+                lat = l.coordinate.latitude; lon = l.coordinate.longitude
+            } else { return Outcome(result: "Couldn't find \(city).", isError: true) }
+            guard let text = await WeatherStore.shared.forecastText(latitude: lat, longitude: lon, place: place) else {
+                return Outcome(result: "The weather service didn't answer. Try again in a moment.", isError: true)
+            }
+            return Outcome(result: text)
 
         case "find_nearby":
             let found = await NearbyFinder.shared.lookup(str("query").isEmpty ? "food" : str("query"),

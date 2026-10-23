@@ -252,7 +252,7 @@ struct ClaudeClient {
         if let tools, !tools.isEmpty { body["tools"] = tools }
         var req = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!)
         req.httpMethod = "POST"
-        req.timeoutInterval = 300
+        req.timeoutInterval = 600
         req.setValue("application/json", forHTTPHeaderField: "content-type")
         req.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         req.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
@@ -305,11 +305,14 @@ struct ClaudeClient {
                     blocks[i] = block
                 case "input_json_delta":
                     partialJSON[i, default: ""] += delta["partial_json"] as? String ?? ""
+                case "citations_delta":
+                    // Web search answers cite their sources; keep them so the turn replays exactly.
+                    if let c = delta["citation"] { block["citations"] = (block["citations"] as? [Any] ?? []) + [c]; blocks[i] = block }
                 default: break
                 }
             case "content_block_stop":
                 // Tool inputs arrive as JSON fragments; parse once the block is complete.
-                if let i = event["index"] as? Int, var block = blocks[i], block["type"] as? String == "tool_use" {
+                if let i = event["index"] as? Int, var block = blocks[i], ["tool_use", "server_tool_use"].contains(block["type"] as? String ?? "") {
                     let json = partialJSON[i] ?? ""
                     if json.isEmpty { block["input"] = [String: Any]() }
                     else if let d = json.data(using: .utf8), let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any] { block["input"] = obj }

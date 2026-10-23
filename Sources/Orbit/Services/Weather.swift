@@ -73,6 +73,46 @@ final class WeatherStore: ObservableObject {
         }
     }
 
+    /// Hour-by-hour forecast for today and tomorrow, as text for the assistant (what to wear, umbrella, sunscreen…).
+    func forecastText(latitude: Double, longitude: Double, place: String) async -> String? {
+        var comps = URLComponents(string: "https://api.open-meteo.com/v1/forecast")!
+        comps.queryItems = [
+            .init(name: "latitude", value: String(latitude)), .init(name: "longitude", value: String(longitude)),
+            .init(name: "current", value: "temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m"),
+            .init(name: "hourly", value: "temperature_2m,apparent_temperature,precipitation_probability,weather_code,wind_speed_10m,uv_index"),
+            .init(name: "daily", value: "temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max,sunrise,sunset"),
+            .init(name: "timezone", value: "auto"), .init(name: "forecast_days", value: "2"),
+            .init(name: "temperature_unit", value: unit),
+        ]
+        guard let (data, _) = try? await URLSession.shared.data(from: comps.url!),
+              let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
+        func nums(_ d: [String: Any]?, _ k: String) -> [Double] { (d?[k] as? [Any] ?? []).map { ($0 as? NSNumber)?.doubleValue ?? 0 } }
+        let u = unit == "fahrenheit" ? "°F" : "°C"
+        var lines = ["Weather for \(place):"]
+        if let c = json["current"] as? [String: Any] {
+            func v(_ k: String) -> Double { (c[k] as? NSNumber)?.doubleValue ?? 0 }
+            lines.append("Now: \(Int(v("temperature_2m").rounded()))\(u), feels like \(Int(v("apparent_temperature").rounded()))\(u), \(Self.describe(c["weather_code"] as? Int ?? 0, isDay: true).label.lowercased()), wind \(Int(v("wind_speed_10m").rounded())) km/h, humidity \(Int(v("relative_humidity_2m")))%")
+        }
+        let daily = json["daily"] as? [String: Any]
+        let days = (daily?["time"] as? [String]) ?? []
+        for (i, day) in days.enumerated() {
+            let hi = nums(daily, "temperature_2m_max"), lo = nums(daily, "temperature_2m_min"), rain = nums(daily, "precipitation_probability_max"), uv = nums(daily, "uv_index_max")
+            let sunset = ((daily?["sunset"] as? [String]) ?? []).indices.contains(i) ? String(((daily?["sunset"] as? [String]) ?? [])[i].suffix(5)) : ""
+            lines.append("\(i == 0 ? "Today" : "Tomorrow") (\(day)): \(Int(lo[safe: i] ?? 0))-\(Int(hi[safe: i] ?? 0))\(u), rain chance up to \(Int(rain[safe: i] ?? 0))%, UV max \(Int(uv[safe: i] ?? 0))\(sunset.isEmpty ? "" : ", sunset \(sunset)")")
+        }
+        let hourly = json["hourly"] as? [String: Any]
+        let times = (hourly?["time"] as? [String]) ?? []
+        let t = nums(hourly, "temperature_2m"), feels = nums(hourly, "apparent_temperature"), rain = nums(hourly, "precipitation_probability"),
+            wind = nums(hourly, "wind_speed_10m"), uv = nums(hourly, "uv_index")
+        let codes = (hourly?["weather_code"] as? [Int]) ?? []
+        let nowHour = DateFormatter.localHour.string(from: .now)
+        lines.append("Every 3 hours from now:")
+        for (i, time) in times.enumerated() where time >= nowHour && i % 3 == 0 {
+            lines.append("- \(time.replacingOccurrences(of: "T", with: " ")): \(Int(t[safe: i] ?? 0))\(u) (feels \(Int(feels[safe: i] ?? 0))), \(Self.describe(codes[safe: i] ?? 0, isDay: true).label.lowercased()), rain \(Int(rain[safe: i] ?? 0))%, wind \(Int(wind[safe: i] ?? 0)) km/h, UV \(Int(uv[safe: i] ?? 0))")
+        }
+        return lines.joined(separator: "\n")
+    }
+
     /// SF Symbol and short label for a WMO weather code.
     static func describe(_ code: Int, isDay: Bool) -> (symbol: String, label: String) {
         switch code {
@@ -129,4 +169,15 @@ struct ClockWeather: View {
             }
         }
     }
+}
+
+extension Array {
+    subscript(safe i: Int) -> Element? { indices.contains(i) ? self[i] : nil }
+}
+
+extension DateFormatter {
+    /// "2026-10-23T14:00", matching Open-Meteo's local hourly times.
+    static let localHour: DateFormatter = {
+        let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd'T'HH':00'"; return f
+    }()
 }

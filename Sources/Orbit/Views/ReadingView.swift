@@ -212,46 +212,7 @@ struct ReadingView: View {
 
     // MARK: Shelves
 
-    private var currentlyReading: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Currently reading").font(Theme.display(22))
-            ScrollView(.horizontal) {
-                HStack(spacing: 16) {
-                    ForEach(reading) { b in
-                        HStack(alignment: .top, spacing: 14) {
-                            BookCover(book: b).frame(width: 84, height: 126)
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(b.title).font(Theme.ui(15, weight: .semibold)).lineLimit(2)
-                                Text(b.author).font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary).lineLimit(1)
-                                Spacer()
-                                Text("\(Int(b.progress * 100))%\(b.pageCount > 0 ? " · page \(Int(b.progress * Double(b.pageCount))) of \(b.pageCount)" : "")")
-                                    .font(Theme.ui(11, weight: .medium)).foregroundStyle(Theme.inkSecondary)
-                                GeometryReader { g in
-                                    ZStack(alignment: .leading) {
-                                        Capsule().fill(Theme.line)
-                                        Capsule().fill(Theme.ink).frame(width: max(6, g.size.width * b.progress))
-                                    }
-                                }
-                                .frame(height: 6)
-                                if timer.active?.bookUUID == b.uuid && !b.uuid.isEmpty {
-                                    Button { timer.stop(context: context) } label: { Label("Stop", systemImage: "stop.fill") }
-                                        .buttonStyle(SoftButtonStyle())
-                                } else {
-                                    Button { timer.start(b, context: context) } label: { Label("Start reading", systemImage: "timer") }
-                                        .buttonStyle(SoftButtonStyle())
-                                }
-                            }
-                            .frame(width: 180)
-                        }
-                        .padding(14)
-                        .background(RoundedRectangle(cornerRadius: 18).fill(Theme.card))
-                        .onTapGesture { editing = b }
-                    }
-                }
-            }
-            .scrollIndicators(.never)
-        }
-    }
+    private var currentlyReading: some View { CurrentlyReadingStrip(books: reading) { editing = $0 } }
 
     private var shelf: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -469,6 +430,56 @@ struct BookCover: View {
     }
 }
 
+/// The books you're reading now, with progress and a reading timer. Shown at the top of Reading on Mac and iPhone.
+struct CurrentlyReadingStrip: View {
+    @Environment(\.modelContext) private var context
+    @ObservedObject private var timer = ReadingTimer.shared
+    let books: [Book]
+    var onOpen: (Book) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Currently reading").font(Theme.display(22))
+            ScrollView(.horizontal) {
+                HStack(spacing: 16) {
+                    ForEach(books) { b in
+                        HStack(alignment: .top, spacing: 14) {
+                            BookCover(book: b).frame(width: 84, height: 126)
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(b.title).font(Theme.ui(15, weight: .semibold)).lineLimit(2)
+                                Text(b.author).font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary).lineLimit(1)
+                                Spacer()
+                                Text("\(Int(b.progress * 100))%\(b.pageCount > 0 ? " · page \(Int(b.progress * Double(b.pageCount))) of \(b.pageCount)" : "")")
+                                    .font(Theme.ui(11, weight: .medium)).foregroundStyle(Theme.inkSecondary)
+                                GeometryReader { g in
+                                    ZStack(alignment: .leading) {
+                                        Capsule().fill(Theme.line)
+                                        Capsule().fill(Theme.ink).frame(width: max(6, g.size.width * b.progress))
+                                    }
+                                }
+                                .frame(height: 6)
+                                if timer.active?.bookUUID == b.uuid && !b.uuid.isEmpty {
+                                    Button { timer.stop(context: context) } label: { Label("Stop", systemImage: "stop.fill") }
+                                        .buttonStyle(SoftButtonStyle())
+                                } else {
+                                    Button { timer.start(b, context: context) } label: { Label("Start reading", systemImage: "timer") }
+                                        .buttonStyle(SoftButtonStyle())
+                                }
+                            }
+                            .frame(width: 180)
+                        }
+                        .padding(14)
+                        .background(RoundedRectangle(cornerRadius: 18).fill(Theme.card))
+                        .contentShape(Rectangle())
+                        .onTapGesture { onOpen(b) }
+                    }
+                }
+            }
+            .scrollIndicators(.never)
+        }
+    }
+}
+
 struct BookTile: View {
     let book: Book
     @State private var hovering = false
@@ -495,6 +506,13 @@ struct BookTile: View {
         }
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
+        .contextMenu {
+            ForEach(ReadingStatus.allCases) { s in
+                Button { withAnimation { book.status = s } } label: {
+                    Label(s == .reading ? "Mark as currently reading" : "Move to \(s.title)", systemImage: book.status == s ? "checkmark" : s.symbol)
+                }
+            }
+        }
     }
 }
 
@@ -545,8 +563,14 @@ struct AddBookSheet: View {
             .padding(12).background(RoundedRectangle(cornerRadius: 12).fill(Theme.card))
 
             HStack {
-                Picker("Shelf", selection: $status) { ForEach(ReadingStatus.allCases) { Text($0.title).tag($0) } }
-                    .pickerStyle(.segmented).labelsHidden()
+                if Platform.isPhone {
+                    Picker("Shelf", selection: $status) { ForEach(ReadingStatus.allCases) { Label($0.title, systemImage: $0.symbol).tag($0) } }
+                        .pickerStyle(.menu)
+                    Spacer()
+                } else {
+                    Picker("Shelf", selection: $status) { ForEach(ReadingStatus.allCases) { Text($0.title).tag($0) } }
+                        .pickerStyle(.segmented).labelsHidden()
+                }
             }
             if !categories.isEmpty {
                 FlowLayout(spacing: 6) {
@@ -730,9 +754,10 @@ struct BookDetailSheet: View {
                 } label: {
                     VStack(spacing: 6) {
                         Image(systemName: status.symbol).font(.system(size: 17, weight: .semibold))
-                        Text(status == .dnf ? "Stopped" : status.title).font(Theme.ui(12, weight: .semibold)).lineLimit(1)
+                        Text(status == .dnf ? "Stopped" : status.title).font(Theme.ui(12, weight: .semibold))
+                            .lineLimit(2).multilineTextAlignment(.center).minimumScaleFactor(0.85)
                     }
-                    .frame(maxWidth: .infinity).padding(.vertical, 12)
+                    .frame(maxWidth: .infinity, minHeight: 58).padding(.vertical, 10).padding(.horizontal, 4)
                     .foregroundStyle(on ? Theme.stickerInk : Theme.inkSecondary)
                     .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(on ? shelfColor(status) : Theme.card))
                     .contentShape(RoundedRectangle(cornerRadius: 16))

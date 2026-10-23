@@ -153,7 +153,7 @@ struct PhoneReading: View {
     @Query private var sessions: [ReadingSession]
     @AppStorage("readingGoal") private var readingGoal = 24
 
-    @State private var shelf: String = ReadingStatus.reading.rawValue
+    @State private var shelf: String = "all"
     @State private var query = ""
     @State private var detail: Book?
     @State private var adding = false
@@ -177,6 +177,8 @@ struct PhoneReading: View {
                     ReadingStat(value: "\(ReadingTimer.minutes(sessions, since: .now.startOfWeek)) min", label: "This week", color: Theme.orange)
                     ReadingStat(value: "\(ReadingTimer.streak(sessions))", label: "Day streak", color: Theme.lime)
                 }
+                let current = books.filter { $0.status == .reading }
+                if !current.isEmpty && query.isEmpty { CurrentlyReadingStrip(books: current) { detail = $0 } }
                 HStack(spacing: 10) {
                     Button { adding = true } label: { Label("Add book", systemImage: "plus") }.buttonStyle(SoftButtonStyle())
                     Button { sources = true } label: { Label("Goodreads sync", systemImage: "arrow.triangle.2.circlepath") }.buttonStyle(SoftButtonStyle())

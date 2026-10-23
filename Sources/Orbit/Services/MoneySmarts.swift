@@ -176,6 +176,7 @@ enum SmartsTest {
             for q in ["food", "coffee", "sushi"] {
                 print("NEARBY  \(q):\n" + (await NearbyFinder.shared.lookup(q, radius: 1500, context: ctx)).text.split(separator: "\n").prefix(5).joined(separator: "\n"))
             }
+            print("WEATHER " + (await WeatherStore.shared.forecastText(latitude: 30.06, longitude: 31.22, place: "Cairo") ?? "nil").split(separator: "\n").prefix(7).joined(separator: "\n"))
             print("SENT    \(Speaker.sentences("Hey! Your day looks calm. Two things left: • Gym at 7 • Call mom. Want me to move one?"))")
             print("VOICE   \(Speaker.bestVoice(for: "Hi").map { "\($0.name) \($0.quality.rawValue) \($0.language)" } ?? "-")")
             for link in ["https://www.google.com/maps/place/Zooba/@30.0612,31.2195,17z/data=!3m1!4b1!4m6!3m5!1s0x0:0x0!8m2!3d30.0613!4d31.2196",

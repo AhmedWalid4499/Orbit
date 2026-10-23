@@ -70,6 +70,8 @@ struct TodayView: View {
         return first.isEmpty ? part : "\(part), \(first)"
     }
 
+    @Query private var readingSessions: [ReadingSession]
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
@@ -402,7 +404,7 @@ struct TodayView: View {
     }
 
     private var readingCard: some View {
-        let current = books.first { $0.status == .reading }
+        let current = BookLibrary.currentlyReading(books, sessions: readingSessions).first
         return Button { state.tab = .reading } label: {
             HStack(spacing: 12) {
                 if let current {

@@ -36,6 +36,19 @@ enum BookImportError: LocalizedError {
 // MARK: - Merge
 
 enum BookLibrary {
+    /// Books on the Currently reading shelf, the one you're actually on first: the book you last read
+    /// (timer sessions), then the one you most recently started or added.
+    static func currentlyReading(_ books: [Book], sessions: [ReadingSession]) -> [Book] {
+        var lastRead: [String: Date] = [:]
+        for s in sessions where !s.bookUUID.isEmpty { lastRead[s.bookUUID] = max(lastRead[s.bookUUID] ?? .distantPast, s.start) }
+        func key(_ b: Book) -> Date { max(lastRead[b.uuid] ?? .distantPast, b.startedAt ?? .distantPast, b.addedAt) }
+        return books.filter { $0.status == .reading }.sorted { key($0) > key($1) }
+    }
+
+    static func currentlyReading(context: ModelContext) -> [Book] {
+        currentlyReading((try? context.fetch(FetchDescriptor<Book>())) ?? [], sessions: (try? context.fetch(FetchDescriptor<ReadingSession>())) ?? [])
+    }
+
     struct Outcome { var added = 0; var updated = 0; var total: Int { added + updated } }
 
     /// Adds new books and enriches existing ones. Never downgrades a status you set by hand.

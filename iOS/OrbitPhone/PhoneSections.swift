@@ -177,7 +177,7 @@ struct PhoneReading: View {
                     ReadingStat(value: "\(ReadingTimer.minutes(sessions, since: .now.startOfWeek)) min", label: "This week", color: Theme.orange)
                     ReadingStat(value: "\(ReadingTimer.streak(sessions))", label: "Day streak", color: Theme.lime)
                 }
-                let current = books.filter { $0.status == .reading }
+                let current = BookLibrary.currentlyReading(books, sessions: sessions)
                 if !current.isEmpty && query.isEmpty { CurrentlyReadingStrip(books: current) { detail = $0 } }
                 HStack(spacing: 10) {
                     Button { adding = true } label: { Label("Add book", systemImage: "plus") }.buttonStyle(SoftButtonStyle())

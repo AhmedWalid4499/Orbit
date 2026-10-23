@@ -33,7 +33,8 @@ struct ReadingView: View {
     private var readThisYear: [Book] {
         books.filter { $0.status == .read && ($0.finishedAt.map { Calendar.current.component(.year, from: $0) == year } ?? false) }
     }
-    private var reading: [Book] { books.filter { $0.status == .reading } }
+    private var reading: [Book] { BookLibrary.currentlyReading(books, sessions: readingSessions) }
+    @Query private var readingSessions: [ReadingSession]
 
     private var visible: [Book] {
         var list = books

@@ -61,7 +61,7 @@ final class WatchBridge: NSObject, WCSessionDelegate {
         s.budgetUsed = budget > 0 ? month / budget : 0
         s.recentExpenses = txns.filter(\.isExpense).prefix(5).map { .init(id: $0.uuid, title: $0.title, amount: Fmt.money(-$0.amount)) }
 
-        if let b = ((try? context.fetch(FetchDescriptor<Book>())) ?? []).filter({ $0.status == .reading }).first {
+        if let b = BookLibrary.currentlyReading(context: context).first {
             s.reading = .init(title: b.title, author: b.author, progress: b.progress)
         }
         if DaySummaryStore.shared.isToday { s.dayLine = DaySummaryStore.shared.summary?.line ?? "" }

@@ -141,9 +141,23 @@ final class NearbyFinder: NSObject, CLLocationManagerDelegate {
     }
 
     /// The text the assistant tool returns.
-    func lookup(_ query: String, radius: Double, context: ModelContext) async -> (text: String, isError: Bool) {
-        let place = await locate()
+    func lookup(_ query: String, near: String = "", radius: Double, context: ModelContext) async -> (text: String, isError: Bool) {
         let loc: CLLocation, whereText: String
+        if !near.trimmingCharacters(in: .whitespaces).isEmpty {
+            // Around a place the user named or linked, not where they are.
+            guard let f = await PlaceLookup.resolve(near), let c = f.coordinate else {
+                return ("Couldn't find “\(near)” on the map. Ask for the area or city, or a maps link.", true)
+            }
+            let anchor = CLLocation(latitude: c.latitude, longitude: c.longitude)
+            var mine = ""
+            if case .here(let me) = await locate() { mine = " It's \(Self.distance(me.distance(from: anchor))) from the user right now." }
+            let results = await search(query, near: anchor, radius: max(300, min(radius, 15000)), limit: 10, context: context)
+            var lines = ["Around \(f.name)\(f.address.isEmpty ? "" : " (\(f.address))"), a \(f.category.title.lowercased()) place, maps: \(f.url).\(mine)",
+                         results.isEmpty ? "No \(query) found within \(Self.distance(radius)) of it." : "“\(query)” nearby, nearest first (distances are from \(f.name)). Link each place you mention with its maps link in markdown."]
+            lines += results.map { p in "- \(p.name) · \(p.kind) · \(Self.distance(p.meters))\(p.address.isEmpty ? "" : " · \(p.address)")\(p.saved ? " · on their Go to list" : "") · maps: \(p.mapsURL)" }
+            return (lines.joined(separator: "\n"), false)
+        }
+        let place = await locate()
         switch place {
         case .here(let l): loc = l; whereText = "near the user's current location"
         case .city(let l, let city): loc = l; whereText = "in \(city) (the user's location is off, so this is around the centre of their weather city; mention that and that they can allow location for Orbit)"

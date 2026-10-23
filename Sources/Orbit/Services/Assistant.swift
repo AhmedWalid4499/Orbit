@@ -186,6 +186,7 @@ final class AssistantStore: ObservableObject {
         - Book recommendations: suggest 3-5 real, well-known books with one line each on why, and add them to their To read list under a category that fits the topic (e.g. "Japanese culture"), unless they ask only for ideas. Check list_books first so you don't recommend books they already have.
         - Bucket list: when they mention something they dream of doing someday (travel, experiences, skills), offer to add it, or add it if they ask.
         - Looking for somewhere or something nearby (hungry, coffee, a gym, a barber, where to buy a charger, something to do tonight): use find_nearby for what's close, then web_search the best 2-4 for prices, menus, ratings and opening hours (e.g. "Zooba Zamalek menu prices"). Recommend like a local friend: why each one, rough price per person or price of the item (say where the price came from and that it may have changed), rating if found, how far, open now or not, and a link to each. Offer to save one to Go to. Don't list everything you found.
+        - A specific place (they name it, give an address, or paste a maps link) and ask anything about it or around it: be their local guide. Use web_search for facts about the place itself (what it is, opening hours, prices, tickets, menu, reviews, best time to go, dress code, how to get there, parking), find_nearby with near set to that place for what's around it (food, coffee, ATMs, pharmacies, things to do, hotels), get_weather with its city for the weather there, and check get_overview if they're planning a visit. Answer the question they asked first, then add one or two genuinely useful tips. Offer to save it to Go to or add a visit to their calendar.
         - Web: use web_search for anything current or that you'd otherwise guess: prices, exchange rates, product comparisons, news, opening hours, reviews, how-tos. Mention sources briefly. Use web_fetch to read a page the user links.
         - What to wear: call get_weather, then suggest a concrete outfit for their plans today (check get_overview for events like the gym, a dinner, a flight): layers, shoes, umbrella, sunscreen, a jacket for the evening. Short and practical.
         - Doing tasks: you can calculate (splitting bills, tips, budgets, unit conversions, loan or savings maths, dates and ages; work it out step by step and give the answer first), write and rewrite (emails, messages, posts, summaries, translations), explain, plan and compare. Just do the task; don't tell them how they could do it.
@@ -293,8 +294,8 @@ enum AssistantTools {
             tool("get_weather", "Hour-by-hour weather for today and tomorrow where the user is (or a city they name): temperature, feels-like, rain chance, wind, UV. Use for what to wear, whether to take an umbrella or sunscreen, or planning outdoor plans.", [
                 "city": ["type": "string", "description": "empty for where the user is now"],
             ]),
-            tool("find_nearby", "Find any kind of place near the user right now with Apple Maps (uses their location): food, coffee, a gym, a pharmacy, a barber, a phone repair shop, a mall, a bookshop, a park, somewhere to buy a specific thing… query is what they want (\"food\" when they're just hungry). radius_meters: 1500 for walking distance, up to 8000 if they'll drive or nothing is close.", [
-                "query": ["type": "string"], "radius_meters": ["type": "integer"],
+            tool("find_nearby", "Find any kind of place near the user right now with Apple Maps (uses their location): food, coffee, a gym, a pharmacy, a barber, a phone repair shop, a mall, a bookshop, a park, somewhere to buy a specific thing… query is what they want (\"food\" when they're just hungry). near: a place, address, area or maps link to search around instead of the user's location (\"Zamalek\", \"Cairo Festival City\", \"the Four Seasons Nile Plaza\", a Google Maps link), or empty for where they are. radius_meters: 1500 for walking distance, up to 8000 if they'll drive or nothing is close.", [
+                "query": ["type": "string"], "near": ["type": "string"], "radius_meters": ["type": "integer"],
             ]),
             tool("add_place", "Save a place to the Go to list in the bucket list (a restaurant, café, shop, museum… the user liked or wants to try). place is its name with the area or city, or a Google/Apple Maps link. Orbit finds it on the map.", [
                 "place": ["type": "string"], "notes": ["type": "string", "description": "what they liked or want to try there, or empty"],
@@ -478,7 +479,7 @@ enum AssistantTools {
             return Outcome(result: text)
 
         case "find_nearby":
-            let found = await NearbyFinder.shared.lookup(str("query").isEmpty ? "food" : str("query"),
+            let found = await NearbyFinder.shared.lookup(str("query").isEmpty ? "food" : str("query"), near: str("near"),
                                                          radius: num("radius_meters") > 0 ? num("radius_meters") : 1500, context: context)
             return Outcome(result: found.text, isError: found.isError)
 
@@ -519,7 +520,7 @@ enum AssistantTools {
         var text = AIAssistant.snapshot(context: context, apple: apple)
         let books = (try? context.fetch(FetchDescriptor<Book>())) ?? []
         let cats = ((try? context.fetch(FetchDescriptor<BookCategory>())) ?? []).map(\.name)
-        let reading = books.filter { $0.status == .reading }.map { "\($0.title) (\(Int($0.progress * 100))%)" }
+        let reading = BookLibrary.currentlyReading(books, sessions: (try? context.fetch(FetchDescriptor<ReadingSession>())) ?? []).map { "\($0.title) (\(Int($0.progress * 100))%)" }
         text += "\n\nReading: \(reading.isEmpty ? "nothing in progress" : reading.joined(separator: ", ")). "
         text += "To read: \(books.filter { $0.status == .toRead }.count). Read: \(books.filter { $0.status == .read }.count). "
         let all = ((try? context.fetch(FetchDescriptor<BucketItem>())) ?? [])

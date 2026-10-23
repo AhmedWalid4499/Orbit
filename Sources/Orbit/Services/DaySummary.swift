@@ -112,8 +112,8 @@ final class DaySummaryStore: ObservableObject {
         let txns = ((try? context.fetch(FetchDescriptor<Transaction>())) ?? []).filter { $0.date >= today }
         let tasks = (try? context.fetch(FetchDescriptor<TaskItem>())) ?? []
         let habits = (try? context.fetch(FetchDescriptor<Habit>())) ?? []
-        let books = ((try? context.fetch(FetchDescriptor<Book>())) ?? []).filter { $0.status == .reading }
         let reading = (try? context.fetch(FetchDescriptor<ReadingSession>())) ?? []
+        let books = BookLibrary.currentlyReading((try? context.fetch(FetchDescriptor<Book>())) ?? [], sessions: reading)
         let focus = (try? context.fetch(FetchDescriptor<FocusSession>())) ?? []
         let events = ((try? context.fetch(FetchDescriptor<EventItem>())) ?? []).filter { $0.start >= today && $0.start < today.adding(days: 1) }
         let parts: [String] = [
@@ -127,7 +127,7 @@ final class DaySummaryStore: ObservableObject {
             // The next event changes as the day goes on.
             "\(events.filter { $0.start > .now }.count)",
         ]
-        return parts.joined(separator: "|")
+        return "v2|" + parts.joined(separator: "|")
     }
 
     /// Data the morning brief doesn't carry: today's spending, reading, focus, mood, trips and places.
@@ -145,10 +145,14 @@ final class DaySummaryStore: ObservableObject {
             }.joined(separator: "; "))
         }
 
-        let books = ((try? context.fetch(FetchDescriptor<Book>())) ?? []).filter { $0.status == .reading }
         let sessions = (try? context.fetch(FetchDescriptor<ReadingSession>())) ?? []
-        lines.append("\nReading now:")
-        lines += books.isEmpty ? ["(nothing)"] : books.prefix(4).map { "- \($0.title) by \($0.author): \(Int($0.progress * 100))%\($0.pageCount > 0 ? " of \($0.pageCount) pages" : "")" }
+        let books = BookLibrary.currentlyReading((try? context.fetch(FetchDescriptor<Book>())) ?? [], sessions: sessions)
+        if let main = books.first {
+            lines.append("\nThe book they're reading now (use this one for the reading tile): \(main.title) by \(main.author), \(Int(main.progress * 100))%\(main.pageCount > 0 ? " of \(main.pageCount) pages" : "")")
+            if books.count > 1 { lines.append("Also on the Currently reading shelf: " + books.dropFirst().prefix(3).map(\.title).joined(separator: ", ")) }
+        } else {
+            lines.append("\nReading now: (nothing)")
+        }
         lines.append("Minutes read today: \(ReadingTimer.minutes(sessions, since: today)); this week: \(ReadingTimer.minutes(sessions, since: Date.now.startOfWeek)); streak \(ReadingTimer.streak(sessions)) days")
 
         let focus = (try? context.fetch(FetchDescriptor<FocusSession>())) ?? []

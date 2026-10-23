@@ -176,6 +176,7 @@ enum SmartsTest {
             for q in ["food", "coffee", "sushi"] {
                 print("NEARBY  \(q):\n" + (await NearbyFinder.shared.lookup(q, radius: 1500, context: ctx)).text.split(separator: "\n").prefix(5).joined(separator: "\n"))
             }
+            print("AROUND  " + (await NearbyFinder.shared.lookup("coffee", near: "Egyptian Museum Cairo", radius: 1000, context: ctx)).text.split(separator: "\n").prefix(5).joined(separator: "\n"))
             print("WEATHER " + (await WeatherStore.shared.forecastText(latitude: 30.06, longitude: 31.22, place: "Cairo") ?? "nil").split(separator: "\n").prefix(7).joined(separator: "\n"))
             print("SENT    \(Speaker.sentences("Hey! Your day looks calm. Two things left: • Gym at 7 • Call mom. Want me to move one?"))")
             print("VOICE   \(Speaker.bestVoice(for: "Hi").map { "\($0.name) \($0.quality.rawValue) \($0.language)" } ?? "-")")

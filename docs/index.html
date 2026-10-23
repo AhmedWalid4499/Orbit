@@ -146,43 +146,16 @@
   .iphone-sec { padding: 96px 0; position: relative; }
   .iphone-sec .row { grid-template-columns: 6fr 5fr; }
   .soon { background: var(--lime); color: var(--sticker-ink); }
-  .devices { position: relative; display: flex; justify-content: center; align-items: flex-end; gap: 28px; padding: 20px 0; }
-  .phone { width: 300px; height: 620px; border-radius: 52px; background: #0d0d0f; padding: 12px; box-shadow: var(--shadow); position: relative; flex: none; }
-  .phone .screen { width: 100%; height: 100%; border-radius: 41px; background: #fff; overflow: hidden; position: relative; color: #111; font-size: 12px; }
-  .phone .island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 92px; height: 27px; border-radius: 20px; background: #0d0d0f; z-index: 2; }
-  .p-status { display: flex; justify-content: space-between; padding: 15px 26px 0; font-weight: 600; font-size: 13px; }
-  .p-body { padding: 26px 16px 0; }
-  .p-date { font-family: var(--display); font-weight: 700; font-size: 25px; line-height: 1.05; }
-  .p-sub { color: #6b6b72; font-size: 11.5px; margin: 4px 0 12px; }
-  .p-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .p-stat { border-radius: 16px; padding: 10px 12px; }
-  .p-stat b { font-family: var(--display); font-size: 19px; display: block; line-height: 1.1; }
-  .p-stat span { font-size: 10.5px; font-weight: 600; }
-  .p-card { background: #f2f2f2; border-radius: 18px; padding: 12px; margin-top: 10px; }
-  .p-card h4 { margin: 0 0 8px; font-family: var(--display); font-size: 16px; }
-  .p-item { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-weight: 500; font-size: 12px; }
-  .p-num { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; font-weight: 700; flex: none; }
-  .p-ring { margin-left: auto; width: 15px; height: 15px; border-radius: 50%; border: 1.5px solid #b9b9bf; flex: none; }
-  .p-pay { display: flex; align-items: center; gap: 10px; background: #111; color: #fff; border-radius: 16px; padding: 10px 12px; margin-top: 10px; }
-  .p-pay .pi { width: 28px; height: 28px; border-radius: 9px; background: var(--mint); display: grid; place-items: center; color: #111; font-weight: 800; flex: none; }
-  .p-pay small { display: block; opacity: .65; font-size: 10px; }
-  .p-tabs { position: absolute; bottom: 0; left: 0; right: 0; height: 78px; background: rgba(255,255,255,.92); border-top: 1px solid #eee;
-            display: flex; justify-content: space-around; padding-top: 10px; }
-  .p-tabs div { display: grid; justify-items: center; gap: 3px; font-size: 9.5px; font-weight: 600; color: #9a9aa1; }
-  .p-tabs div.on { color: #111; }
-  .p-tabs svg { width: 21px; height: 21px; }
-  .p-fab { position: absolute; right: 16px; bottom: 92px; width: 48px; height: 48px; border-radius: 50%; background: var(--lime); display: grid; place-items: center;
-           box-shadow: 0 10px 24px -8px rgba(0,0,0,.35); }
-  .watch { width: 158px; height: 192px; border-radius: 46px; background: #0d0d0f; padding: 11px; box-shadow: var(--shadow); position: relative; flex: none; margin-bottom: 40px; }
-  .watch::after { content: ""; position: absolute; right: -7px; top: 52px; width: 7px; height: 34px; border-radius: 0 6px 6px 0; background: #2a2a2e; }
-  .watch .screen { width: 100%; height: 100%; border-radius: 36px; background: #000; color: #fff; padding: 16px 14px; display: grid; align-content: start; gap: 6px; }
-  .w-time { font-size: 11px; text-align: right; opacity: .8; font-weight: 600; }
-  .w-big { font-family: var(--display); font-size: 21px; line-height: 1.05; }
-  .w-row { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; }
-  .w-row i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-  .w-btn { margin-top: 4px; background: var(--lime); color: #111; border-radius: 999px; text-align: center; font-size: 11px; font-weight: 700; padding: 6px; }
+  .devices { position: relative; display: flex; justify-content: center; align-items: center; padding: 20px 0; min-height: 600px; }
+  .phone { width: 270px; flex: none; border-radius: 46px; background: #0d0d0f; padding: 10px; box-shadow: 0 0 0 1.5px #3a3a40, var(--shadow); position: relative; z-index: 2; }
+  .phone .screen { border-radius: 37px; overflow: hidden; background: #fff; }
+  .phone .screen img { width: 100%; }
+  .phone.side { position: absolute; width: 225px; z-index: 1; top: 50%; opacity: .96; }
+  .phone.side.left { left: 0; transform: translateY(-50%) rotate(-7deg); }
+  .phone.side.right { right: 0; transform: translateY(-50%) rotate(7deg); }
   @media (max-width: 960px) { .iphone-sec .row { grid-template-columns: 1fr; } }
-  @media (max-width: 520px) { .watch { display: none; } }
+  @media (max-width: 1100px) and (min-width: 961px) { .phone.side { display: none; } }
+  @media (max-width: 560px) { .phone.side { display: none; } .devices { min-height: 0; } }
 
   /* Privacy + install */
   .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 24px 0 88px; }
@@ -225,7 +198,6 @@
     .hero { padding-top: 44px; }
     .orbit-mark { width: 260px; height: 130px; }
     .orbit-mark .word { font-size: 78px; }
-    .phone { width: 270px; height: 560px; }
   }
   @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .btn { transition: none; } }
 </style>
@@ -444,47 +416,10 @@
       </ul>
       <p class="fine" style="text-align:left">Download Orbit for Mac today and your data will be ready on iPhone the moment it launches.</p>
     </div>
-    <div class="devices" aria-label="Preview of Orbit on iPhone and Apple Watch">
-      <div class="phone">
-        <div class="screen">
-          <div class="island"></div>
-          <div class="p-status"><span>9:41</span><span>●●● ◔</span></div>
-          <div class="p-body">
-            <div class="p-date">Friday,<br>23 October</div>
-            <div class="p-sub">Good morning, Alex. A busy morning, easy evening.</div>
-            <div class="p-stats">
-              <div class="p-stat" style="background:var(--peach)"><b>3 of 5</b><span>Tasks done</span></div>
-              <div class="p-stat" style="background:var(--lime)"><b>2/4</b><span>Habits today</span></div>
-              <div class="p-stat" style="background:var(--cyan)"><b>EGP 350</b><span>Spent today</span></div>
-              <div class="p-stat" style="background:var(--purple)"><b>42%</b><span>Atomic Habits</span></div>
-            </div>
-            <div class="p-card">
-              <h4>Your top 3</h4>
-              <div class="p-item"><span class="p-num" style="background:var(--lime)">1</span>Finish the budget review deck<span class="p-ring"></span></div>
-              <div class="p-item"><span class="p-num" style="background:var(--pink)">2</span>Call the landlord<span class="p-ring"></span></div>
-              <div class="p-item"><span class="p-num" style="background:var(--cyan)">3</span>30 minutes of Spanish<span class="p-ring"></span></div>
-            </div>
-            <div class="p-pay"><span class="pi">✓</span><div>Logged from Apple Pay<small>Carrefour · EGP 350 · Food</small></div></div>
-          </div>
-          <div class="p-fab"><svg viewBox="0 0 24 24" width="22" height="22" fill="#111"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8z"/></svg></div>
-          <div class="p-tabs">
-            <div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M5 19l1.5-1.5M17.5 6.5 19 5"/></svg>Today</div>
-            <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Calendar</div>
-            <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7l2 2 3-3M4 16l2 2 3-3M12 8h8M12 17h8"/></svg>Tasks</div>
-            <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18"/></svg>Money</div>
-            <div><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>More</div>
-          </div>
-        </div>
-      </div>
-      <div class="watch">
-        <div class="screen">
-          <div class="w-time">9:41</div>
-          <div class="w-big">3 left<br>today</div>
-          <div class="w-row"><i style="background:var(--lime)"></i>Budget deck</div>
-          <div class="w-row"><i style="background:var(--pink)"></i>Water · 10🔥</div>
-          <div class="w-btn">+ Add</div>
-        </div>
-      </div>
+    <div class="devices" aria-label="Orbit on iPhone">
+      <div class="phone side left"><div class="screen"><img src="assets/phone-money.jpg" width="690" height="1500" loading="lazy" alt="Orbit for iPhone: Money with left to spend, auto-logged card payments and the money coach."></div></div>
+      <div class="phone"><div class="screen"><img src="assets/phone-today.jpg" width="690" height="1500" loading="lazy" alt="Orbit for iPhone: Today with your day summary, habits and the morning brief."></div></div>
+      <div class="phone side right"><div class="screen"><img src="assets/phone-assistant.jpg" width="690" height="1500" loading="lazy" alt="Orbit for iPhone: the assistant finding food nearby and suggesting what to wear."></div></div>
     </div>
   </div>
 </section>

@@ -292,42 +292,124 @@ struct RepoRow: View {
     }
 }
 
-/// Shown on the GitHub tab and in Settings › Connections.
+/// Shown on the GitHub tab and in Settings › Connections: a three-step walkthrough to connect GitHub.
 struct GitHubConnectCard: View {
     @ObservedObject private var gh = GitHubStore.shared
+    @State private var step = 1
     @State private var user = ""
     @State private var token = ""
+    @State private var connecting = false
+
+    /// A classic token with exactly what Orbit needs, filled in on GitHub's page.
+    private let tokenURL = URL(string: "https://github.com/settings/tokens/new?description=Orbit&scopes=repo,read:user")!
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
                 Image(systemName: "chevron.left.forwardslash.chevron.right")
                     .font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.onInverse)
                     .frame(width: 44, height: 44).background(Circle().fill(Theme.inverse))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Connect GitHub").font(Theme.display(24))
-                    Text("See your projects, pull requests, issues and activity.").font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
+                    Text("Your projects, pull requests, issues and activity, next to the rest of your day.").font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
                 }
             }
-            TextField("GitHub username", text: $user).textFieldStyle(.roundedBorder)
-            SecureField("Personal access token (optional)", text: $token).textFieldStyle(.roundedBorder)
-            Text("With just a username Orbit shows public data. A token adds private repos and your contribution graph. Create a fine-grained token with read-only access at github.com › Settings › Developer settings. It's stored in your Keychain.")
-                .font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
-            HStack {
-                Link("Create a token", destination: URL(string: "https://github.com/settings/personal-access-tokens/new")!)
-                    .font(Theme.ui(12))
-                Spacer()
-                Button("Connect") {
-                    gh.saveToken(token)
-                    gh.username = user.trimmingCharacters(in: .whitespaces)
-                    token = ""
-                    Task { await gh.refresh() }
+            HStack(spacing: 6) {
+                ForEach(1...3, id: \.self) { i in
+                    Capsule().fill(i <= step ? Theme.ink : Theme.line).frame(height: 4)
                 }
-                .buttonStyle(PrimaryButtonStyle()).frame(width: 130)
-                .disabled(user.trimmingCharacters(in: .whitespaces).isEmpty && token.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            switch step {
+            case 1: usernameStep
+            case 2: tokenStep
+            default: doneStep
             }
         }
         .padding(24)
         .background(RoundedRectangle(cornerRadius: 22).fill(Theme.card))
+        .animation(.easeOut(duration: 0.2), value: step)
+    }
+
+    private func stepTitle(_ n: Int, _ title: String) -> some View {
+        Text("Step \(n) of 3 · \(title)").font(Theme.ui(13, weight: .semibold))
+    }
+
+    private func instruction(_ n: Int, _ text: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text("\(n)").font(Theme.ui(11, weight: .bold)).frame(width: 20, height: 20).background(Circle().fill(Theme.canvas))
+            Text(.init(text)).font(Theme.ui(13)).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var usernameStep: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            stepTitle(1, "Your username")
+            Text("It's the name in your profile link: github.com/**username**.").font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
+            TextField("GitHub username", text: $user).textFieldStyle(.roundedBorder)
+                #if os(iOS)
+                .textInputAutocapitalization(.never).autocorrectionDisabled()
+                #endif
+                .onSubmit { if !trimmedUser.isEmpty { step = 2 } }
+            HStack {
+                Link("Don't have an account? Sign up", destination: URL(string: "https://github.com/signup")!).font(Theme.ui(12))
+                Spacer()
+                Button("Next") { step = 2 }.buttonStyle(PrimaryButtonStyle()).frame(width: 120).disabled(trimmedUser.isEmpty)
+            }
+        }
+    }
+
+    private var tokenStep: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            stepTitle(2, "Private repos (optional)")
+            Text("With just your username, Orbit shows your public work. To include private repos and your contribution graph, give it a token:")
+                .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
+            instruction(1, "Tap **Open GitHub** below and sign in. The token is already filled in for Orbit.")
+            instruction(2, "Pick how long it lasts under **Expiration** (e.g. 90 days).")
+            instruction(3, "Scroll down and click **Generate token**.")
+            instruction(4, "Copy the token (it starts with **ghp_**) and paste it here.")
+            HStack {
+                Button { Platform.open(tokenURL) } label: { Label("Open GitHub", systemImage: "arrow.up.right.square") }.buttonStyle(SoftButtonStyle())
+                Spacer()
+            }
+            SecureField("Paste your token (ghp_…)", text: $token).textFieldStyle(.roundedBorder)
+            Text("It's kept in your \(Platform.isPhone ? "iPhone's" : "Mac's") Keychain and only used to read your GitHub data.")
+                .font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
+            HStack {
+                Button("Back") { step = 1 }.buttonStyle(.orbitLink)
+                Spacer()
+                Button(token.isEmpty ? "Skip, public only" : "Connect") { connect() }
+                    .buttonStyle(PrimaryButtonStyle()).fixedSize()
+            }
+        }
+    }
+
+    private var doneStep: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            stepTitle(3, "Connecting")
+            if connecting || gh.loading {
+                HStack(spacing: 10) { ProgressView().controlSize(.small); Text("Loading @\(trimmedUser)…").font(Theme.ui(13)) }
+            } else if let e = gh.error {
+                Label(e, systemImage: "exclamationmark.triangle.fill").font(Theme.ui(13)).foregroundStyle(Theme.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Try again") { step = 1 }.buttonStyle(SoftButtonStyle())
+            } else {
+                Label("Connected as @\(gh.username)", systemImage: "checkmark.circle.fill").font(Theme.ui(14, weight: .semibold)).foregroundStyle(Theme.good)
+            }
+        }
+    }
+
+    private var trimmedUser: String {
+        user.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "@", with: "")
+            .replacingOccurrences(of: "https://github.com/", with: "").replacingOccurrences(of: "github.com/", with: "")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    }
+
+    private func connect() {
+        step = 3
+        connecting = true
+        gh.saveToken(token.trimmingCharacters(in: .whitespacesAndNewlines))
+        gh.username = trimmedUser
+        token = ""
+        Task { await gh.refresh(); connecting = false }
     }
 }

@@ -12,8 +12,6 @@ struct PhoneConnections: View {
     @AppStorage("googleCalendarEnabled") private var googleCalendar = true
     @AppStorage("emailExpensesEnabled") private var emailExpenses = true
     @AppStorage("goodreadsUser") private var goodreadsUser = ""
-    @State private var user = ""
-    @State private var token = ""
     @State private var readingSources = false
 
     var body: some View {
@@ -27,9 +25,13 @@ struct PhoneConnections: View {
 
             Section {
                 if inbox.accounts.isEmpty {
-                    row("envelope.fill", Theme.pink, "Gmail", detail: cloud.isSignedIn
-                        ? "Your Gmail accounts come from your Orbit account once they're connected on your Mac."
-                        : "Sign in to your Orbit account (Settings › Account & sync) to bring your Gmail accounts here.")
+                    row("envelope.fill", Theme.pink, "Gmail", detail: "Connect Gmail and your assistant summarises your inbox on Today. Accounts you added on your Mac come here on their own.")
+                    if GoogleAuth.isConfigured {
+                        Button { Task { await inbox.addAccount() } } label: {
+                            Label(inbox.signingIn ? "Waiting for Google…" : "Add Gmail account", systemImage: "plus")
+                        }
+                        .disabled(inbox.signingIn)
+                    }
                 } else {
                     ForEach(inbox.accounts, id: \.self) { email in
                         HStack(spacing: 12) {
@@ -51,6 +53,7 @@ struct PhoneConnections: View {
                     Toggle("Add receipts from email to Money", isOn: $emailExpenses)
                 }
                 if let error = inbox.error { Text(error).font(Theme.ui(12)).foregroundStyle(Theme.critical) }
+                InboxWindowControls()
             } header: {
                 Text("Google")
             }
@@ -68,15 +71,7 @@ struct PhoneConnections: View {
                         Button("Disconnect") { gh.disconnect() }.buttonStyle(SoftButtonStyle())
                     }
                 } else {
-                    TextField("GitHub username", text: $user).textInputAutocapitalization(.never).autocorrectionDisabled()
-                    SecureField("Access token (optional, for private repos)", text: $token)
-                    Button("Connect GitHub") {
-                        gh.saveToken(token)
-                        gh.username = user.trimmingCharacters(in: .whitespaces)
-                        token = ""
-                        Task { await gh.refresh() }
-                    }
-                    .disabled(user.trimmingCharacters(in: .whitespaces).isEmpty)
+                    GitHubConnectCard().listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
                 }
             }
 

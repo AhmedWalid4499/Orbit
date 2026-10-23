@@ -6,7 +6,10 @@ struct PhoneMore: View {
     @EnvironmentObject private var state: AppState
     @AppStorage("userName") private var userName = ""
 
-    private let sections: [Tab] = [.insights, .habits, .notes, .reading, .bucket, .documents, .github]
+    @AppStorage("hiddenTabs") private var hiddenTabs = ""
+    private var sections: [Tab] {
+        [.insights, .habits, .notes, .reading, .bucket, .documents, .github].filter { !hiddenTabs.split(separator: ",").contains(Substring($0.rawValue)) }
+    }
 
     var body: some View {
         List {

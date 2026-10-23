@@ -379,7 +379,7 @@ struct TodayView: View {
                 }
                 if !inbox.isConnected {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Connect Gmail and \(AssistantName.current) sums up both inboxes for you: what needs a reply, what matters, what can wait.")
+                        Text("Connect Gmail\(ai.hasKey ? "" : " and add an API key") and \(AssistantName.current) sums up your inbox: what needs a reply, what matters, what can wait. You choose how far back it reads.")
                             .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
                         OpenSettingsLink { Text("Connect Gmail") }.buttonStyle(SoftButtonStyle())
                     }
@@ -392,6 +392,7 @@ struct TodayView: View {
                             }
                             if let d = inbox.digest {
                                 InboxSummary(digest: d, multi: inbox.accounts.count > 1)
+                                Text("Last \(inbox.windowLabel) · change in Settings › Connections").font(Theme.ui(10)).foregroundStyle(Theme.inkMuted)
                             } else if !inbox.loading {
                                 EmptyHint(symbol: "envelope", text: ai.hasKey ? "Refresh to summarise your inbox." : "Add your Anthropic API key to get summaries.")
                             }

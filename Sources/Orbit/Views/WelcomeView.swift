@@ -13,8 +13,39 @@ struct WelcomeView: View {
     @AppStorage("weatherCity") private var city = ""
     @AppStorage("onboarded") private var onboarded = false
     @State private var apiKey = ""
+    @ObservedObject private var cloud = CloudSync.shared
+    @AppStorage("hiddenTabs") private var hiddenRaw = ""
+    private var hiddenSet: Set<Tab> { Set(hiddenRaw.split(separator: ",").compactMap { Tab(rawValue: String($0)) }) }
+    @State private var accountStep = SupabaseConfig.isConfigured && CloudSync.shared.email == nil
 
     var body: some View {
+        if accountStep { accountPage } else { settingsPage }
+    }
+
+    /// Step 1: sign in or create an account (skippable).
+    private var accountPage: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 14) {
+                OrbitMark(size: 56)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Welcome to Orbit").font(Theme.display(30))
+                    Text("Create an account to keep everything in sync and backed up.").font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
+                }
+            }
+            AuthPanel()
+            HStack {
+                Spacer()
+                Button("Skip for now") { withAnimation { accountStep = false } }.buttonStyle(.orbitLink).font(Theme.ui(13))
+            }
+        }
+        .padding(30)
+        .sheetFrame(width: 480)
+        .interactiveDismissDisabled()
+        .onChange(of: cloud.email) { _, e in if e != nil { withAnimation { accountStep = false } } }
+    }
+
+    /// Step 2: a few quick settings.
+    private var settingsPage: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 14) {
                 OrbitMark(size: 56)
@@ -72,10 +103,30 @@ struct WelcomeView: View {
                 }
             }
 
+            VStack(alignment: .leading, spacing: 8) {
+                Text("What will you use? (change it any time in Settings › General)").font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkMuted)
+                FlowLayout(spacing: 6) {
+                    ForEach(Tab.allCases.filter(\.canHide)) { t in
+                        let on = !hiddenSet.contains(t)
+                        Label(t == .reading ? "Reading" : t.title, systemImage: t.symbol).font(Theme.ui(12, weight: .medium))
+                            .foregroundStyle(on ? Theme.onInverse : Theme.inkSecondary)
+                            .padding(.horizontal, 10).padding(.vertical, 6)
+                            .background(Capsule().fill(on ? Theme.inverse : Theme.card))
+                            .onTapGesture {
+                                var h = Tab.hidden
+                                if on { h.insert(t) } else { h.remove(t) }
+                                Tab.hidden = h
+                                hiddenRaw = UserDefaults.standard.string(forKey: "hiddenTabs") ?? ""
+                            }
+                    }
+                }
+            }
+
             HStack {
-                if SupabaseConfig.isConfigured {
-                    Text("Already use Orbit on another Mac? After this, sign in under Settings › Account to bring everything over.")
-                        .font(Theme.ui(11)).foregroundStyle(Theme.inkMuted).fixedSize(horizontal: false, vertical: true)
+                if let e = cloud.email {
+                    Label("Signed in as \(e)", systemImage: "checkmark.circle.fill").font(Theme.ui(11)).foregroundStyle(Theme.good)
+                } else if SupabaseConfig.isConfigured {
+                    Button("Sign in or create an account") { withAnimation { accountStep = true } }.buttonStyle(.orbitLink).font(Theme.ui(12))
                 }
                 Spacer()
                 Button("Get started") {

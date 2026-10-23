@@ -307,10 +307,18 @@ final class InboxStore: ObservableObject {
         if accounts.isEmpty { digest = nil; UserDefaults.standard.removeObject(forKey: cacheKey) }
     }
 
-    /// Refreshes when the digest is older than three hours.
+    /// How far back the summary reads (hours) and how often it refreshes (hours). Set in Settings › Connections.
+    @AppStorage("inbox.windowHours") var windowHours = 48
+    @AppStorage("inbox.everyHours") var everyHours = 3
+
+    static let windowChoices: [(hours: Int, label: String)] = [(6, "6 hours"), (12, "12 hours"), (24, "1 day"), (48, "2 days"), (72, "3 days"), (168, "7 days")]
+    static let everyChoices: [(hours: Int, label: String)] = [(1, "Every hour"), (3, "Every 3 hours"), (6, "Every 6 hours"), (12, "Twice a day"), (24, "Once a day")]
+    var windowLabel: String { Self.windowChoices.first { $0.hours == windowHours }?.label ?? "\(windowHours) hours" }
+
+    /// Refreshes when the digest is older than the chosen interval.
     func refreshIfDue(context: ModelContext) async {
         guard isConnected, AIAssistant.shared.hasKey else { return }
-        if let d = digest, Date.now.timeIntervalSince(d.generatedAt) < 3 * 3600 { return }
+        if let d = digest, Date.now.timeIntervalSince(d.generatedAt) < Double(max(1, everyHours)) * 3600 { return }
         await refresh()
     }
 
@@ -327,9 +335,10 @@ final class InboxStore: ObservableObject {
         for account in accounts {
             do {
                 let token = try await GoogleAuth.accessToken(for: account)
-                let q = "in:inbox newer_than:2d -category:promotions -category:social"
+                let since = Int(Date.now.addingTimeInterval(-Double(windowHours) * 3600).timeIntervalSince1970)
+                let q = "in:inbox after:\(since) -category:promotions -category:social"
                 var comps = URLComponents(string: "https://gmail.googleapis.com/gmail/v1/users/me/messages")!
-                comps.queryItems = [.init(name: "q", value: q), .init(name: "maxResults", value: "30")]
+                comps.queryItems = [.init(name: "q", value: q), .init(name: "maxResults", value: windowHours > 72 ? "60" : "30")]
                 let list = try await gmailJSON(comps.url!, token: token)
                 let ids = (list["messages"] as? [[String: Any]] ?? []).compactMap { $0["id"] as? String }
                 try await withThrowingTaskGroup(of: Mail?.self) { group in
@@ -356,7 +365,7 @@ final class InboxStore: ObservableObject {
         if mails.isEmpty {
             error = failures.first
             if failures.isEmpty {
-                digest = InboxDigest(overview: "Nothing new in the last two days.", needsReply: [], important: [], otherCount: 0, scanned: 0, generatedAt: .now)
+                digest = InboxDigest(overview: "Nothing new in the last \(windowLabel).", needsReply: [], important: [], otherCount: 0, scanned: 0, generatedAt: .now)
                 save()
             }
             return
@@ -367,7 +376,7 @@ final class InboxStore: ObservableObject {
         }.joined(separator: "\n")
         let name = (Platform.userName).split(separator: " ").first.map(String.init) ?? "the user"
         let system = """
-        You triage email for \(name) across their Gmail accounts. You get the last two days of inbox mail (promotions and social already filtered out), each with a reference number, sender, subject and a short snippet.
+        You triage email for \(name) across their Gmail accounts. You get the last \(windowLabel) of inbox mail (promotions and social already filtered out), each with a reference number, sender, subject and a short snippet.
         - headline: at most 9 words capturing what matters most, e.g. "Uber needs a reply; Railway security alert". No full stop.
         - highlights: 2-4 short points (each under 14 words) of what matters, most urgent first. Start with the person or company. Add the account in brackets only if there are several accounts and it helps.
         - overview: the same in 1-2 calm sentences (used where there's no room for points).

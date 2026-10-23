@@ -28,7 +28,6 @@ struct TourView: View {
         var both = false
     }
 
-    static let pageSeconds = 7.0
     private let phone = Platform.isPhone
 
     private var pages: [Page] {
@@ -99,7 +98,6 @@ struct TourView: View {
     @State private var index = 0
     @State private var zoomed = false
     @State private var revealed = false
-    @State private var progress = 0.0
     @State private var timerTask: Task<Void, Never>?
 
     var body: some View {
@@ -128,7 +126,7 @@ struct TourView: View {
                     GeometryReader { g in
                         ZStack(alignment: .leading) {
                             Capsule().fill(Theme.ink.opacity(0.14))
-                            Capsule().fill(Theme.ink).frame(width: g.size.width * (p.id < index ? 1 : p.id == index ? progress : 0))
+                            Capsule().fill(Theme.ink).frame(width: p.id <= index ? g.size.width : 0)
                         }
                     }
                     .frame(height: 4)
@@ -185,7 +183,8 @@ struct TourView: View {
                 .padding(.horizontal, 10).padding(.vertical, 5)
                 .background(Capsule().fill(page.color))
                 .foregroundStyle(Theme.stickerInk)
-            WordReveal(text: page.title, font: Theme.display(phone ? 29 : 38), shown: revealed)
+            Text(page.title).font(Theme.display(phone ? 29 : 38)).fixedSize(horizontal: false, vertical: true)
+                .opacity(revealed ? 1 : 0).animation(.easeOut(duration: 0.35), value: revealed)
             VStack(alignment: .leading, spacing: 9) {
                 ForEach(Array(page.points.enumerated()), id: \.offset) { i, p in
                     HStack(alignment: .top, spacing: 11) {
@@ -227,22 +226,20 @@ struct TourView: View {
                     IPhoneFrame(image: shot("phone-today"))
                         .frame(height: phone ? 230 : 330)
                         .offset(x: phone ? 6 : 10, y: phone ? 24 : 36)
-                        .rotationEffect(.degrees(revealed ? 0 : 8))
                 }
                 .padding(.horizontal, phone ? 26 : 0)
                 .overlay { stickers(page) }
             } else if phone {
-                IPhoneFrame(image: shot("phone-" + page.image), zoom: zoomed ? page.zoom : 1, focus: page.focus)
+                IPhoneFrame(image: shot("phone-" + page.image))
                     .overlay { stickers(page) }
             } else {
-                MacBookFrame(image: shot("mac-" + page.image), zoom: zoomed ? page.zoom : 1, focus: page.focus)
+                MacBookFrame(image: shot("mac-" + page.image))
                     .overlay { stickers(page) }
             }
         }
-        .scaleEffect(revealed ? 1 : 0.9)
-        .rotation3DEffect(.degrees(revealed ? 0 : 14), axis: (x: 0.4, y: -1, z: 0), perspective: 0.5)
         .opacity(revealed ? 1 : 0)
-        .animation(.spring(response: 0.75, dampingFraction: 0.78), value: revealed)
+        .offset(y: revealed ? 0 : 12)
+        .animation(.easeOut(duration: 0.4), value: revealed)
         .id("stage-\(page.id)")
         .transition(.opacity)
     }
@@ -275,25 +272,16 @@ struct TourView: View {
         start()
     }
 
-    /// Brings the page in, zooms to the focus, pops the cards, eases back out near the end, then moves on.
+    /// Shows the page: the screen fades in, then the text and the cards. You move on with Next.
     private func start() {
         timerTask?.cancel()
-        progress = 0
         let page = index
         timerTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(120))
+            try? await Task.sleep(for: .milliseconds(80))
             revealed = true
-            try? await Task.sleep(for: .milliseconds(700))
+            try? await Task.sleep(for: .milliseconds(450))
             guard !Task.isCancelled, index == page else { return }
-            withAnimation(.spring(response: 1.4, dampingFraction: 0.86)) { zoomed = true }
-            let steps = 140
-            for s in 1...steps {
-                try? await Task.sleep(for: .seconds(Self.pageSeconds / Double(steps)))
-                guard !Task.isCancelled, index == page else { return }
-                progress = Double(s) / Double(steps)
-                if s == steps * 5 / 6 { withAnimation(.easeInOut(duration: 1.0)) { zoomed = false } }
-            }
-            if page < pages.count - 1 { go(page + 1) } else { withAnimation { zoomed = true } }
+            zoomed = true   // shows the cards
         }
     }
 
@@ -360,8 +348,7 @@ private struct StickerChip: View {
     let bob: Int
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30)) { tl in
-            let y = sin(tl.date.timeIntervalSinceReferenceDate * 1.6 + Double(bob) * 1.3) * 5
+        Group {
             HStack(spacing: 7) {
                 Image(systemName: sticker.symbol).font(.system(size: 12, weight: .bold))
                     .frame(width: 24, height: 24).background(Circle().fill(Color.white.opacity(0.55)))
@@ -372,11 +359,9 @@ private struct StickerChip: View {
             .background(Capsule().fill(sticker.color))
             .overlay(Capsule().strokeBorder(Color.white.opacity(0.6), lineWidth: 1))
             .shadow(color: .black.opacity(0.18), radius: 12, y: 6)
-            .offset(y: y)
         }
-        .scaleEffect(shown ? 1 : 0.3)
         .opacity(shown ? 1 : 0)
-        .animation(.spring(response: 0.45, dampingFraction: 0.6).delay(shown ? delay : 0), value: shown)
+        .animation(.easeOut(duration: 0.35).delay(shown ? delay * 0.4 : 0), value: shown)
     }
 }
 

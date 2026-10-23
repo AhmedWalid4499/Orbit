@@ -53,6 +53,30 @@ enum Tab: String, CaseIterable, Identifiable {
     /// Nav groups: day, plan, life.
     static let groups: [[Tab]] = [[.today, .insights], [.calendar, .tasks, .habits, .bucket], [.money, .notes, .reading, .documents, .github]]
 
+    /// Tabs you turned off in Settings › General › Tabs (synced). Today is always there.
+    static var hidden: Set<Tab> {
+        get { Set((UserDefaults.standard.string(forKey: "hiddenTabs") ?? "").split(separator: ",").compactMap { Tab(rawValue: String($0)) }) }
+        set { UserDefaults.standard.set(newValue.subtracting([.today]).map(\.rawValue).sorted().joined(separator: ","), forKey: "hiddenTabs") }
+    }
+    static func visibleGroups(hidden: Set<Tab>) -> [[Tab]] { groups.map { $0.filter { !hidden.contains($0) } }.filter { !$0.isEmpty } }
+    var canHide: Bool { self != .today }
+    /// One line on what the tab is for, shown next to its switch.
+    var blurb: String {
+        switch self {
+        case .today: "Your day at a glance"
+        case .insights: "Charts of your week and month"
+        case .calendar: "Apple and Google calendars"
+        case .tasks: "To-dos and reminders"
+        case .habits: "Daily habits and streaks"
+        case .bucket: "Dreams, trips and places to go"
+        case .money: "Spending, budgets and subscriptions"
+        case .notes: "Notes and your journal"
+        case .reading: "Books from Goodreads, Apple Books or Kindle"
+        case .documents: "Passports, IDs and warranties"
+        case .github: "Your GitHub repos and pull requests"
+        }
+    }
+
     /// ⌘1…⌘9 for the first nine tabs (there's no ⌘10).
     var shortcutNumber: Int? { let i = Tab.allCases.firstIndex(of: self)! + 1; return i <= 9 ? i : nil }
 }

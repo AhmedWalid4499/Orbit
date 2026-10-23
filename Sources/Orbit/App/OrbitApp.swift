@@ -35,12 +35,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    static func fitWindowsToScreen() {
+        for w in NSApp.windows where w.canBecomeMain && w.isVisible && !w.styleMask.contains(.fullScreen) {
+            guard let visible = (w.screen ?? NSScreen.main)?.visibleFrame else { continue }
+            var f = w.frame
+            f.size.width = min(f.width, visible.width)
+            f.size.height = min(f.height, visible.height)
+            f.origin.x = min(max(f.minX, visible.minX), visible.maxX - f.width)
+            f.origin.y = min(max(f.minY, visible.minY), visible.maxY - f.height)
+            if f != w.frame { w.setFrame(f, display: true, animate: false) }
+        }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.applicationIconImage = AppIcon.make()
         // ⌥Space: a quick tap opens quick capture; holding it records your voice and Ask files what you said.
         hotKey = HotKey(onPress: { VoiceCapture.shared.keyDown() }, onRelease: { VoiceCapture.shared.keyUp() })
         _ = Reminders.shared // become the notification delegate before any notification is tapped
+        // The window is never taller than the screen (or its top, with the tabs, would sit above the edge).
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { Self.fitWindowsToScreen() }
+        NotificationCenter.default.addObserver(forName: NSWindow.didChangeScreenNotification, object: nil, queue: .main) { _ in
+            Task { @MainActor in Self.fitWindowsToScreen() }
+        }
+        NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { _ in
+            Task { @MainActor in Self.fitWindowsToScreen() }
+        }
+        // Testing hook: `-fullscreen` opens the main window in full screen.
+        if ProcessInfo.processInfo.arguments.contains("-fullscreen") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { NSApp.windows.first { $0.canBecomeMain }?.toggleFullScreen(nil) }
+        }
         // Testing hook: ORBIT_AUTO_UPDATE=1 installs any newer release without clicking.
         if ProcessInfo.processInfo.environment["ORBIT_AUTO_UPDATE"] != nil {
             Task { @MainActor in
@@ -102,7 +126,7 @@ struct OrbitApp: App {
             RootView()
                 .environmentObject(state)
                 .environmentObject(apple)
-                .frame(minWidth: 1180, minHeight: 760)
+                .frame(minWidth: 1180, minHeight: 640)
                 .onAppear {
                     Snapshot.runIfRequested(container: container, apple: apple)
                     SyncTest.runIfRequested()
@@ -128,7 +152,7 @@ struct OrbitApp: App {
                     .keyboardShortcut("j", modifiers: .command)
             }
             CommandMenu("Go") {
-                ForEach(Tab.allCases) { tab in
+                ForEach(Tab.allCases.filter { !Tab.hidden.contains($0) }) { tab in
                     if let n = tab.shortcutNumber {
                         Button(tab.title) { state.tab = tab }.keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: .command)
                     } else {

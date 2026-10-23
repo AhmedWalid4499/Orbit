@@ -382,7 +382,7 @@ private let syncedSettings = ["monthlyBudget", "readingGoal", "currencyCode", "a
                               "notify.tasks", "notify.events", "notify.bills", "notify.habits", "notify.journal", "notify.review",
                               "notify.subscriptions", "notify.documents", "notify.evening", "notify.trips", "notify.morningHour",
                               "notify.habitHour", "notify.journalHour", "notify.eventLead",
-                              "merchantRules", "categoryBudgets", "places.home", "places.work", "notify.budgets", "notify.bigCharges", "spendAlerts.sent"]
+                              "merchantRules", "categoryBudgets", "places.home", "places.work", "hiddenTabs", "inbox.windowHours", "inbox.everyHours", "notify.budgets", "notify.bigCharges", "spendAlerts.sent"]
 
 // MARK: - Sync engine
 

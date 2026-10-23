@@ -7,15 +7,18 @@ struct RootView: View {
     @Environment(\.modelContext) private var context
     @AppStorage("userName") private var userName = NSFullUserName()
     @AppStorage("tourSeen") private var tourSeen = false
+    @AppStorage("hiddenTabs") private var hiddenTabs = ""
     @AppStorage("assistantName") private var assistantName = "Ask"
     @AppStorage("onboarded") private var onboarded = false
     @ObservedObject private var focus = FocusTimer.shared
+    /// In full screen the window has no title bar, so keep the tabs below the camera notch.
+    @State private var fullScreenTopInset: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 0) {
             TopBar(userName: userName)
                 .padding(.horizontal, 32)
-                .padding(.top, 22)
+                .padding(.top, 22 + fullScreenTopInset)
                 .padding(.bottom, 18)
 
             Group {
@@ -58,6 +61,19 @@ struct RootView: View {
         .task { if ProcessInfo.processInfo.arguments.contains("-tour") { state.tourOpen = true } }
         .sheet(item: Binding(get: { focus.justFinished }, set: { focus.justFinished = $0 })) { FocusDoneSheet(session: $0) }
         .modifier(SplashOverlay())
+        // A tab you hid closes if you were on it.
+        .onChange(of: hiddenTabs) { _, raw in if raw.split(separator: ",").contains(Substring(state.tab.rawValue)) { state.tab = .today } }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { n in
+            fullScreenTopInset = (n.object as? NSWindow)?.screen?.safeAreaInsets.top ?? 0
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { _ in fullScreenTopInset = 0 }
+        .task {
+            // Orbit can reopen already in full screen (macOS restores it), with no "entered" notification.
+            try? await Task.sleep(for: .seconds(1))
+            if let w = NSApp.windows.first(where: { $0.canBecomeMain && $0.styleMask.contains(.fullScreen) }) {
+                fullScreenTopInset = w.screen?.safeAreaInsets.top ?? 0
+            }
+        }
         .task { focus.restore(context: context) }
         .task {
             // Keep the next two days of notifications current.
@@ -157,10 +173,12 @@ struct NavDock: View {
     /// 0 roomy, 1 tighter, 2 tightest.
     let density: Int
     @Namespace private var ns
+    @AppStorage("hiddenTabs") private var hiddenRaw = ""
+    private var hidden: Set<Tab> { Set(hiddenRaw.split(separator: ",").compactMap { Tab(rawValue: String($0)) }) }
 
     var body: some View {
         HStack(spacing: [4, 2, 0][density]) {
-            ForEach(Array(Tab.groups.enumerated()), id: \.offset) { i, group in
+            ForEach(Array(Tab.visibleGroups(hidden: hidden).enumerated()), id: \.offset) { i, group in
                 if i > 0 {
                     Capsule().fill(Theme.line).frame(width: 1.5, height: 22).padding(.horizontal, density == 0 ? 4 : 2)
                 }

@@ -85,19 +85,7 @@ struct PhoneWelcome: View {
                         .font(Theme.ui(15)).foregroundStyle(Theme.inkSecondary)
                 }
                 if !cloud.isSignedIn {
-                    Button {
-                        run { try await cloud.signInWithGoogle(context: context) }
-                    } label: {
-                        Label("Continue with Google", systemImage: "g.circle.fill").frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(PrimaryButtonStyle())
-                    VStack(spacing: 10) {
-                        TextField("Email", text: $email).textContentType(.username).keyboardType(.emailAddress).textInputAutocapitalization(.never)
-                        SecureField("Password", text: $password).textContentType(.password)
-                    }
-                    .textFieldStyle(.roundedBorder)
-                    Button("Sign in with email") { run { try await cloud.signIn(email: email, password: password, context: context) } }
-                        .buttonStyle(SoftButtonStyle()).disabled(email.isEmpty || password.isEmpty)
+                    AuthPanel()
                 } else {
                     VStack(alignment: .leading, spacing: 10) {
                         Label("Signed in as \(cloud.email ?? "")", systemImage: "checkmark.circle.fill").foregroundStyle(Theme.good)

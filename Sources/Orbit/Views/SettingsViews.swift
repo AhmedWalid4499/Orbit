@@ -52,6 +52,7 @@ struct GeneralSettings: View {
         LabeledContent("Search", value: "⌘K")
         #endif
         SavedPlacesSection(editing: $placeEditing, refresh: placesVersion)
+        TabsSection(phoneTabs: Platform.isPhone ? [.calendar, .tasks, .money] : [])
         Section {
             Button("Take the tour") {
                 // On iPhone, Settings is a sheet: close it first so the tour can cover the screen.
@@ -289,6 +290,7 @@ struct GmailSettings: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             if let error = inbox.error { Text(error).font(.caption).foregroundStyle(Theme.critical) }
+            InboxWindowControls()
 
             if showSetup {
                 VStack(alignment: .leading, spacing: 6) {
@@ -360,11 +362,6 @@ struct GmailSettings: View {
 struct AccountSettings: View {
     @Environment(\.modelContext) private var context
     @ObservedObject private var cloud = CloudSync.shared
-    @State private var email = ""
-    @State private var password = ""
-    @State private var creating = false
-    @State private var working = false
-    @State private var message: String?
 
     var body: some View {
         Form {
@@ -390,87 +387,12 @@ struct AccountSettings: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
             } else {
-                Section {
-                    Button { google() } label: {
-                        HStack {
-                            Image(systemName: "g.circle.fill").font(.title2)
-                            Text("Continue with Google").fontWeight(.semibold)
-                            Spacer()
-                            if working { ProgressView().controlSize(.small) }
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(working)
-                    Text("Use the same Google account on your Mac, your Windows PC and anywhere else Orbit runs, and you're always in the same Orbit account.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Section(creating ? "Or create an account with email" : "Or sign in with email") {
-                    TextField("Email", text: $email).textContentType(.username)
-                    SecureField("Password", text: $password).textContentType(creating ? .newPassword : .password)
-                    if let message { Text(message).font(.caption).foregroundStyle(.secondary) }
-                    HStack {
-                        Button(creating ? "I already have an account" : "Create an account") { creating.toggle(); message = nil }
-                            .buttonStyle(.orbitLink)
-                        Spacer()
-                        if working { ProgressView().controlSize(.small) }
-                        Button(creating ? "Create Account" : "Sign In", action: submit)
-                            .buttonStyle(.borderedProminent)
-                            .disabled(working || !email.contains("@") || password.count < 6)
-                            .keyboardShortcut(.defaultAction)
-                    }
-                    if !creating {
-                        Button("Forgot password?") {
-                            Task {
-                                do { try await CloudAuth.resetPassword(email: email); message = "Check \(email) for a link to reset your password." }
-                                catch { message = error.localizedDescription }
-                            }
-                        }
-                        .buttonStyle(.orbitLink).font(.caption).disabled(!email.contains("@"))
-                    }
-                }
-                Section {
-                    Text("An Orbit account keeps your data in sync between your Macs and backs it up online. Each person only ever sees their own data. Passwords need at least 6 characters.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
+                Section { AuthPanel().padding(.vertical, 6) }
             }
         }
         .formStyle(.grouped)
     }
 
-    private func google() {
-        working = true
-        message = nil
-        Task {
-            defer { working = false }
-            do { try await cloud.signInWithGoogle(context: context) }
-            catch is CancellationError {}
-            catch { message = error.localizedDescription }
-        }
-    }
-
-    private func submit() {
-        working = true
-        message = nil
-        let e = email.trimmingCharacters(in: .whitespaces)
-        Task {
-            defer { working = false }
-            do {
-                if creating {
-                    switch try await cloud.signUp(email: e, password: password, context: context) {
-                    case .signedIn: password = ""
-                    case .checkEmail:
-                        message = "Almost done: open the email Supabase sent to \(e), confirm it, then come back and sign in."
-                        creating = false
-                    }
-                } else {
-                    try await cloud.signIn(email: e, password: password, context: context)
-                    password = ""
-                }
-            } catch {
-                message = error.localizedDescription
-            }
-        }
-    }
 }
 
 /// Sync API keys and connections between devices, end-to-end encrypted with a passphrase.
@@ -532,5 +454,62 @@ struct VoiceSection: View {
                  ? "Premium voices sound the most like a person."
                  : "For a much more human voice, download a Premium one (free): \(Platform.isPhone ? "Settings › Accessibility › Spoken Content › Voices › English" : "System Settings › Accessibility › Spoken Content › System voice › Manage Voices"), then pick e.g. Zoe, Ava or Evan (Premium). It shows up here.")
         }
+    }
+}
+
+/// Settings › General › Tabs: switch off the parts of Orbit you don't use.
+struct TabsSection: View {
+    @AppStorage("hiddenTabs") private var hiddenRaw = ""
+    var phoneTabs: Set<Tab> = []
+
+    var body: some View {
+        Section {
+            ForEach(Tab.allCases.filter(\.canHide)) { t in
+                Toggle(isOn: Binding(get: { !Tab.hidden.contains(t) }, set: { on in
+                    var h = Tab.hidden
+                    if on { h.remove(t) } else { h.insert(t) }
+                    Tab.hidden = h
+                    hiddenRaw = UserDefaults.standard.string(forKey: "hiddenTabs") ?? ""
+                })) {
+                    Label { VStack(alignment: .leading, spacing: 1) { Text(t == .reading ? "Reading" : t.title); Text(t.blurb).font(.caption).foregroundStyle(.secondary) } }
+                    icon: { Image(systemName: t.symbol) }
+                }
+                .disabled(phoneTabs.contains(t))
+            }
+        } header: {
+            Text("Tabs")
+        } footer: {
+            Text(Platform.isPhone ? "Today, Calendar, Tasks and Money stay in the tab bar; the rest are under More." : "Turn off what you don't use. Nothing is deleted, and you can turn a tab back on any time.")
+        }
+    }
+}
+
+/// How far back the AI reads your inbox, and how often. Needs a Gmail account and an API key.
+struct InboxWindowControls: View {
+    @ObservedObject private var inbox = InboxStore.shared
+    @ObservedObject private var ai = AIAssistant.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Inbox summary").font(.subheadline.weight(.semibold))
+            if !ai.hasKey {
+                Label("Add your Anthropic API key in Settings › AI and \(AssistantName.current) summarises your inbox: who's waiting on you, bills, deliveries and alerts.",
+                      systemImage: "sparkles").font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            } else if inbox.accounts.isEmpty {
+                Text("Add a Gmail account above and \(AssistantName.current) summarises it on Today.").font(.caption).foregroundStyle(.secondary)
+            }
+            Picker("Read mail from the last", selection: $inbox.windowHours) {
+                ForEach(InboxStore.windowChoices, id: \.hours) { Text($0.label).tag($0.hours) }
+            }
+            Picker("Check for new mail", selection: $inbox.everyHours) {
+                ForEach(InboxStore.everyChoices, id: \.hours) { Text($0.label).tag($0.hours) }
+            }
+            if ai.hasKey && !inbox.accounts.isEmpty {
+                Button(inbox.loading ? "Reading your inbox…" : "Summarise now") { Task { await inbox.refresh() } }.disabled(inbox.loading)
+            }
+            Text("Only the sender, subject and the first line of each email are sent to Anthropic to write the summary; promotions and social mail are skipped.")
+                .font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+        .disabled(false)
     }
 }

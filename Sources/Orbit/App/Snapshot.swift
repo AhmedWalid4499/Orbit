@@ -83,7 +83,11 @@ extension Snapshot {
             renderAlone("plan-tomorrow", width: 1040, height: 720, PlanTomorrowSheet())
             renderAlone("goto", width: 1100, height: 820, wait: 3, ScrollView { GoToSection().padding(28) })
             renderAlone("money-rules", width: 560, height: 720, MoneyRulesSheet())
-            renderAlone("tour", width: 1000, height: 640, wait: 3.2, TourView {})
+            renderAlone("tour", width: 1040, height: 660, wait: 1.5, TourView {})
+            renderAlone("auth", width: 480, height: 620, ScrollView { AuthPanel().padding(28) })
+            renderAlone("github-connect", width: 640, height: 520, ScrollView { GitHubConnectCard().padding(24) })
+            renderAlone("tabs", width: 520, height: 720, Form { TabsSection() }.formStyle(.grouped))
+            renderAlone("inbox-window", width: 520, height: 360, Form { InboxWindowControls() }.formStyle(.grouped))
             if let trip = try? container.mainContext.fetch(FetchDescriptor<Trip>()).first {
                 renderAlone("trip", width: 820, height: 720, TripSheet(trip: trip))
             }

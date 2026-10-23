@@ -157,15 +157,15 @@ struct TodayView: View {
         HStack(alignment: .center, spacing: 20) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide))).font(Theme.display(32))
-                HStack(spacing: 10) {
-                    Text(headline).font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary).lineLimit(1)
-                    ViewThatFits(in: .horizontal) {
-                        headerActions(short: 0)
-                        headerActions(short: 1)
-                        headerActions(short: 2)
-                    }
-                    .layoutPriority(1)
+                // The line wraps instead of being cut, with the actions on their own row underneath.
+                Text(headline).font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
+                    .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                ViewThatFits(in: .horizontal) {
+                    headerActions(short: 0)
+                    headerActions(short: 1)
+                    headerActions(short: 2)
                 }
+                .padding(.top, 4)
             }
             Spacer(minLength: 16)
             ClockWeather()
@@ -173,7 +173,7 @@ struct TodayView: View {
                 HStack(spacing: 10) {
                     Image(systemName: capturing ? "hourglass" : (ai.smartCaptureActive ? "sparkles" : "plus"))
                         .foregroundStyle(Theme.inkSecondary)
-                    TextField(ai.smartCaptureActive ? "Add anything — “gym tomorrow 7am, pay rent friday, $12 lunch”" : "Add a task, event, expense or note…",
+                    TextField(ai.smartCaptureActive ? "Add anything — “gym 7am, $12 lunch”" : "Add a task, event, expense or note…",
                               text: $capture)
                         .textFieldStyle(.plain)
                         .font(Theme.ui(14))
@@ -182,7 +182,7 @@ struct TodayView: View {
                     Text("↩").font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkMuted)
                 }
                 .padding(.horizontal, 16).padding(.vertical, 12)
-                .frame(minWidth: 280, maxWidth: 440)
+                .frame(minWidth: 260, maxWidth: 400)
                 .background(Capsule().fill(Theme.card))
                 if let captureResult {
                     Text(captureResult).font(Theme.ui(11, weight: .medium)).foregroundStyle(Theme.good).lineLimit(1)

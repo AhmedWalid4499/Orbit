@@ -96,7 +96,7 @@ struct DaySummaryCard: View {
         case "mood": ("face.smiling", Theme.pink)
         case "trips": ("airplane", Theme.cyan)
         case "places": ("mappin.and.ellipse", Theme.mint)
-        default: ("sparkles", Theme.blush)
+        default: ("sparkles", Theme.sand)
         }
     }
 }

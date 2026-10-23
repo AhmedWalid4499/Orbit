@@ -45,7 +45,7 @@ struct TourView: View {
                  points: [("sparkles", "A morning brief with what matters today"),
                           ("sun.horizon.fill", "“Your day” rewrites itself as you spend, read and tick things off"),
                           ("lightbulb.fill", "A gentle nudge for the next few hours")],
-                 image: "today", focus: phone ? .init(x: 0.5, y: 0.42) : .init(x: 0.17, y: 0.36), zoom: phone ? 1.65 : 2.3, color: Theme.orange, accent: Theme.pink,
+                 image: "day", focus: phone ? .init(x: 0.5, y: 0.42) : .init(x: 0.17, y: 0.36), zoom: phone ? 1.65 : 2.3, color: Theme.orange, accent: Theme.pink,
                  stickers: [.init(symbol: "creditcard.fill", text: "EGP 350 today", color: Theme.peach, at: .init(x: 1.05, y: 0.25)),
                             .init(symbol: "book.fill", text: "42% · Atomic Habits", color: Theme.purple, at: .init(x: -0.06, y: 0.62))]),
             Page(id: 2, eyebrow: "Meet \(ai)", title: "An assistant that actually does things",
@@ -222,8 +222,8 @@ struct TourView: View {
         Group {
             if page.both {
                 ZStack(alignment: .bottomTrailing) {
-                    MacBookFrame(image: shot("mac-today")).padding(.trailing, phone ? 40 : 70)
-                    IPhoneFrame(image: shot("phone-today"))
+                    MacBookFrame(image: shot("mac-insights")).padding(.trailing, phone ? 40 : 70)
+                    IPhoneFrame(image: shot("phone-money"))
                         .frame(height: phone ? 230 : 330)
                         .offset(x: phone ? 6 : 10, y: phone ? 24 : 36)
                 }

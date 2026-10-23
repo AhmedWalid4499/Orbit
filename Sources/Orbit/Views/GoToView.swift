@@ -12,8 +12,8 @@ extension PlaceCategory {
         case .museum: Theme.cyan
         case .park: Theme.lime
         case .attraction: Theme.mint
-        case .hotel: Theme.blush
-        case .other: Theme.card
+        case .hotel: Theme.lavender
+        case .other: Theme.sand
         }
     }
 }
@@ -104,7 +104,7 @@ struct GoToSection: View {
         Map(position: $camera, selection: $selected) {
             ForEach(places.filter { $0.hasLocation && (category == nil || $0.placeCategory == category) }) { p in
                 Marker(p.title, systemImage: p.placeCategory.symbol, coordinate: CLLocationCoordinate2D(latitude: p.latitude, longitude: p.longitude))
-                    .tint(p.isDone ? Color.gray : p.placeCategory.color == Theme.card ? Theme.ink : p.placeCategory.color)
+                    .tint(p.isDone ? Color.gray : p.placeCategory.color)
                     .tag(p.uuid)
             }
         }
@@ -281,7 +281,7 @@ struct PlaceEditor: View {
 
                 if let c = found?.coordinate ?? (place?.hasLocation == true ? CLLocationCoordinate2D(latitude: place!.latitude, longitude: place!.longitude) : nil) {
                     Map(initialPosition: .region(MKCoordinateRegion(center: c, latitudinalMeters: 600, longitudinalMeters: 600))) {
-                        Marker(name, systemImage: category.symbol, coordinate: c).tint(category.color == Theme.card ? Theme.ink : category.color)
+                        Marker(name, systemImage: category.symbol, coordinate: c).tint(category.color)
                     }
                     .id("\(c.latitude),\(c.longitude)")
                     .frame(height: 170).clipShape(RoundedRectangle(cornerRadius: 14))

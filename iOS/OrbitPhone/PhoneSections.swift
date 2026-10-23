@@ -27,7 +27,7 @@ struct PhoneMore: View {
                 row("Search", "magnifyingglass", Theme.cyan) { state.searchOpen = true }
             }
             Section {
-                row("Settings", "gearshape.fill", Theme.card) { state.settingsOpen = true }
+                row("Settings", "gearshape.fill", Theme.silver) { state.settingsOpen = true }
             }
         }
         .navigationTitle("More")
@@ -49,7 +49,8 @@ struct PhoneMore: View {
         case .bucket: Theme.cyan
         case .documents: Theme.mint
         case .insights: Theme.lime
-        default: Theme.card
+        case .github: Theme.lavender
+        default: Theme.silver
         }
     }
 

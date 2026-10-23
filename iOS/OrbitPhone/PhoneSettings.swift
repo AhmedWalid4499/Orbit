@@ -31,7 +31,7 @@ struct PhoneSettings: View {
                     page("AI", "sparkles", Theme.lime, detail: ai.hasKey ? AssistantName.current : "Add your API key") { AISettings() }
                     page("Connections", "link", Theme.purple, detail: nil) { PhoneConnections() }
                     page("Notifications", "bell.fill", Theme.orange, detail: nil) { NotificationSettingsView() }
-                    page("General", "gearshape.fill", Theme.card, detail: nil) { GeneralSettings() }
+                    page("General", "gearshape.fill", Theme.silver, detail: nil) { GeneralSettings() }
                 }
                 Section {
                     LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")

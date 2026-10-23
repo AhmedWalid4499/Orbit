@@ -314,7 +314,7 @@ struct ClaudeClient {
                 // Tool inputs arrive as JSON fragments; parse once the block is complete.
                 if let i = event["index"] as? Int, var block = blocks[i], ["tool_use", "server_tool_use"].contains(block["type"] as? String ?? "") {
                     let json = partialJSON[i] ?? ""
-                    if json.isEmpty { block["input"] = [String: Any]() }
+                    if json.isEmpty { if block["input"] == nil { block["input"] = [String: Any]() } }  // server tools can arrive whole
                     else if let d = json.data(using: .utf8), let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any] { block["input"] = obj }
                     else { block["input"] = [String: Any](); block["_invalid"] = true }
                     blocks[i] = block

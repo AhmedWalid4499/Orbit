@@ -54,14 +54,34 @@ struct GeneralSettings: View {
         SavedPlacesSection(editing: $placeEditing, refresh: placesVersion)
         TabsSection(phoneTabs: Platform.isPhone ? [.calendar, .tasks, .money] : [])
         Section {
-            Button("Take the tour") {
-                // On iPhone, Settings is a sheet: close it first so the tour can cover the screen.
-                state.settingsOpen = false
-                DispatchQueue.main.asyncAfter(deadline: .now() + (Platform.isPhone ? 0.5 : 0)) { state.tourOpen = true }
+            HStack(spacing: 12) {
+                Image(systemName: "play.rectangle.fill").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.stickerInk)
+                    .frame(width: 30, height: 30).background(RoundedRectangle(cornerRadius: 8).fill(Theme.lime))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Tour").font(Theme.ui(14, weight: .medium))
+                    Text("A quick look at what Orbit can do.").font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
+                }
+                Spacer()
+                Button("Take the tour") {
+                    // On iPhone, Settings is a sheet: close it first so the tour can cover the screen.
+                    state.settingsOpen = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + (Platform.isPhone ? 0.5 : 0)) { state.tourOpen = true }
+                }
+                .buttonStyle(SoftButtonStyle()).fixedSize()
             }
         }
         Section {
-            Button("Delete all data…", role: .destructive) { confirmClear = true }
+            HStack(spacing: 12) {
+                Image(systemName: "trash.fill").font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                    .frame(width: 30, height: 30).background(RoundedRectangle(cornerRadius: 8).fill(Theme.critical))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Delete all data").font(Theme.ui(14, weight: .medium))
+                    Text("Removes everything in Orbit, here and in your account.").font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
+                }
+                Spacer()
+                Button("Delete…", role: .destructive) { confirmClear = true }
+                    .buttonStyle(SoftButtonStyle()).foregroundStyle(Theme.critical).fixedSize()
+            }
         }
     }
         .savedPlaceSearch($placeEditing) { placesVersion += 1 }

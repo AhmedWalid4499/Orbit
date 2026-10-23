@@ -38,6 +38,11 @@ final class AssistantStore: ObservableObject {
 
     // MARK: Conversation
 
+    /// Content block types of the conversation so far (test hook only).
+    var debugBlockTypes: [String] {
+        messages.flatMap { m in (m["content"] as? [[String: Any]] ?? []).map { "\(m["role"] ?? "")/\($0["type"] ?? "")" } }
+    }
+
     func newChat() {
         items = []
         messages = []
@@ -255,8 +260,8 @@ enum AssistantTools {
 
     /// Anthropic-run tools: searching the web (prices, menus, ratings, opening hours, news) and reading pages.
     static var serverTools: [[String: Any]] {
-        var location: [String: Any] = ["type": "approximate", "timezone": TimeZone.current.identifier, "city": WeatherStore.shared.effectiveCity]
-        if let region = Locale.current.region?.identifier { location["country"] = region }
+        // City and time zone only: web search rejects some country codes (e.g. EG) and fails the whole request.
+        let location: [String: Any] = ["type": "approximate", "timezone": TimeZone.current.identifier, "city": WeatherStore.shared.effectiveCity]
         return [
             ["type": "web_search_20260209", "name": "web_search", "max_uses": 6, "user_location": location],
             ["type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 4],

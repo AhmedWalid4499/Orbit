@@ -139,6 +139,7 @@ struct OrbitApp: App {
                     SyncTest.runIfRequested()
                     AITest.runIfRequested(apple: apple)
                     BankTest.runIfRequested()
+                    AskTest.runIfRequested(apple: apple)
                     SmartsTest.runIfRequested()
                 }
         }

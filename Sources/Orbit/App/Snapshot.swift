@@ -31,8 +31,7 @@ extension Snapshot {
                 window.contentView = host
                 host.layoutSubtreeIfNeeded()
                 RunLoop.main.run(until: .now + 0.4)
-                guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { return }
-                host.cacheDisplay(in: host.bounds, to: rep)
+                guard let rep = Snapshot.retinaRep(host) else { return }
                 try? rep.representation(using: .png, properties: [:])?
                     .write(to: URL(fileURLWithPath: dir).appending(path: "\(name)\(appearance == .aqua ? "" : "-dark").png"))
             }
@@ -72,8 +71,7 @@ extension Snapshot {
                 window.contentView = host
                 host.layoutSubtreeIfNeeded()
                 RunLoop.main.run(until: .now + wait)
-                if let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
-                    host.cacheDisplay(in: host.bounds, to: rep)
+                if let rep = Snapshot.retinaRep(host) {
                     try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: dir).appending(path: "\(name).png"))
                 }
             }
@@ -84,6 +82,24 @@ extension Snapshot {
             renderAlone("goto", width: 1100, height: 820, wait: 3, ScrollView { GoToSection().padding(28) })
             renderAlone("money-rules", width: 560, height: 720, MoneyRulesSheet())
             renderAlone("tour", width: 1040, height: 660, wait: 1.5, TourView {})
+            // The tour's MacBook screens: a smaller window, so text stays readable when the picture is shown small.
+            if ProcessInfo.processInfo.environment["ORBIT_SNAPSHOT_TOUR"] != nil {
+                let tourSize = CGSize(width: 1280, height: 800)
+                @MainActor func tourShot(_ name: String, _ tab: Tab, _ configure: @escaping @MainActor (AppState) -> Void = { _ in }) {
+                    let state = AppState(); state.tab = tab; configure(state)
+                    renderAlone("tour-\(name)", width: tourSize.width, height: tourSize.height, wait: 1.2,
+                                RootView().environmentObject(state).frame(width: tourSize.width, height: tourSize.height))
+                }
+                tourShot("today", .today)
+                tourShot("assistant", .today) { $0.assistantOpen = true }
+                tourShot("calendar", .calendar)
+                tourShot("money", .money)
+                tourShot("reading", .reading)
+                tourShot("insights", .insights)
+                renderAlone("tour-day", width: 760, height: 475, wait: 0.8,
+                            VStack(spacing: 14) { DaySummaryCard(); BriefCard() }.padding(20).frame(width: 760, height: 475, alignment: .top).background(Theme.canvas))
+                renderAlone("tour-goto", width: 1100, height: 688, wait: 3, ScrollView { GoToSection().padding(28) }.background(Theme.canvas))
+            }
             renderAlone("auth", width: 480, height: 620, ScrollView { AuthPanel().padding(28) })
             renderAlone("github-connect", width: 640, height: 520, ScrollView { GitHubConnectCard().padding(24) })
             renderAlone("tabs", width: 520, height: 720, Form { TabsSection() }.formStyle(.grouped))
@@ -253,4 +269,18 @@ enum SyncTest {
             NSApp.terminate(nil)
         }
     }
+}
+
+extension Snapshot {
+    /// A 2× bitmap of a view (offscreen windows render at 1×, which looks blurry on Retina).
+    static func retinaRep(_ view: NSView) -> NSBitmapImageRep? {
+        let size = view.bounds.size
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width * 2), pixelsHigh: Int(size.height * 2),
+                                         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
+        rep.size = size
+        view.cacheDisplay(in: view.bounds, to: rep)
+        return rep
+    }
+
 }

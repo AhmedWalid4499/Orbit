@@ -8,6 +8,7 @@ enum Snapshot {
     nonisolated static let isActive = ProcessInfo.processInfo.environment["ORBIT_SNAPSHOT_DIR"] != nil
         || ProcessInfo.processInfo.environment["ORBIT_SYNC_TEST"] != nil
         || ProcessInfo.processInfo.environment["ORBIT_AI_TEST"] != nil
+        || ProcessInfo.processInfo.environment["ORBIT_ASK_TEST"] != nil
         || ProcessInfo.processInfo.arguments.contains("-demo")
     /// Sample data only: no saved caches (chat, inbox, money coach, photo, name) are shown, so screenshots never
     /// carry personal data. On for demo screenshots and the iPhone `-demo` launch.
@@ -183,5 +184,25 @@ enum Snapshot {
         ctx.insert(loose)
 
         return c
+    }
+}
+
+/// Test hook: `ORBIT_ASK_TEST="question"` asks the assistant once with sample data, prints the reply, the tool
+/// activity and any error, and quits. The chat isn't saved.
+@MainActor
+enum AskTest {
+    static func runIfRequested(apple: AppleSync) {
+        guard let q = ProcessInfo.processInfo.environment["ORBIT_ASK_TEST"] else { return }
+        Task {
+            let container = Snapshot.demoContainer()
+            let store = AssistantStore.shared
+            store.newChat()
+            await store.send(q, context: container.mainContext, apple: apple)
+            for i in store.items { print("ASK [\(i.role.rawValue)] \(i.text)") }
+            print("ASK blocks: " + store.debugBlockTypes.joined(separator: ", "))
+            print("ASK error: \(store.error ?? "-")")
+            fflush(stdout)
+            withExtendedLifetime(container) { exit(0) }
+        }
     }
 }

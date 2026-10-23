@@ -37,6 +37,9 @@ enum Theme {
     static let cyan = Color(hex: 0x27D3F6)
     static let mint = Color(hex: 0x8EEDBF)
     static let peach = Color(hex: 0xFFC6A3)
+    static let lavender = Color(hex: 0xD9C8FF)
+    static let sand = Color(hex: 0xF3DE9E)
+    static let silver = Color(hex: 0xD4D4D8)
     static let stickerInk = Color(hex: 0x111111)
 
     static let good = Color(hex: 0x16A34A)

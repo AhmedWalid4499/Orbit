@@ -48,6 +48,8 @@ G_MAIN, G_PRODUCTS = oid("group.main"), oid("group.products")
 F_SUPABASE, B_SUPABASE = oid("file.supabase"), oid("build.supabase")
 # The signed Shortcuts the app shares (scripts/make-shortcuts.py), copied in as a folder.
 F_SHORTCUTS, B_SHORTCUTS = oid("file.shortcuts"), oid("build.shortcuts")
+# Screenshots for the first-launch tour (TourView), copied in as a folder.
+F_TOUR, B_TOUR = oid("file.tour"), oid("build.tour")
 B_EMBED = oid("build.embed.widgets")
 PROJECT = oid("project")
 
@@ -190,11 +192,13 @@ def cfg_list(lid, comment, a, b):
 
 app_phases = [oid("app.sources"), oid("app.frameworks"), oid("app.resources")]
 phases_text = (phase("PBXSourcesBuildPhase", app_phases[0]) + phase("PBXFrameworksBuildPhase", app_phases[1])
-               + phase("PBXResourcesBuildPhase", app_phases[2], f"\t\t\t\t{B_SUPABASE} /* Supabase.json in Resources */,\n\t\t\t\t{B_SHORTCUTS} /* Shortcuts in Resources */,\n"))
+               + phase("PBXResourcesBuildPhase", app_phases[2], f"\t\t\t\t{B_SUPABASE} /* Supabase.json in Resources */,\n\t\t\t\t{B_SHORTCUTS} /* Shortcuts in Resources */,\n\t\t\t\t{B_TOUR} /* Tour in Resources */,\n"))
 build_files = (f"\t\t{B_SUPABASE} /* Supabase.json in Resources */ = {{isa = PBXBuildFile; fileRef = {F_SUPABASE}; }};\n"
-               f"\t\t{B_SHORTCUTS} /* Shortcuts in Resources */ = {{isa = PBXBuildFile; fileRef = {F_SHORTCUTS}; }};\n")
+               f"\t\t{B_SHORTCUTS} /* Shortcuts in Resources */ = {{isa = PBXBuildFile; fileRef = {F_SHORTCUTS}; }};\n"
+               f"\t\t{B_TOUR} /* Tour in Resources */ = {{isa = PBXBuildFile; fileRef = {F_TOUR}; }};\n")
 products = f"\t\t\t\t{P_APP} /* Orbit.app */,\n"
-file_refs = (f"\t\t{F_SHORTCUTS} /* Shortcuts */ = {{isa = PBXFileReference; lastKnownFileType = folder; name = Shortcuts; path = Support/Shortcuts; sourceTree = SOURCE_ROOT; }};\n"
+file_refs = (f"\t\t{F_TOUR} /* Tour */ = {{isa = PBXFileReference; lastKnownFileType = folder; name = Tour; path = Support/Tour; sourceTree = SOURCE_ROOT; }};\n"
+             f"\t\t{F_SHORTCUTS} /* Shortcuts */ = {{isa = PBXFileReference; lastKnownFileType = folder; name = Shortcuts; path = Support/Shortcuts; sourceTree = SOURCE_ROOT; }};\n"
              f"\t\t{F_SUPABASE} /* Supabase.json */ = {{isa = PBXFileReference; lastKnownFileType = text.json; name = Supabase.json; path = ../Support/Supabase.json; sourceTree = SOURCE_ROOT; }};\n"
              f"\t\t{P_APP} /* Orbit.app */ = {{isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Orbit.app; sourceTree = BUILT_PRODUCTS_DIR; }};\n")
 targets = ""
@@ -265,7 +269,7 @@ if WATCH:
 target_ids = [(T_APP, "OrbitPhone")] + ([(T_WID, "OrbitWidgets")] if WIDGETS else []) + ([(T_WATCH, "OrbitWatch"), (T_WWID, "OrbitWatchWidgets")] if WATCH else [])
 all_targets = "".join(f"\t\t\t\t{t} /* {n} */,\n" for t, n in target_ids)
 attrs = "".join(f"\t\t\t\t\t{t} = {{\n\t\t\t\t\t\tCreatedOnToolsVersion = 27.1;\n\t\t\t\t\t}};\n" for t, _ in target_ids)
-main_children = "".join(f"\t\t\t\t{oid('sync.' + n)} /* {n} */,\n" for n in SYNC) + f"\t\t\t\t{F_SUPABASE} /* Supabase.json */,\n\t\t\t\t{F_SHORTCUTS} /* Shortcuts */,\n\t\t\t\t{G_PRODUCTS} /* Products */,\n"
+main_children = "".join(f"\t\t\t\t{oid('sync.' + n)} /* {n} */,\n" for n in SYNC) + f"\t\t\t\t{F_SUPABASE} /* Supabase.json */,\n\t\t\t\t{F_SHORTCUTS} /* Shortcuts */,\n\t\t\t\t{F_TOUR} /* Tour */,\n\t\t\t\t{G_PRODUCTS} /* Products */,\n"
 
 text = f"""// !$*UTF8*$!
 {{

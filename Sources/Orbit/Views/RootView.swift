@@ -6,6 +6,7 @@ struct RootView: View {
     @EnvironmentObject private var apple: AppleSync
     @Environment(\.modelContext) private var context
     @AppStorage("userName") private var userName = NSFullUserName()
+    @AppStorage("tourSeen") private var tourSeen = false
     @AppStorage("assistantName") private var assistantName = "Ask"
     @AppStorage("onboarded") private var onboarded = false
     @ObservedObject private var focus = FocusTimer.shared
@@ -49,7 +50,11 @@ struct RootView: View {
         .sheet(isPresented: $state.reviewOpen) { ReviewView() }
         .sheet(isPresented: $state.cardOpen) { ProfileCardSheet() }
         .sheet(isPresented: $state.planOpen) { PlanTomorrowSheet() }
-        .sheet(isPresented: Binding(get: { !onboarded && !Snapshot.isActive }, set: { if !$0 { onboarded = true } })) { WelcomeView() }
+        // First launch: the tour, then a few quick settings.
+        .sheet(isPresented: Binding(get: { !onboarded && !Snapshot.isActive }, set: { if !$0 { onboarded = true } })) {
+            if tourSeen { WelcomeView() } else { TourView { tourSeen = true } }
+        }
+        .sheet(isPresented: $state.tourOpen) { TourView { state.tourOpen = false } }
         .sheet(item: Binding(get: { focus.justFinished }, set: { focus.justFinished = $0 })) { FocusDoneSheet(session: $0) }
         .modifier(SplashOverlay())
         .task { focus.restore(context: context) }

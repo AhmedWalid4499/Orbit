@@ -21,6 +21,7 @@ BUILD="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" -c "Set :CFBundleVersion $BUILD" "$APP/Contents/Info.plist"
 [[ -f Support/AppIcon.icns ]] && cp Support/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cp Support/Supabase.json "$APP/Contents/Resources/Supabase.json" # sync project (publishable key only)
+mkdir -p "$APP/Contents/Resources/Tour" && cp Support/Tour/*.jpg "$APP/Contents/Resources/Tour/" # first-launch tour screenshots
 
 # Siri & Shortcuts: extract App Intents metadata the way Xcode does, from the compiler's constant values.
 CONF_DIR="$( [[ "$CONFIG" == "release" ]] && echo Release || echo Debug )"

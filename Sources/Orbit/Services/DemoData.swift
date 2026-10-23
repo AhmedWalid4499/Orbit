@@ -9,6 +9,33 @@ enum Snapshot {
         || ProcessInfo.processInfo.environment["ORBIT_SYNC_TEST"] != nil
         || ProcessInfo.processInfo.environment["ORBIT_AI_TEST"] != nil
         || ProcessInfo.processInfo.arguments.contains("-demo")
+    /// Sample data only: no saved caches (chat, inbox, money coach, photo, name) are shown, so screenshots never
+    /// carry personal data. On for demo screenshots and the iPhone `-demo` launch.
+    nonisolated static let isDemo = ProcessInfo.processInfo.environment["ORBIT_SNAPSHOT_DEMO"] != nil
+        || ProcessInfo.processInfo.arguments.contains("-demo")
+
+    /// In demo mode, your own settings (name, what you call your AI, budget) are covered by sample ones for this run only.
+    nonisolated static func applyDemoDefaults() {
+        guard isDemo else { return }
+        let sample: [String: Any] = ["userName": "Alex Morgan", "assistantName": "Ask", "monthlyBudget": 6000.0, "profileCard": "", "readingGoal": 24]
+        // Keep launch options (-open, -moneyTab…) that are already in the argument domain.
+        let args = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+        UserDefaults.standard.setVolatileDomain(sample.merging(args) { _, launch in launch }, forName: UserDefaults.argumentDomain)
+    }
+
+    /// Canned AI cards (morning brief, Your day) for screenshots, without calling the API.
+    static func previewAI() {
+        if let data = #"{"headline":"Busy morning, easy evening","summary":"You have a budget review at 7 PM and four tasks due, including the electricity bill. Your water streak is at 7 days.","focus":["Pay the electricity bill before noon","Reply to your landlord — it's a day overdue","Do 20 minutes on chapter 4 notes"],"heads_up":"You've used 89% of this month's budget with 10 days left.","day":"\#(DayKey.key(.now))"}"#.data(using: .utf8),
+           let brief = try? JSONDecoder().decode(MorningBrief.self, from: data) {
+            AIAssistant.shared.previewBrief(brief)
+        }
+        DaySummaryStore.shared.preview(DaySummary(line: "A calm afternoon, and you're ahead on tasks.", tiles: [
+            .init(kind: "money", title: "Spent today", value: "EGP 350", detail: "Mostly Carrefour; month on pace"),
+            .init(kind: "reading", title: "Reading", value: "42% · Atomic Habits", detail: "15 min today, 4-day streak"),
+            .init(kind: "tasks", title: "Tasks", value: "3 of 5 done", detail: "Next: call the landlord"),
+            .init(kind: "calendar", title: "Next up", value: "Gym · 7:00 PM", detail: "Then nothing else tonight"),
+        ], nudge: "Twenty minutes of reading before the gym keeps your streak going."))
+    }
 
     /// Sample data, in memory only.
     static func demoContainer() -> ModelContainer {
@@ -35,15 +62,25 @@ enum Snapshot {
         for (t, a, c, d, mail, orig) in [("Uber", -86.0, "Transport", 0, true, ""), ("Netflix", -620.0, "Subscriptions", 1, true, "12.99 USD"),
                                          ("Carrefour", -1250.0, "Food", 2, true, ""), ("Coffee", -95.0, "Food", 2, false, "")] {
             let x = Transaction(title: t, amount: a, category: c, date: .now.adding(days: -d))
-            if mail { x.source = "gmail:ahmedwalid4499@gmail.com"; x.sourceID = "demo\(d)" }
+            if mail { x.source = "gmail:alex@example.com"; x.sourceID = "demo\(d)" }
             if !orig.isEmpty { x.originalAmount = 12.99; x.originalCurrency = "USD"; x.isRecurring = true }
             ctx.insert(x)
         }
-        for (i, (t, h, len)) in [("Team sync", 10, 60), ("Gym", 18, 90), ("Dinner with Sara", 20, 120), ("Dentist", 15, 45)].enumerated() {
-            let start = Calendar.current.date(bySettingHour: h, minute: 0, second: 0, of: Date.now.startOfWeek.adding(days: i + 1))!
-            ctx.insert(EventItem(title: t, start: start, end: start.adding(minutes: len), area: [.work, .health, .social, .health][i]))
+        // A believable week from today, so Today, Calendar and the planner have something to show.
+        for (t, day, h, m, len, area) in [("Team standup", 0, 10, 0, 30, Area.work), ("Lunch with Omar", 0, 13, 30, 60, .social), ("Gym", 0, 19, 0, 75, .health),
+                                          ("Dentist", 1, 15, 0, 45, .health), ("Design review", 1, 11, 0, 60, .work), ("Dinner with Sara", 2, 20, 0, 120, .social),
+                                          ("Team sync", 3, 10, 0, 60, .work), ("Yoga", 4, 8, 0, 60, .health), ("Movie night", 5, 21, 0, 150, .social)] {
+            let start = Calendar.current.date(bySettingHour: h, minute: m, second: 0, of: Date.now.startOfDay.adding(days: day))!
+            ctx.insert(EventItem(title: t, start: start, end: start.adding(minutes: len), area: area))
         }
         ctx.insert(TaskItem(title: "Pay Electricity — 450 EGP", area: .money, due: Date.now.startOfDay.adding(days: 4), priority: 2))
+        ctx.insert(TaskItem(title: "Send the project update", area: .work, due: Date.now.startOfDay, priority: 3))
+        ctx.insert(TaskItem(title: "Book a table for Saturday", area: .personal, due: Date.now.startOfDay, priority: 1))
+        ctx.insert(TaskItem(title: "Buy a birthday gift for Sara", area: .personal, due: Date.now.startOfDay.adding(days: 1), priority: 2))
+        ctx.insert(TaskItem(title: "Renew passport", area: .personal, due: Date.now.startOfDay.adding(days: 9), priority: 1))
+        let finished = TaskItem(title: "Reply to the landlord", area: .personal, due: Date.now.startOfDay, priority: 2)
+        finished.isDone = true; finished.completedAt = .now.adding(minutes: -90)
+        ctx.insert(finished)
         ctx.insert(BucketItem(title: "See the northern lights in Norway", kind: .travel, notes: "Tromsø in February", targetDate: Date.now.startOfDay.adding(days: 23), excitement: 3))
         ctx.insert(BucketItem(title: "Learn to surf", kind: .adventure, excitement: 2))
         for (name, cat, addr, lat, lon, note, been) in [
@@ -77,6 +114,11 @@ enum Snapshot {
             }
         }
         ctx.insert(gym)
+        for (name, symbol, doneToday, streak) in [("Drink water", "drop.fill", true, 9), ("Read 20 minutes", "book.fill", false, 4), ("Meditate", "brain.head.profile", true, 3)] {
+            let h = Habit(name: name, symbol: symbol, area: .health, targetPerWeek: 7)
+            for d in (doneToday ? 0 : 1)...streak { h.doneDays.append(DayKey.key(Date.now.startOfDay.adding(days: -d))) }
+            ctx.insert(h)
+        }
         for (t, b) in [("You do not rise to the level of your goals. You fall to the level of your systems.", "Atomic Habits"),
                        ("Every action you take is a vote for the type of person you wish to become.", "Atomic Habits"),
                        ("You have power over your mind, not outside events. Realize this, and you will find strength.", "Meditations")] {

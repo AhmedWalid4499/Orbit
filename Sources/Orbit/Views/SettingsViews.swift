@@ -31,6 +31,8 @@ struct GeneralSettings: View {
     @AppStorage("currencyCode") private var currency = Locale.current.currency?.identifier ?? "USD"
     @State private var confirmClear = false
 
+    @EnvironmentObject private var state: AppState
+
     var body: some View {
     Form {
         TextField("Your name", text: $userName)
@@ -46,6 +48,13 @@ struct GeneralSettings: View {
         LabeledContent("Quick capture", value: "⌥Space (anywhere)")
         LabeledContent("Search", value: "⌘K")
         #endif
+        Section {
+            Button("Take the tour") {
+                // On iPhone, Settings is a sheet: close it first so the tour can cover the screen.
+                state.settingsOpen = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + (Platform.isPhone ? 0.5 : 0)) { state.tourOpen = true }
+            }
+        }
         Section {
             Button("Delete all data…", role: .destructive) { confirmClear = true }
         }

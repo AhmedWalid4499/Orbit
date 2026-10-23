@@ -34,6 +34,10 @@ final class MoneyCoach: ObservableObject {
     private let cacheKey = "moneyCoachCache"
 
     private init() {
+        if Snapshot.isDemo {
+            advice = try? JSONDecoder().decode(Advice.self, from: Data(#"{"headline":"You're on pace this month, with food delivery as the one to watch.","tips":[{"title":"Cook two more dinners a week","detail":"Delivery is your biggest category this month. Two home dinners a week would cover most of the gap.","monthly_saving":900},{"title":"Pick one streaming service","detail":"Netflix and Shahid overlap. Keeping one saves the other every month.","monthly_saving":250},{"title":"Walk the short trips","detail":"Six Uber rides were under 2 km this month.","monthly_saving":300}]}"#.utf8))
+            return
+        }
         if let data = UserDefaults.standard.data(forKey: cacheKey) { advice = try? JSONDecoder().decode(Advice.self, from: data) }
     }
 

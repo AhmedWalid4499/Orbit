@@ -7,19 +7,7 @@ extension Snapshot {
 
     static func runIfRequested(container: ModelContainer, apple: AppleSync) {
         guard let dir = ProcessInfo.processInfo.environment["ORBIT_SNAPSHOT_DIR"] else { return }
-        if ProcessInfo.processInfo.environment["ORBIT_SNAPSHOT_AI"] != nil,
-           let data = #"{"headline":"Busy morning, easy evening","summary":"You have a budget review at 7 PM and four tasks due, including the electricity bill. Your water streak is at 7 days.","focus":["Pay the electricity bill before noon","Reply to your landlord — it's a day overdue","Do 20 minutes on chapter 4 notes"],"heads_up":"You've used 89% of this month's budget with 10 days left.","day":"\#(DayKey.key(.now))"}"#.data(using: .utf8),
-           let brief = try? JSONDecoder().decode(MorningBrief.self, from: data) {
-            AIAssistant.shared.previewBrief(brief)
-        }
-        if ProcessInfo.processInfo.environment["ORBIT_SNAPSHOT_DEMO"] != nil {
-            DaySummaryStore.shared.preview(DaySummary(line: "A calm afternoon, and you're ahead on tasks.", tiles: [
-                .init(kind: "money", title: "Spent today", value: "EGP 350", detail: "Mostly Carrefour; month on pace"),
-                .init(kind: "reading", title: "Reading", value: "42% · Atomic Habits", detail: "15 min today, 4-day streak"),
-                .init(kind: "tasks", title: "Tasks", value: "3 of 5 done", detail: "Next: call the landlord"),
-                .init(kind: "calendar", title: "Next up", value: "Gym · 7:00 PM", detail: "Then nothing else tonight"),
-            ], nudge: "Twenty minutes of reading before the gym keeps your streak going."))
-        }
+        if ProcessInfo.processInfo.environment["ORBIT_SNAPSHOT_AI"] != nil { Snapshot.previewAI() }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             // Demo data lives in memory only, so screenshots never touch the real store.
             let container = ProcessInfo.processInfo.environment["ORBIT_SNAPSHOT_DEMO"] != nil ? demoContainer() : container
@@ -95,6 +83,7 @@ extension Snapshot {
             renderAlone("plan-tomorrow", width: 1040, height: 720, PlanTomorrowSheet())
             renderAlone("goto", width: 1100, height: 820, wait: 3, ScrollView { GoToSection().padding(28) })
             renderAlone("money-rules", width: 560, height: 720, MoneyRulesSheet())
+            renderAlone("tour", width: 1000, height: 640, wait: 3.2, TourView {})
             if let trip = try? container.mainContext.fetch(FetchDescriptor<Trip>()).first {
                 renderAlone("trip", width: 820, height: 720, TripSheet(trip: trip))
             }

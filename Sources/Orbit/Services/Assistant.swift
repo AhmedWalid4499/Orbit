@@ -156,12 +156,24 @@ final class AssistantStore: ObservableObject {
     }
 
     private func save() {
+        guard !Snapshot.isActive else { return }   // screenshots and tests never touch your real chat
         let saved = Saved(system: system, messages: (try? JSONSerialization.data(withJSONObject: messages)) ?? Data(), items: items)
         try? FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? JSONEncoder().encode(saved).write(to: fileURL)
     }
 
     private func load() {
+        if Snapshot.isDemo {
+            items = [
+                ChatItem(role: .user, text: "I'm hungry, anything good near me?"),
+                ChatItem(role: .action, text: "Searched the web: “Zooba Zamalek menu prices”", symbol: "globe"),
+                ChatItem(role: .assistant, text: "Ooh, you're in luck. **Zooba** is 2 minutes away, great koshary and taameya for about EGP 150 a person, open till 1 am. If you want something calmer, **Kadusha** next door does good pasta for around EGP 300. Want me to save Zooba to your Go to list?"),
+                ChatItem(role: .user, text: "Yes, and what should I wear tonight?"),
+                ChatItem(role: .action, text: "Go to: “Zooba” · Food", symbol: "mappin.and.ellipse"),
+                ChatItem(role: .assistant, text: "Saved! It's 28° now but drops to 22° by 9, so a T-shirt with a light jacket or overshirt is perfect. No rain, so skip the umbrella."),
+            ]
+            return
+        }
         guard let data = try? Data(contentsOf: fileURL), let saved = try? JSONDecoder().decode(Saved.self, from: data) else { return }
         system = saved.system
         messages = (try? JSONSerialization.jsonObject(with: saved.messages) as? [[String: Any]]) ?? []

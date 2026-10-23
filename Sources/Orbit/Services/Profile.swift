@@ -13,7 +13,7 @@ final class ProfileStore: ObservableObject {
 
     private let url = URL.applicationSupportDirectory.appending(path: "Orbit/profile.png")
 
-    private init() { photo = PlatformImage.load(url) }
+    private init() { photo = Snapshot.isDemo ? nil : PlatformImage.load(url) }
 
     #if os(macOS)
     func choosePhoto() {

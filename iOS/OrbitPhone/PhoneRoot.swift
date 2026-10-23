@@ -13,13 +13,16 @@ struct PhoneRoot: View {
     @ObservedObject private var focus = FocusTimer.shared
     @ObservedObject private var reading = ReadingTimer.shared
     @AppStorage("phoneOnboarded") private var onboarded = false
+    @AppStorage("tourSeen") private var tourSeen = false
 
     @State private var tab: PhoneTab = .today
     @State private var morePath: [Tab] = []
 
     var body: some View {
         Group {
-            if !onboarded && !cloud.isSignedIn && !Snapshot.isActive {
+            if !tourSeen && !Snapshot.isActive {
+                TourView { tourSeen = true }
+            } else if !onboarded && !cloud.isSignedIn && !Snapshot.isActive {
                 PhoneWelcome { onboarded = true }
             } else {
                 tabs
@@ -28,6 +31,7 @@ struct PhoneRoot: View {
         .tint(Theme.ink)
         .sheet(isPresented: $state.assistantOpen) { AssistantPanel().presentationDragIndicator(.visible) }
         .sheet(isPresented: $state.searchOpen) { SearchView() }
+        .fullScreenCover(isPresented: $state.tourOpen) { TourView { state.tourOpen = false } }
         .sheet(isPresented: $state.settingsOpen) { PhoneSettings() }
         .sheet(isPresented: $state.reviewOpen) { ReviewView() }
         .sheet(isPresented: $state.cardOpen) { PhoneCardSheet() }
@@ -52,6 +56,7 @@ struct PhoneRoot: View {
         .task {
             focus.restore(context: context); reading.restore(context: context)
             BankTest.runIfRequested()
+            if ProcessInfo.processInfo.arguments.contains("-demoAI") { Snapshot.previewAI() }
             SmartsTest.runIfRequested()
             // For testing: `-open habits` (or any tab), `-sheet plan|review|card|assistant|settings|capture|search`.
             let args = ProcessInfo.processInfo.arguments
@@ -63,6 +68,7 @@ struct PhoneRoot: View {
                 case "card": state.cardOpen = true
                 case "assistant": state.assistantOpen = true
                 case "settings": state.settingsOpen = true
+                case "tour": state.tourOpen = true
                 case "capture": state.captureOpen = true
                 case "search": state.searchOpen = true
                 default: break

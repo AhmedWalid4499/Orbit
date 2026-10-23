@@ -65,6 +65,8 @@ final class AppState: ObservableObject {
 
     @Published var tab: Tab = .today
     @Published var searchOpen = false
+    /// The animated tour of what Orbit can do (first launch, or Settings › General › Take the tour).
+    @Published var tourOpen = false
     @Published var settingsOpen = false
     @Published var openTodayJournal = false
     @Published var assistantOpen = false

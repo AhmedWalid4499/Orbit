@@ -62,10 +62,15 @@ struct OrbitApp: App {
     let container: ModelContainer
 
     init() {
+        Snapshot.applyDemoDefaults()
         Keychain.warmUp()
         // People who used Orbit before the welcome screen existed skip it.
         if UserDefaults.standard.bool(forKey: "didSeedSampleData") || Keychain.apiKey != nil {
             UserDefaults.standard.set(true, forKey: "onboarded")
+        }
+        // The tour is for new people; anyone already set up can open it from Orbit › Take the Tour.
+        if UserDefaults.standard.bool(forKey: "onboarded") && UserDefaults.standard.object(forKey: "tourSeen") == nil {
+            UserDefaults.standard.set(true, forKey: "tourSeen")
         }
         // Store the currency and name explicitly (not just implied by this Mac's region), so they sync to other devices.
         if UserDefaults.standard.string(forKey: "currencyCode") == nil {
@@ -108,6 +113,7 @@ struct OrbitApp: App {
         .commands {
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates…") { Task { await Updater.shared.checkAndReport() } }
+                Button("Take the Tour…") { state.tourOpen = true }
             }
             CommandGroup(after: .newItem) {
                 Button("Quick Capture") { CapturePanel.shared.show() }
@@ -131,6 +137,7 @@ struct OrbitApp: App {
         Settings {
             SettingsView()
                 .environmentObject(apple)
+                .environmentObject(state)
                 .modelContainer(container)
         }
 

@@ -32,6 +32,7 @@ enum Platform {
 
     /// The name Orbit calls you, with the Mac account name as a fallback.
     nonisolated static var userName: String {
+        if Snapshot.isDemo { return "Alex Morgan" }
         let saved = UserDefaults.standard.string(forKey: "userName") ?? ""
         return saved.isEmpty ? fullUserName : saved
     }

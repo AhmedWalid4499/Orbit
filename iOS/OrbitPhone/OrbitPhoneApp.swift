@@ -10,6 +10,12 @@ struct OrbitPhoneApp: App {
     let container: ModelContainer
 
     init() {
+        Snapshot.applyDemoDefaults()
+        // The tour is for new people; anyone already set up can open it from Settings › General.
+        let d = UserDefaults.standard
+        if d.object(forKey: "tourSeen") == nil && (d.bool(forKey: "phoneOnboarded") || CloudAuth.session != nil) {
+            d.set(true, forKey: "tourSeen")
+        }
         Keychain.warmUp()
         if UserDefaults.standard.string(forKey: "currencyCode") == nil {
             UserDefaults.standard.set(Fmt.currencyCode, forKey: "currencyCode")

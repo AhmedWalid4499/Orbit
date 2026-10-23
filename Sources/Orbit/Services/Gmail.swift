@@ -269,6 +269,15 @@ final class InboxStore: ObservableObject {
     private let cacheKey = "inboxDigestCache"
 
     private init() {
+        if Snapshot.isDemo {
+            accounts = ["alex@example.com"]
+            digest = InboxDigest(overview: "A quiet inbox: one reply needed and a delivery on its way.", headline: "1 reply, a delivery and a receipt",
+                                 highlights: ["Sara asked if Saturday dinner is still on", "Your headphones arrive tomorrow", "Spotify renewed for EGP 99"],
+                                 needsReply: [.init(account: "alex@example.com", from: "Sara", subject: "Dinner Saturday?", note: "Reply to confirm Saturday dinner at 8.", messageID: "demo1")],
+                                 important: [.init(account: "alex@example.com", from: "Amazon", subject: "Your order is on its way", note: "Headphones arrive tomorrow before 6 pm.", messageID: "demo2")],
+                                 otherCount: 14, scanned: 17, generatedAt: .now)
+            return
+        }
         if let data = UserDefaults.standard.data(forKey: cacheKey) {
             digest = try? JSONDecoder().decode(InboxDigest.self, from: data)
         }

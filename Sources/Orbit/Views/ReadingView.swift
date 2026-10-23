@@ -667,79 +667,158 @@ struct BookDetailSheet: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 26) {
-            VStack(spacing: 12) {
-                BookCover(book: book).frame(width: 150, height: 225)
-                Stars(rating: book.rating, size: 16) { book.rating = $0 }
-                Text(sourceLabel).font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
-            }
-            VStack(alignment: .leading, spacing: 14) {
-                TextField("Title", text: $book.title, axis: .vertical).textFieldStyle(.plain).font(Theme.display(24))
-                TextField("Author", text: $book.author).textFieldStyle(.plain).font(Theme.ui(15)).foregroundStyle(Theme.inkSecondary)
-                Picker("", selection: Binding(get: { book.status }, set: { book.status = $0 })) {
-                    ForEach(ReadingStatus.allCases) { Text($0.title).tag($0) }
+        ScrollView {
+            VStack(spacing: 22) {
+                hero
+                shelfPicker
+                if book.status == .reading { progressCard }
+                detailsCard
+                categoriesSection
+                VStack(alignment: .leading, spacing: 10) { bookExtras }
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Notes").font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkMuted)
+                    TextEditor(text: $book.notes)
+                        .font(Theme.display(14, weight: .regular))
+                        .scrollContentBackground(.hidden)
+                        .padding(8)
+                        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
+                        .frame(height: 110)
                 }
-                .pickerStyle(.segmented).labelsHidden()
-
-                if book.status == .reading {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Progress \(Int(book.progress * 100))%").font(Theme.ui(12, weight: .semibold))
-                        Slider(value: $book.progress, in: 0...1)
-                    }
-                }
-                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
-                    GridRow {
-                        Text("Pages").foregroundStyle(Theme.inkSecondary)
-                        TextField("", value: $book.pageCount, format: .number).textFieldStyle(.roundedBorder).frame(width: 90)
-                    }
-                    if book.status != .toRead {
-                        GridRow {
-                            Text("Started").foregroundStyle(Theme.inkSecondary)
-                            DatePicker("", selection: Binding(get: { book.startedAt ?? .now }, set: { book.startedAt = $0 }),
-                                       displayedComponents: .date).labelsHidden()
-                        }
-                    }
-                    if book.status == .read {
-                        GridRow {
-                            Text("Finished").foregroundStyle(Theme.inkSecondary)
-                            DatePicker("", selection: Binding(get: { book.finishedAt ?? .now }, set: { book.finishedAt = $0 }),
-                                       displayedComponents: .date).labelsHidden()
-                        }
-                    }
-                }
-                .font(Theme.ui(13))
-
-                Text("Categories").font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkMuted)
-                if categories.isEmpty {
-                    Text("Create categories from the Reading sidebar.").font(Theme.ui(12)).foregroundStyle(Theme.inkMuted)
-                }
-                FlowLayout(spacing: 6) {
-                    ForEach(categories) { c in
-                        let on = book.categories.contains(c.name)
-                        Text(c.name).font(Theme.ui(12, weight: .medium)).foregroundStyle(Theme.stickerInk)
-                            .padding(.horizontal, 10).padding(.vertical, 5)
-                            .background(Capsule().fill(BookPalette.color(c.colorIndex).opacity(on ? 1 : 0.3)))
-                            .onTapGesture { if on { book.categories.removeAll { $0 == c.name } } else { book.categories.append(c.name) } }
-                    }
-                }
-
-                bookExtras
-                Text("Notes").font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkMuted)
-                TextEditor(text: $book.notes)
-                    .font(Theme.display(14, weight: .regular))
-                    .scrollContentBackground(.hidden)
-                    .padding(8)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(Theme.card))
-                    .frame(height: 110)
                 HStack {
                     Button("Delete", role: .destructive) { context.delete(book); dismiss() }.buttonStyle(SoftButtonStyle())
                     Spacer()
                     Button("Done") { dismiss() }.buttonStyle(PrimaryButtonStyle()).frame(width: 110).keyboardShortcut(.defaultAction)
                 }
             }
+            .padding(.horizontal, Platform.isPhone ? 20 : 32)
+            .padding(.vertical, 24)
         }
-        .padding(28)
-        .sheetFrame(width: 640)
+        .scrollIndicators(.never)
+        .background(Theme.canvas)
+        .sheetFrame(width: 520, height: 760)
+    }
+
+    /// The cover, centred on a wash of its own colour, with the title, author and rating under it.
+    private var hero: some View {
+        let tint = BookPalette.color(book.title.unicodeScalars.reduce(0) { $0 + Int($1.value) })
+        return VStack(spacing: 10) {
+            BookCover(book: book).frame(width: 150, height: 225)
+                .shadow(color: .black.opacity(0.18), radius: 16, y: 10)
+                .padding(.bottom, 8)
+            TextField("Title", text: $book.title, axis: .vertical)
+                .textFieldStyle(.plain).font(Theme.display(24)).multilineTextAlignment(.center)
+            TextField("Author", text: $book.author)
+                .textFieldStyle(.plain).font(Theme.ui(15)).foregroundStyle(Theme.inkSecondary).multilineTextAlignment(.center)
+            Stars(rating: book.rating, size: 20) { book.rating = $0 }.padding(.top, 2)
+            Text(sourceLabel).font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24).padding(.horizontal, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(LinearGradient(colors: [tint.opacity(0.45), tint.opacity(0.08)], startPoint: .top, endPoint: .bottom))
+        )
+    }
+
+    /// One big button per shelf, the current one filled.
+    private var shelfPicker: some View {
+        HStack(spacing: 8) {
+            ForEach(ReadingStatus.allCases) { status in
+                let on = book.status == status
+                Button {
+                    withAnimation(.snappy(duration: 0.2)) { book.status = status }
+                } label: {
+                    VStack(spacing: 6) {
+                        Image(systemName: status.symbol).font(.system(size: 17, weight: .semibold))
+                        Text(status == .dnf ? "Stopped" : status.title).font(Theme.ui(12, weight: .semibold)).lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity).padding(.vertical, 12)
+                    .foregroundStyle(on ? Theme.stickerInk : Theme.inkSecondary)
+                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(on ? shelfColor(status) : Theme.card))
+                    .contentShape(RoundedRectangle(cornerRadius: 16))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func shelfColor(_ status: ReadingStatus) -> Color {
+        switch status {
+        case .reading: Theme.orange
+        case .toRead: Theme.cyan
+        case .read: Theme.lime
+        case .dnf: Theme.pink
+        }
+    }
+
+    private var progressCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Progress").font(Theme.ui(13, weight: .semibold))
+                Spacer()
+                Text("\(Int(book.progress * 100))%").font(Theme.ui(13, weight: .semibold)).monospacedDigit()
+            }
+            Slider(value: $book.progress, in: 0...1).tint(Theme.orange)
+        }
+        .padding(16)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Theme.card))
+    }
+
+    private var detailsCard: some View {
+        VStack(spacing: 0) {
+            detailRow("Pages") {
+                TextField("", value: $book.pageCount, format: .number).textFieldStyle(.plain)
+                    .multilineTextAlignment(.trailing).frame(width: 90)
+                    #if os(iOS)
+                    .keyboardType(.numberPad)
+                    #endif
+            }
+            if book.status != .toRead {
+                Divider()
+                detailRow("Started") {
+                    DatePicker("", selection: Binding(get: { book.startedAt ?? .now }, set: { book.startedAt = $0 }),
+                               displayedComponents: .date).labelsHidden()
+                }
+            }
+            if book.status == .read {
+                Divider()
+                detailRow("Finished") {
+                    DatePicker("", selection: Binding(get: { book.finishedAt ?? .now }, set: { book.finishedAt = $0 }),
+                               displayedComponents: .date).labelsHidden()
+                }
+            }
+        }
+        .font(Theme.ui(14))
+        .padding(.horizontal, 16)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Theme.card))
+    }
+
+    private func detailRow<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        HStack {
+            Text(title).foregroundStyle(Theme.inkSecondary)
+            Spacer()
+            content()
+        }
+        .frame(minHeight: 46)
+    }
+
+    private var categoriesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Categories").font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkMuted)
+            if categories.isEmpty {
+                Text("Create categories from the Reading sidebar.").font(Theme.ui(12)).foregroundStyle(Theme.inkMuted)
+            }
+            FlowLayout(spacing: 6) {
+                ForEach(categories) { c in
+                    let on = book.categories.contains(c.name)
+                    Text(c.name).font(Theme.ui(12, weight: .medium)).foregroundStyle(Theme.stickerInk)
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .background(Capsule().fill(BookPalette.color(c.colorIndex).opacity(on ? 1 : 0.3)))
+                        .onTapGesture { if on { book.categories.removeAll { $0 == c.name } } else { book.categories.append(c.name) } }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var sourceLabel: String {

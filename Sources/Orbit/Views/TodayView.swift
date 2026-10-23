@@ -76,12 +76,13 @@ struct TodayView: View {
     private let comfortableHeight: CGFloat = 780
 
     var body: some View {
+        // Always scrollable: the cards fill the window when they fit, and you scroll when there's more than fits
+        // (long AI summaries, a small screen), so nothing is ever cut off.
         GeometryReader { g in
-            if g.size.height >= comfortableHeight {
-                dashboard
-            } else {
-                ScrollView { dashboard.frame(height: comfortableHeight) }.scrollIndicators(.automatic)
+            ScrollView {
+                dashboard.frame(minHeight: max(g.size.height, comfortableHeight), alignment: .top)
             }
+            .scrollIndicators(.automatic)
         }
         .task {
             if gh.isConnected, gh.lastRefresh == nil { await gh.refresh() }

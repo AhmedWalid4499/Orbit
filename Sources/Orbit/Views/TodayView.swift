@@ -687,6 +687,12 @@ struct TaskRow: View {
                     if task.recurrence != .none {
                         Label(task.recurrence.title, systemImage: "repeat").foregroundStyle(Theme.inkMuted)
                     }
+                    if let r = task.remindAt, !task.isDone {
+                        Label(r.isSameDay(as: .now) ? Fmt.time(r) : "\(Fmt.relativeDay(r)) \(Fmt.time(r))", systemImage: "alarm").foregroundStyle(Theme.inkMuted)
+                    }
+                    if task.hasPlaceReminder && !task.isDone {
+                        Label(task.placeName, systemImage: task.placeOnLeave ? "figure.walk.departure" : "location.fill").foregroundStyle(Theme.inkMuted)
+                    }
                 }
                 .font(Theme.ui(11))
                 .labelStyle(.titleAndIcon)

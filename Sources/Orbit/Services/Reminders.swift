@@ -218,10 +218,14 @@ final class Reminders: NSObject, ObservableObject, UNUserNotificationCenterDeleg
                 at: at(next, 18), route: "review")
         }
 
+        // Your own reminders (at a time or a place) always get a slot; the automatic ones fill the rest.
+        let smart = SmartReminders.requests(tasks: allTasks, prefix: prefix)
+        requests += smart.timed
         let pending = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(prefix) }
         center.removePendingNotificationRequests(withIdentifiers: pending)
+        for r in smart.places { try? await center.add(r) }
         for r in requests.sorted(by: { ($0.trigger as? UNCalendarNotificationTrigger)?.nextTriggerDate() ?? .distantFuture
-                                      < ($1.trigger as? UNCalendarNotificationTrigger)?.nextTriggerDate() ?? .distantFuture }).prefix(60) {
+                                      < ($1.trigger as? UNCalendarNotificationTrigger)?.nextTriggerDate() ?? .distantFuture }).prefix(60 - smart.places.count) {
             try? await center.add(r)
         }
     }

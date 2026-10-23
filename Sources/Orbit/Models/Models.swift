@@ -54,6 +54,17 @@ final class TaskItem {
     var completedAt: Date?
     var createdAt: Date
     var recurrenceRaw: String
+    /// A reminder at an exact time ("remind me at 6pm").
+    var remindAt: Date? = nil
+    /// A reminder at a place: "when I get home", "when I'm near Carrefour". Empty name means none.
+    var placeName: String = ""
+    var placeLat: Double = 0
+    var placeLon: Double = 0
+    /// Remind when leaving the place instead of arriving.
+    var placeOnLeave: Bool = false
+
+    var hasPlaceReminder: Bool { !placeName.isEmpty && (placeLat != 0 || placeLon != 0) }
+    var placeReminderText: String { placeOnLeave ? "When you leave \(placeName)" : "When you get to \(placeName)" }
 
     init(title: String, area: Area = .personal, due: Date? = nil, priority: Int = 0,
          notes: String = "", recurrence: Recurrence = .none) {
@@ -88,8 +99,10 @@ final class TaskItem {
         isDone = true
         completedAt = .now
         if let due, let next = recurrence.next(after: due) {
-            context.insert(TaskItem(title: title, area: area, due: next, priority: priority,
-                                    notes: notes, recurrence: recurrence))
+            let t = TaskItem(title: title, area: area, due: next, priority: priority, notes: notes, recurrence: recurrence)
+            t.placeName = placeName; t.placeLat = placeLat; t.placeLon = placeLon; t.placeOnLeave = placeOnLeave
+            if let r = remindAt { t.remindAt = next.startOfDay.addingTimeInterval(r.timeIntervalSince(r.startOfDay)) }
+            context.insert(t)
         }
     }
 }

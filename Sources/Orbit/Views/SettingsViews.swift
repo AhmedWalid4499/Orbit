@@ -48,6 +48,7 @@ struct GeneralSettings: View {
         LabeledContent("Quick capture", value: "⌥Space (anywhere)")
         LabeledContent("Search", value: "⌘K")
         #endif
+        SavedPlacesSection()
         Section {
             Button("Take the tour") {
                 // On iPhone, Settings is a sheet: close it first so the tour can cover the screen.

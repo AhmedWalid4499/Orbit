@@ -45,7 +45,7 @@ final class DaySummaryStore: ObservableObject {
     private let cacheKey = "daySummaryCache"
 
     private init() {
-        if let d = UserDefaults.standard.data(forKey: cacheKey), let s = try? JSONDecoder().decode(DaySummary.self, from: d) { summary = s }
+        if !Snapshot.isDemo, let d = UserDefaults.standard.data(forKey: cacheKey), let s = try? JSONDecoder().decode(DaySummary.self, from: d) { summary = s }
     }
 
     var isToday: Bool { summary?.day == DayKey.key(.now) }

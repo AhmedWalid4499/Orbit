@@ -55,6 +55,7 @@ struct RootView: View {
             if tourSeen { WelcomeView() } else { TourView { tourSeen = true } }
         }
         .sheet(isPresented: $state.tourOpen) { TourView { state.tourOpen = false } }
+        .task { if ProcessInfo.processInfo.arguments.contains("-tour") { state.tourOpen = true } }
         .sheet(item: Binding(get: { focus.justFinished }, set: { focus.justFinished = $0 })) { FocusDoneSheet(session: $0) }
         .modifier(SplashOverlay())
         .task { focus.restore(context: context) }

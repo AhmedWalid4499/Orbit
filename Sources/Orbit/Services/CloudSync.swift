@@ -200,11 +200,18 @@ private let syncKinds: [SyncKind] = [
              fetch: { (try? $0.fetch(FetchDescriptor<TaskItem>())) ?? [] }, uuid: { ($0 as! TaskItem).uuid },
              encode: { m in let t = m as! TaskItem
                  return ["title": t.title, "notes": t.notes, "area": t.areaRaw, "due": J.date(t.due), "priority": t.priority,
-                         "isDone": t.isDone, "completedAt": J.date(t.completedAt), "createdAt": J.date(t.createdAt), "repeat": t.recurrenceRaw] },
+                         "isDone": t.isDone, "completedAt": J.date(t.completedAt), "createdAt": J.date(t.createdAt), "repeat": t.recurrenceRaw,
+                         "remindAt": J.date(t.remindAt),
+                         "place": ["name": t.placeName, "lat": t.placeLat, "lon": t.placeLon, "onLeave": t.placeOnLeave]] },
              apply: { d, m in let t = m as! TaskItem
                  t.title = J.str(d["title"]); t.notes = J.str(d["notes"]); t.areaRaw = J.str(d["area"]); t.due = J.date(d["due"])
                  t.priority = J.int(d["priority"]); t.isDone = J.bool(d["isDone"]); t.completedAt = J.date(d["completedAt"])
-                 t.createdAt = J.date(d["createdAt"]) ?? t.createdAt; t.recurrenceRaw = J.str(d["repeat"]).isEmpty ? "none" : J.str(d["repeat"]) },
+                 t.createdAt = J.date(d["createdAt"]) ?? t.createdAt; t.recurrenceRaw = J.str(d["repeat"]).isEmpty ? "none" : J.str(d["repeat"])
+                 // Only rows from an Orbit that knows reminders carry these (the Windows app doesn't yet).
+                 if d["remindAt"] != nil { t.remindAt = J.date(d["remindAt"]) }
+                 if let p = d["place"] as? [String: Any] {
+                     t.placeName = J.str(p["name"]); t.placeLat = J.num(p["lat"]); t.placeLon = J.num(p["lon"]); t.placeOnLeave = J.bool(p["onLeave"])
+                 } },
              make: { let t = TaskItem(title: ""); $0.insert(t); return t }),
     SyncKind(kind: "event",
              fetch: { (try? $0.fetch(FetchDescriptor<EventItem>())) ?? [] }, uuid: { ($0 as! EventItem).uuid },
@@ -375,7 +382,7 @@ private let syncedSettings = ["monthlyBudget", "readingGoal", "currencyCode", "a
                               "notify.tasks", "notify.events", "notify.bills", "notify.habits", "notify.journal", "notify.review",
                               "notify.subscriptions", "notify.documents", "notify.evening", "notify.trips", "notify.morningHour",
                               "notify.habitHour", "notify.journalHour", "notify.eventLead",
-                              "merchantRules", "categoryBudgets", "notify.budgets", "notify.bigCharges", "spendAlerts.sent"]
+                              "merchantRules", "categoryBudgets", "places.home", "places.work", "notify.budgets", "notify.bigCharges", "spendAlerts.sent"]
 
 // MARK: - Sync engine
 

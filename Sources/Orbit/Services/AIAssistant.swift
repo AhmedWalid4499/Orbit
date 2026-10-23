@@ -40,7 +40,7 @@ final class AIAssistant: ObservableObject {
     private let briefKey = "aiMorningBriefCache"
 
     private init() {
-        if let data = UserDefaults.standard.data(forKey: briefKey),
+        if !Snapshot.isDemo, let data = UserDefaults.standard.data(forKey: briefKey),
            let cached = try? JSONDecoder().decode(MorningBrief.self, from: data) {
             brief = cached
         }

@@ -238,6 +238,7 @@ struct TaskEditor: View {
                 }
             }
             .font(Theme.ui(13))
+            ReminderSection(task: task)
             Text("Notes").font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
             TextEditor(text: $task.notes)
                 .font(Theme.ui(14))

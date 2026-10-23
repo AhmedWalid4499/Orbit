@@ -83,10 +83,14 @@ struct OrbitApp: App {
         let url = URL.applicationSupportDirectory.appending(path: "Orbit", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         let config = ModelConfiguration(schema: schema, url: url.appending(path: "Orbit.store"))
-        do {
-            container = try ModelContainer(for: schema, configurations: config)
-        } catch {
-            fatalError("Could not open data store: \(error)")
+        if Snapshot.isDemo {
+            container = Snapshot.demoContainer()   // `-demo`: sample data in memory, your store isn't opened
+        } else {
+            do {
+                container = try ModelContainer(for: schema, configurations: config)
+            } catch {
+                fatalError("Could not open data store: \(error)")
+            }
         }
         CapturePanel.shared.container = container
         OrbitStore.container = container

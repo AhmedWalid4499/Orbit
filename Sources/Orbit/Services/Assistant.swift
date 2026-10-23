@@ -203,6 +203,7 @@ final class AssistantStore: ObservableObject {
         - What to wear: call get_weather, then suggest a concrete outfit for their plans today (check get_overview for events like the gym, a dinner, a flight): layers, shoes, umbrella, sunscreen, a jacket for the evening. Short and practical.
         - Doing tasks: you can calculate (splitting bills, tips, budgets, unit conversions, loan or savings maths, dates and ages; work it out step by step and give the answer first), write and rewrite (emails, messages, posts, summaries, translations), explain, plan and compare. Just do the task; don't tell them how they could do it.
         - Reviewing documents: when they send a file, read all of it. If they ask for a review, give the main points first, then what's unclear, risky or missing (for contracts: obligations, dates, fees, cancellation terms), and what you'd change. Quote the exact lines that matter.
+        - Reminders: "remind me to X when I get home / leave work / am near a pharmacy / at 6pm / in an hour" → create_task with remind_place or remind_at (and a due date of that day). Say it back casually ("I'll nudge you when you get home").
         - Places: when they mention a restaurant, café, shop, museum or any spot they liked or want to try, save it with add_place (Go to list).
         - Notes: when they ask you to write notes, a summary, a plan, a study sheet or a list, write the real, useful content yourself and save it with create_note; then tell them in a line or two what's in it. Don't save their request as the note. To add to or change an existing note, use list_notes, then update_note.
         - Use get_overview or get_money_summary when you need their current data instead of guessing.
@@ -270,10 +271,11 @@ enum AssistantTools {
             tool("list_books", "Books in the user's library, filtered by shelf.", [
                 "shelf": ["type": "string", "enum": ["all", "reading", "toRead", "read", "dnf"]],
             ]),
-            tool("create_task", "Create a task. due_date yyyy-MM-dd or empty for no date.", [
+            tool("create_task", "Create a task, optionally with a reminder. due_date yyyy-MM-dd or empty for no date. remind_at: local time yyyy-MM-ddTHH:mm for a reminder at a time (\"remind me at 6\", \"in 2 hours\"), else empty. remind_place: where to remind them, for \"when I get home\", \"when I'm at work\", \"when I'm near Carrefour\": \"home\", \"work\", a shop or place name (the nearest one is used) or a maps link; else empty. remind_on: \"arrive\" or \"leave\".", [
                 "title": ["type": "string"], "area": ["type": "string", "enum": areas], "due_date": ["type": "string"],
                 "priority": ["type": "integer", "description": "0 none, 1 low, 2 medium, 3 high"],
                 "repeat": ["type": "string", "enum": Recurrence.allCases.map(\.rawValue)], "notes": ["type": "string"],
+                "remind_at": ["type": "string"], "remind_place": ["type": "string"], "remind_on": ["type": "string", "enum": ["arrive", "leave"]],
             ]),
             tool("create_event", "Add an event to the calendar. start is local time yyyy-MM-ddTHH:mm.", [
                 "title": ["type": "string"], "start": ["type": "string"], "duration_minutes": ["type": "integer"],
@@ -369,9 +371,28 @@ enum AssistantTools {
                              priority: max(0, min(3, Int(num("priority")))), notes: str("notes"),
                              recurrence: Recurrence(rawValue: str("repeat")) ?? .none)
             context.insert(t)
-            let when = t.due.map { " · due \(Fmt.relativeDay($0))" } ?? ""
-            return Outcome(result: "Created task.", action: ChatItem(role: .action, text: "Task “\(title)”\(when)", symbol: "checklist",
-                                                                    undo: .models([t.persistentModelID])))
+            var when = t.due.map { " · due \(Fmt.relativeDay($0))" } ?? ""
+            var note = "Created task."
+            if let at = dayTime.date(from: str("remind_at")) {
+                t.remindAt = at
+                when += " · reminder \(Fmt.relativeDay(at)) \(Fmt.time(at))"
+            }
+            let placeText = str("remind_place")
+            if !placeText.isEmpty {
+                if let p = await SmartReminders.resolve(placeText) {
+                    t.placeName = p.name; t.placeLat = p.lat; t.placeLon = p.lon; t.placeOnLeave = str("remind_on") == "leave"
+                    SmartReminders.ensureLocationAccess()
+                    when += " · " + t.placeReminderText.lowercased().replacingOccurrences(of: "when you", with: "when you")
+                } else if ["home", "work"].contains(placeText.lowercased()) {
+                    note += " Couldn't set the place reminder: \(placeText) isn't saved yet. Tell the user to add it in Settings › General › Places."
+                } else {
+                    note += " Couldn't find \(placeText) on the map for the place reminder."
+                }
+            }
+            try? context.save()
+            Task { await Reminders.shared.reschedule(context: context, apple: apple) }
+            return Outcome(result: note, action: ChatItem(role: .action, text: "Task “\(title)”\(when)", symbol: "checklist",
+                                                         undo: .models([t.persistentModelID])))
 
         case "create_event":
             guard let start = dayTime.date(from: str("start")) else { return Outcome(result: "start must be yyyy-MM-ddTHH:mm", isError: true) }

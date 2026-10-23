@@ -108,6 +108,7 @@ final class ReviewStore: ObservableObject {
     private func key(_ week: Date) -> String { "weeklyReview-\(DayKey.key(week.startOfWeek))" }
 
     func load(week: Date) {
+        guard !Snapshot.isDemo else { reflection = nil; patterns = []; return }
         reflection = UserDefaults.standard.data(forKey: key(week)).flatMap { try? JSONDecoder().decode(WeeklyReflection.self, from: $0) }
         patterns = UserDefaults.standard.data(forKey: "lifePatterns").flatMap { try? JSONDecoder().decode([LifePattern].self, from: $0) } ?? []
     }

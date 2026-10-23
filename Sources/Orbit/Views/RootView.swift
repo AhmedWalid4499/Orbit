@@ -20,6 +20,7 @@ struct RootView: View {
             Group {
                 switch state.tab {
                 case .today: TodayView()
+                case .insights: InsightsDashboard()
                 case .calendar: CalendarWeekView()
                 case .tasks: TasksView()
                 case .habits: HabitsView()

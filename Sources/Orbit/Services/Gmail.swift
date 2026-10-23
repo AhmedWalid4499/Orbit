@@ -245,6 +245,10 @@ struct InboxDigest: Codable, Equatable {
         let messageID: String
     }
     var overview: String
+    /// A few words on the shape of the inbox, e.g. "2 replies needed, a security alert" (newer summaries).
+    var headline: String? = nil
+    /// 2-4 short points of what matters (newer summaries).
+    var highlights: [String]? = nil
     var needsReply: [Item]
     var important: [Item]
     var otherCount: Int
@@ -355,7 +359,9 @@ final class InboxStore: ObservableObject {
         let name = (Platform.userName).split(separator: " ").first.map(String.init) ?? "the user"
         let system = """
         You triage email for \(name) across their Gmail accounts. You get the last two days of inbox mail (promotions and social already filtered out), each with a reference number, sender, subject and a short snippet.
-        - overview: 1-2 calm sentences on what's going on across their inboxes. Mention the account when it matters.
+        - headline: at most 9 words capturing what matters most, e.g. "Uber needs a reply; Railway security alert". No full stop.
+        - highlights: 2-4 short points (each under 14 words) of what matters, most urgent first. Start with the person or company. Add the account in brackets only if there are several accounts and it helps.
+        - overview: the same in 1-2 calm sentences (used where there's no room for points).
         - needs_reply: messages where a real person is waiting on \(name) or a decision/action is clearly asked of them. At most 6. note = what they need to do, in under 15 words.
         - important: other messages worth knowing about (deadlines, bills, deliveries, security alerts, schedule changes). At most 6. note = the gist in under 15 words.
         - other_count: how many of the rest are routine.
@@ -369,16 +375,18 @@ final class InboxStore: ObservableObject {
         let schema: [String: Any] = [
             "type": "object",
             "properties": [
+                "headline": ["type": "string"],
+                "highlights": ["type": "array", "items": ["type": "string"]],
                 "overview": ["type": "string"],
                 "needs_reply": ["type": "array", "items": itemSchema],
                 "important": ["type": "array", "items": itemSchema],
                 "other_count": ["type": "integer"],
             ],
-            "required": ["overview", "needs_reply", "important", "other_count"],
+            "required": ["headline", "highlights", "overview", "needs_reply", "important", "other_count"],
             "additionalProperties": false,
         ]
         struct Ref: Decodable { let ref: Int; let note: String }
-        struct Out: Decodable { let overview: String; let needs_reply: [Ref]; let important: [Ref]; let other_count: Int }
+        struct Out: Decodable { let headline: String; let highlights: [String]; let overview: String; let needs_reply: [Ref]; let important: [Ref]; let other_count: Int }
         do {
             let out = try await claude.structured(Out.self, system: system, user: listing, schema: schema, effort: "medium")
             func items(_ refs: [Ref]) -> [InboxDigest.Item] {
@@ -388,7 +396,8 @@ final class InboxStore: ObservableObject {
                     return .init(account: m.account, from: Self.displayName(m.from), subject: m.subject, note: r.note, messageID: m.id)
                 }
             }
-            digest = InboxDigest(overview: out.overview, needsReply: items(out.needs_reply), important: items(out.important),
+            digest = InboxDigest(overview: out.overview, headline: out.headline, highlights: out.highlights,
+                                 needsReply: items(out.needs_reply), important: items(out.important),
                                  otherCount: out.other_count, scanned: mails.count, generatedAt: .now)
             save()
             if !failures.isEmpty { error = failures.joined(separator: "\n") }

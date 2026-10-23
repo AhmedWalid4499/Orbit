@@ -76,6 +76,22 @@ struct ProfileCard: Codable, Equatable {
             }
         }
 
+        /// The short "who" under the service name: in/yourname, @yourname, or the website's address.
+        var handle: String {
+            let d = display
+            let parts = d.split(separator: "/", maxSplits: 1).map(String.init)
+            let path = parts.count > 1 ? parts[1] : ""
+            switch kind {
+            case .linkedin: return path.isEmpty ? d : path
+            case .github, .x, .instagram, .tiktok, .youtube, .facebook, .behance, .dribbble:
+                if d.hasPrefix("@") { return d }
+                let last = path.split(separator: "/").last.map(String.init) ?? (parts.count == 1 && !d.contains(".") ? d : "")
+                return last.isEmpty ? d : (last.hasPrefix("@") ? last : "@" + last)
+            case .whatsapp: return value.trimmingCharacters(in: .whitespacesAndNewlines)
+            default: return parts.first ?? d
+            }
+        }
+
         /// Short text shown on the card (no https://, no trailing slash).
         var display: String {
             let v = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -132,7 +148,7 @@ struct ProfileCard: Codable, Equatable {
     var color: Color { Self.colors[min(max(colorIndex, 0), Self.colors.count - 1)] }
     var isDark: Bool { colorIndex == Self.colors.count - 1 }
 
-    var filledLinks: [Link] { links.filter { !$0.value.trimmingCharacters(in: .whitespaces).isEmpty } }
+    var filledLinks: [Link] { links.filter { !$0.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } }
 
     // MARK: Storage
 
@@ -198,7 +214,7 @@ struct ProfileCard: Codable, Equatable {
     func publicData(photo: PlatformImage?) -> [String: Any] {
         var d: [String: Any] = ["name": name, "headline": headline, "company": company, "location": location, "bio": bio,
                                 "colorIndex": colorIndex,
-                                "links": filledLinks.map { ["kind": $0.kind.rawValue, "url": $0.url, "display": $0.display] },
+                                "links": filledLinks.map { ["kind": $0.kind.rawValue, "url": $0.url, "display": $0.display, "title": $0.kind.title, "handle": $0.handle] },
                                 "email": publicShowContact ? email : "", "phone": publicShowContact ? phone : "", "photo": ""]
         if showPhoto, let photo, let jpeg = photo.square(side: 200, type: .jpeg, quality: 0.7) {
             d["photo"] = "data:image/jpeg;base64," + jpeg.base64EncodedString()

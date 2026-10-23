@@ -10,7 +10,7 @@ enum OrbitSchema {
 }
 
 enum Tab: String, CaseIterable, Identifiable {
-    case today, calendar, tasks, habits, bucket, money, notes, reading, documents, github
+    case today, insights, calendar, tasks, habits, bucket, money, notes, reading, documents, github
     var id: String { rawValue }
 
     var title: String {
@@ -27,6 +27,8 @@ enum Tab: String, CaseIterable, Identifiable {
             return "Bucket list"
         case .documents:
             return "Documents"
+        case .insights:
+            return "Insights"
         default:
             return rawValue.capitalized
         }
@@ -35,6 +37,7 @@ enum Tab: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .today: "sun.max.fill"
+        case .insights: "chart.xyaxis.line"
         case .calendar: "calendar"
         case .tasks: "checklist"
         case .habits: "flame.fill"
@@ -48,7 +51,7 @@ enum Tab: String, CaseIterable, Identifiable {
     }
 
     /// Nav groups: day, plan, life.
-    static let groups: [[Tab]] = [[.today], [.calendar, .tasks, .habits, .bucket], [.money, .notes, .reading, .documents, .github]]
+    static let groups: [[Tab]] = [[.today, .insights], [.calendar, .tasks, .habits, .bucket], [.money, .notes, .reading, .documents, .github]]
 
     /// ⌘1…⌘9 for the first nine tabs (there's no ⌘10).
     var shortcutNumber: Int? { let i = Tab.allCases.firstIndex(of: self)! + 1; return i <= 9 ? i : nil }

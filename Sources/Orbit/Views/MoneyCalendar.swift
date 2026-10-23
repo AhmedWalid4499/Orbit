@@ -60,43 +60,51 @@ struct MoneyCalendar: View {
         let upcoming = DuePayments.between(Date.now.startOfDay, Date.now.startOfDay.adding(days: 31), tasks: moneyTasks, transactions: transactions)
             .filter { !$0.paid }
 
-        HStack(alignment: .top, spacing: 20) {
-            VStack(spacing: 6) {
-                HStack(spacing: 6) {
-                    ForEach(gridDays.prefix(7), id: \.self) { d in
-                        Text(d.formatted(.dateTime.weekday(.abbreviated))).font(Theme.ui(12, weight: .semibold))
-                            .foregroundStyle(Theme.inkSecondary).frame(maxWidth: .infinity)
-                    }
+        let grid = VStack(spacing: compact ? 4 : 6) {
+            HStack(spacing: compact ? 4 : 6) {
+                ForEach(gridDays.prefix(7), id: \.self) { d in
+                    Text(d.formatted(.dateTime.weekday(compact ? .narrow : .abbreviated))).font(Theme.ui(12, weight: .semibold))
+                        .foregroundStyle(Theme.inkSecondary).frame(maxWidth: .infinity)
                 }
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 6) {
-                    ForEach(gridDays, id: \.self) { day in
-                        MoneyDayCell(day: day,
-                                     inMonth: Calendar.current.isDate(day, equalTo: month, toGranularity: .month),
-                                     spent: spentByDay[day] ?? 0,
-                                     due: due.filter { $0.date.isSameDay(as: day) },
-                                     selected: selected == day)
-                            .onTapGesture { selected = selected == day ? nil : day }
-                    }
-                }
-                legend
             }
-            .frame(maxWidth: .infinity)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: compact ? 4 : 6), count: 7), spacing: compact ? 4 : 6) {
+                ForEach(gridDays, id: \.self) { day in
+                    MoneyDayCell(day: day,
+                                 inMonth: Calendar.current.isDate(day, equalTo: month, toGranularity: .month),
+                                 spent: spentByDay[day] ?? 0,
+                                 due: due.filter { $0.date.isSameDay(as: day) },
+                                 selected: selected == day,
+                                 compact: compact)
+                        .onTapGesture { selected = selected == day ? nil : day }
+                }
+            }
+            legend
+        }
+        let side = VStack(alignment: .leading, spacing: 14) {
+            if let selected { dayDetail(selected, due: due.filter { $0.date.isSameDay(as: selected) }) }
+            upcomingCard(upcoming)
+        }
 
-            VStack(alignment: .leading, spacing: 14) {
-                if let selected { dayDetail(selected, due: due.filter { $0.date.isSameDay(as: selected) }) }
-                upcomingCard(upcoming)
+        // A phone stacks the month and the details; a Mac puts them side by side.
+        if compact {
+            VStack(alignment: .leading, spacing: 16) { grid; side }
+        } else {
+            HStack(alignment: .top, spacing: 20) {
+                grid.frame(maxWidth: .infinity)
+                side.frame(width: 340)
             }
-            .frame(width: 340)
         }
     }
 
+    private var compact: Bool { Platform.isPhone }
+
     private var legend: some View {
-        HStack(spacing: 16) {
+        FlowLayout(spacing: 16) {
             Label { Text("Due") } icon: { Circle().fill(Theme.orange).frame(width: 8, height: 8) }
             Label { Text("Paid") } icon: { Circle().fill(Theme.good).frame(width: 8, height: 8) }
             Label { Text("Spent that day") } icon: { Image(systemName: "creditcard") }
-            Spacer()
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .font(Theme.ui(11)).foregroundStyle(Theme.inkSecondary)
         .padding(.top, 4)
     }
@@ -159,9 +167,41 @@ struct MoneyDayCell: View {
     let spent: Double
     let due: [DuePayment]
     let selected: Bool
+    var compact = false
     @State private var hovering = false
 
     var body: some View {
+        if compact { phoneCell } else { macCell }
+    }
+
+    /// Phone: the day, a dot per payment due, and what was spent, short.
+    private var phoneCell: some View {
+        VStack(spacing: 3) {
+            Text(day.formatted(.dateTime.day()))
+                .font(Theme.ui(14, weight: day.isToday ? .bold : .medium))
+                .frame(width: 24, height: 24)
+                .background(Circle().fill(day.isToday ? Theme.lime : .clear))
+                .foregroundStyle(day.isToday ? Theme.stickerInk : Theme.ink)
+            HStack(spacing: 2) {
+                ForEach(due.prefix(3)) { d in Circle().fill(d.paid ? Theme.good : Theme.orange).frame(width: 5, height: 5) }
+            }
+            .frame(height: 5)
+            Text(spent > 0 ? Self.short(spent) : " ").font(Theme.ui(9, weight: .medium)).foregroundStyle(Theme.inkSecondary).lineLimit(1)
+        }
+        .padding(.vertical, 5)
+        .frame(maxWidth: .infinity)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.card))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.ink, lineWidth: selected ? 1.5 : 0))
+        .opacity(inMonth ? 1 : 0.35)
+        .contentShape(Rectangle())
+    }
+
+    /// 1,250 → "1.3k", without the currency, to fit a phone cell.
+    static func short(_ v: Double) -> String {
+        v >= 1000 ? String(format: v >= 10000 ? "%.0fk" : "%.1fk", v / 1000) : String(format: "%.0f", v)
+    }
+
+    private var macCell: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(day.formatted(.dateTime.day()))
                 .font(Theme.display(15, weight: day.isToday ? .bold : .medium))

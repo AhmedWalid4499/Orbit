@@ -342,15 +342,7 @@ struct PhoneToday: View {
                     }
                 }
                 if let d = inbox.digest {
-                    Text(d.overview).font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
-                    if !d.needsReply.isEmpty {
-                        Text("Needs a reply").font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkMuted)
-                        ForEach(d.needsReply) { MailRow(item: $0, tint: Theme.pink, multi: inbox.accounts.count > 1) }
-                    }
-                    if !d.important.isEmpty {
-                        Text("Worth knowing").font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkMuted)
-                        ForEach(d.important) { MailRow(item: $0, tint: Theme.cyan, multi: inbox.accounts.count > 1) }
-                    }
+                    InboxSummary(digest: d, multi: inbox.accounts.count > 1)
                 } else if let error = inbox.error {
                     Label(error, systemImage: "exclamationmark.triangle.fill").font(Theme.ui(12)).foregroundStyle(Theme.orange)
                 } else {

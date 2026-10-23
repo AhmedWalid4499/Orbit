@@ -9,6 +9,9 @@ struct CardFace: View {
     let card: ProfileCard
     let photo: PlatformImage?
     let qr: PlatformImage?
+    /// Links can be tapped (in the app); off when rendering the shareable image.
+    var interactive = true
+    @Environment(\.openURL) private var openURL
 
     private var ink: Color { card.isDark ? Color(hex: 0xF4F4F5) : Theme.stickerInk }
 
@@ -33,10 +36,16 @@ struct CardFace: View {
             if !card.bio.isEmpty {
                 Text(card.bio).font(.system(size: 14, design: .serif)).opacity(0.85).lineLimit(3).fixedSize(horizontal: false, vertical: true)
             }
-            VStack(alignment: .leading, spacing: 9) {
-                if !card.email.isEmpty { row("envelope.fill", card.email) }
-                if !card.phone.isEmpty { row("phone.fill", card.phone) }
-                ForEach(card.filledLinks.prefix(7)) { row($0.kind.symbol, $0.display) }
+            if !card.email.isEmpty || !card.phone.isEmpty {
+                HStack(spacing: 8) {
+                    if !card.email.isEmpty { contact("envelope.fill", card.email, url: "mailto:\(card.email)") }
+                    if !card.phone.isEmpty { contact("phone.fill", card.phone, url: "tel:\(card.phone.filter { $0.isNumber || $0 == "+" })") }
+                }
+            }
+            VStack(spacing: 7) {
+                ForEach(card.filledLinks.prefix(6)) { link in
+                    linkRow(link)
+                }
             }
             Spacer(minLength: 0)
             HStack(alignment: .bottom) {
@@ -51,7 +60,7 @@ struct CardFace: View {
                 Spacer()
                 if let qr {
                     qr.swiftUI.interpolation(.none).resizable()
-                        .frame(width: 150, height: 150)
+                        .frame(width: 124, height: 124)
                         .padding(8)
                         .background(RoundedRectangle(cornerRadius: 14).fill(.white))
                 }
@@ -63,13 +72,42 @@ struct CardFace: View {
         .background(RoundedRectangle(cornerRadius: 32, style: .continuous).fill(card.color))
     }
 
-    private func row(_ symbol: String, _ text: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: symbol).font(.system(size: 12, weight: .bold))
-                .frame(width: 28, height: 28)
-                .background(Circle().fill(ink.opacity(0.1)))
-            Text(text).font(.system(size: 14, weight: .medium)).lineLimit(1).truncationMode(.middle)
+    /// "LinkedIn" with the handle under it, like a button.
+    private func linkRow(_ link: ProfileCard.Link) -> some View {
+        Button { if interactive, let u = URL(string: link.url) { openURL(u) } } label: {
+            HStack(spacing: 11) {
+                Image(systemName: link.kind.symbol).font(.system(size: 12, weight: .bold))
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(ink.opacity(0.12)))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(link.kind == .other ? (link.handle.isEmpty ? "Link" : link.handle) : link.kind.title)
+                        .font(.system(size: 14, weight: .semibold))
+                    if link.kind != .other {
+                        Text(link.handle).font(.system(size: 11, weight: .medium)).opacity(0.65).lineLimit(1).truncationMode(.middle)
+                    }
+                }
+                Spacer(minLength: 6)
+                Image(systemName: "arrow.up.right").font(.system(size: 11, weight: .bold)).opacity(0.55)
+            }
+            .padding(.horizontal, 10).padding(.vertical, 7)
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(ink.opacity(0.07)))
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .disabled(!interactive)
+    }
+
+    private func contact(_ symbol: String, _ text: String, url: String) -> some View {
+        Button { if interactive, let u = URL(string: url) { openURL(u) } } label: {
+            HStack(spacing: 6) {
+                Image(systemName: symbol).font(.system(size: 10, weight: .bold))
+                Text(text).font(.system(size: 12, weight: .medium)).lineLimit(1).truncationMode(.middle)
+            }
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(Capsule().fill(ink.opacity(0.1)))
+        }
+        .buttonStyle(.plain)
+        .disabled(!interactive)
     }
 }
 
@@ -87,13 +125,19 @@ struct ProfileCardSheet: View {
     var body: some View {
         #if os(iOS)
         ScrollView {
-            VStack(spacing: 18) {
-                CardFace(card: card, photo: profile.photo, qr: qrImage)
-                    .shadow(color: .black.opacity(0.15), radius: 18, y: 10)
-                    .scaleEffect(0.86).frame(height: 500)
+            VStack(spacing: 16) {
+                // The card fills the width (minus margins) and the buttons line up with its edges.
+                GeometryReader { g in
+                    CardFace(card: card, photo: profile.photo, qr: qrImage)
+                        .scaleEffect(g.size.width / 420, anchor: .topLeading)
+                        .frame(width: g.size.width, height: g.size.height, alignment: .topLeading)
+                }
+                .aspectRatio(420.0 / 620.0, contentMode: .fit)
+                .shadow(color: .black.opacity(0.15), radius: 18, y: 10)
                 actions
                 editor
             }
+            .padding(.horizontal, 20)
             .padding(.vertical, 20)
         }
         .onChange(of: card) { old, new in
@@ -166,14 +210,27 @@ struct ProfileCardSheet: View {
 
                 group("Links") {
                     ForEach($card.links) { $link in
-                        HStack(spacing: 8) {
-                            Picker("", selection: $link.kind) {
-                                ForEach(ProfileCard.Link.Kind.allCases) { Label($0.title, systemImage: $0.symbol).tag($0) }
+                        let kindPicker = Picker("", selection: $link.kind) {
+                            ForEach(ProfileCard.Link.Kind.allCases) { Label($0.title, systemImage: $0.symbol).tag($0) }
+                        }
+                        .labelsHidden().fixedSize()
+                        let field = TextField(link.kind.placeholder, text: Binding(
+                            get: { link.value },
+                            set: { link.value = $0.trimmingCharacters(in: .newlines) }))
+                            .textFieldStyle(.roundedBorder)
+                            #if os(iOS)
+                            .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
+                            #endif
+                        let remove = Button { card.links.removeAll { $0.id == link.id } } label: { Image(systemName: "minus.circle") }
+                            .buttonStyle(.plain).foregroundStyle(Theme.inkMuted)
+                        if Platform.isPhone {
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack { kindPicker; Spacer(); remove }
+                                field
                             }
-                            .labelsHidden().frame(width: 130)
-                            TextField(link.kind.placeholder, text: $link.value).textFieldStyle(.roundedBorder)
-                            Button { card.links.removeAll { $0.id == link.id } } label: { Image(systemName: "minus.circle") }
-                                .buttonStyle(.plain).foregroundStyle(Theme.inkMuted)
+                            .padding(.vertical, 4)
+                        } else {
+                            HStack(spacing: 8) { kindPicker.frame(width: 130); field; remove }
                         }
                     }
                     Menu {
@@ -290,11 +347,11 @@ struct ProfileCardSheet: View {
             #if os(iOS)
             if let files {
                 ShareLink(items: [files.png, files.vcf]) { Label("Share card…", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity) }
-                    .buttonStyle(PrimaryButtonStyle()).padding(.horizontal, 24)
+                    .buttonStyle(PrimaryButtonStyle())
             }
             HStack(spacing: 10) {
-                Button { copyImage() } label: { Label("Copy image", systemImage: "doc.on.doc") }.buttonStyle(SoftButtonStyle())
-                Button { copyText() } label: { Label("Copy links", systemImage: "link") }.buttonStyle(SoftButtonStyle())
+                Button { copyImage() } label: { Label("Copy image", systemImage: "doc.on.doc").frame(maxWidth: .infinity) }.buttonStyle(SoftButtonStyle())
+                Button { copyText() } label: { Label("Copy links", systemImage: "link").frame(maxWidth: .infinity) }.buttonStyle(SoftButtonStyle())
             }
             #else
             HStack(spacing: 10) {
@@ -333,7 +390,7 @@ struct ProfileCardSheet: View {
     }
 
     @MainActor private func renderPNG() -> Data? {
-        let renderer = ImageRenderer(content: CardFace(card: card, photo: profile.photo, qr: qrImage).padding(20))
+        let renderer = ImageRenderer(content: CardFace(card: card, photo: profile.photo, qr: qrImage, interactive: false).padding(20))
         renderer.scale = 3
         guard let cg = renderer.cgImage else { return nil }
         return ImageData.encode(cg, size: CGSize(width: cg.width, height: cg.height), type: .png, quality: 1, crop: nil)

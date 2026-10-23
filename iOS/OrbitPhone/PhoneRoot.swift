@@ -133,6 +133,7 @@ struct PhoneSection: View {
 
     var body: some View {
         switch tab {
+        case .insights: InsightsDashboard().phoneChrome("Insights")
         case .habits: PhoneHabits()
         case .notes: PhoneNotes()
         case .reading: PhoneReading()

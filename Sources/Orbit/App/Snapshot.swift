@@ -82,7 +82,7 @@ extension Snapshot {
                 }
             }
             renderAlone("review", width: 920, height: 740, ReviewView(startOnInsights: false))
-            renderAlone("insights", width: 920, height: 740, ReviewView(startOnInsights: true))
+            renderAlone("review-insights", width: 920, height: 740, ReviewView(startOnInsights: true))
             for (i, a) in [0.6, 2.2, 4.0].enumerated() { renderAlone("splash-\(i)", width: size.width, height: size.height, SplashView(angle: a)) }
             renderAlone("plan-tomorrow", width: 1040, height: 720, PlanTomorrowSheet())
             if let trip = try? container.mainContext.fetch(FetchDescriptor<Trip>()).first {

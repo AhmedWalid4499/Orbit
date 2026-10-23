@@ -28,6 +28,10 @@
   .dark .links a { background: rgba(255,255,255,.08); }
   .dark .links a:hover { background: rgba(255,255,255,.16); }
   .kind { font-size: 11px; font-weight: 600; opacity: .6; min-width: 72px; }
+  .svc { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+  .svc b { font-weight: 600; font-size: 15px; }
+  .svc small { font-size: 12px; opacity: .65; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .go { opacity: .5; font-size: 14px; }
   .save { display: block; width: 100%; margin-top: 20px; padding: 14px; border: 0; border-radius: 999px; background: #111111; color: #fff;
           font: 600 15px Inter, system-ui, sans-serif; cursor: pointer; }
   .dark .save { background: #e6ff1f; color: #111111; }
@@ -90,7 +94,11 @@ function render(d) {
   if (d.email) list.append(el("li", {}, el("a", { href: "mailto:" + d.email }, el("span", { class: "kind" }, "Email"), d.email)));
   if (d.phone) list.append(el("li", {}, el("a", { href: "tel:" + d.phone.replace(/[^+\d]/g, "") }, el("span", { class: "kind" }, "Phone"), d.phone)));
   for (const l of d.links || []) {
-    list.append(el("li", {}, el("a", { href: safeURL(l.url), target: "_blank", rel: "noopener" }, el("span", { class: "kind" }, title(l.kind)), l.display || l.url)));
+    // "LinkedIn" with the handle under it; older cards without a title/handle fall back to the address.
+    const name = l.kind === "other" ? (l.handle || l.display || "Link") : (l.title || title(l.kind));
+    const handle = l.kind === "other" ? "" : (l.handle || l.display || "");
+    list.append(el("li", {}, el("a", { href: safeURL(l.url), target: "_blank", rel: "noopener" },
+      el("span", { class: "svc" }, el("b", {}, name), handle ? el("small", {}, handle) : null), el("span", { class: "go" }, "↗"))));
   }
   card.append(list);
   const save = el("button", { class: "save", type: "button" }, "Save contact");

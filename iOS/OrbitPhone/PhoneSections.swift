@@ -6,7 +6,7 @@ struct PhoneMore: View {
     @EnvironmentObject private var state: AppState
     @AppStorage("userName") private var userName = ""
 
-    private let sections: [Tab] = [.habits, .notes, .reading, .bucket, .documents, .github]
+    private let sections: [Tab] = [.insights, .habits, .notes, .reading, .bucket, .documents, .github]
 
     var body: some View {
         List {
@@ -45,6 +45,7 @@ struct PhoneMore: View {
         case .reading: Theme.purple
         case .bucket: Theme.cyan
         case .documents: Theme.mint
+        case .insights: Theme.lime
         default: Theme.card
         }
     }

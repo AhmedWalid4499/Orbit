@@ -388,17 +388,7 @@ struct TodayView: View {
                                 Label(error, systemImage: "exclamationmark.triangle.fill").font(Theme.ui(11)).foregroundStyle(Theme.orange)
                             }
                             if let d = inbox.digest {
-                                Text(d.overview).font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
-                                if !d.needsReply.isEmpty {
-                                    Text("Needs a reply").font(Theme.ui(11, weight: .semibold)).foregroundStyle(Theme.inkMuted).padding(.top, 2)
-                                    ForEach(d.needsReply) { MailRow(item: $0, tint: Theme.pink, multi: inbox.accounts.count > 1) }
-                                }
-                                if !d.important.isEmpty {
-                                    Text("Worth knowing").font(Theme.ui(11, weight: .semibold)).foregroundStyle(Theme.inkMuted).padding(.top, 2)
-                                    ForEach(d.important) { MailRow(item: $0, tint: Theme.cyan, multi: inbox.accounts.count > 1) }
-                                }
-                                Text("\(d.scanned) emails scanned · \(d.otherCount) routine · updated \(d.generatedAt.formatted(.relative(presentation: .named)))")
-                                    .font(Theme.ui(10)).foregroundStyle(Theme.inkMuted).padding(.top, 2)
+                                InboxSummary(digest: d, multi: inbox.accounts.count > 1)
                             } else if !inbox.loading {
                                 EmptyHint(symbol: "envelope", text: ai.hasKey ? "Refresh to summarise your inbox." : "Add your Anthropic API key to get summaries.")
                             }
@@ -537,6 +527,55 @@ struct AgendaRow: View {
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 12).fill(Theme.canvas))
         .opacity(past || dim ? 0.5 : 1)
+    }
+}
+
+/// The inbox summary, laid out to scan: a headline, counts, the few points that matter, then who to reply to.
+struct InboxSummary: View {
+    let digest: InboxDigest
+    let multi: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(digest.headline.flatMap { $0.isEmpty ? nil : $0 } ?? digest.overview)
+                .font(Theme.display(17)).fixedSize(horizontal: false, vertical: true)
+            FlowLayout(spacing: 6) {
+                if !digest.needsReply.isEmpty { chip("\(digest.needsReply.count) to reply", Theme.pink) }
+                if !digest.important.isEmpty { chip("\(digest.important.count) worth knowing", Theme.cyan) }
+                chip("\(digest.otherCount) routine", Theme.card, ink: Theme.inkSecondary)
+            }
+            if let points = digest.highlights, !points.isEmpty {
+                VStack(alignment: .leading, spacing: 5) {
+                    ForEach(points, id: \.self) { p in
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Circle().fill(Theme.inkMuted).frame(width: 5, height: 5).offset(y: -2)
+                            Text(p).font(Theme.ui(13)).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            } else if digest.headline != nil {
+                Text(digest.overview).font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
+            }
+            if !digest.needsReply.isEmpty {
+                section("Reply to")
+                ForEach(digest.needsReply) { MailRow(item: $0, tint: Theme.pink, multi: multi) }
+            }
+            if !digest.important.isEmpty {
+                section("Worth knowing")
+                ForEach(digest.important) { MailRow(item: $0, tint: Theme.cyan, multi: multi) }
+            }
+            Text("\(digest.scanned) emails from the last two days · updated \(digest.generatedAt.formatted(.relative(presentation: .named)))")
+                .font(Theme.ui(10)).foregroundStyle(Theme.inkMuted)
+        }
+    }
+
+    private func chip(_ text: String, _ fill: Color, ink: Color = Theme.stickerInk) -> some View {
+        Text(text).font(Theme.ui(11, weight: .semibold)).foregroundStyle(ink)
+            .padding(.horizontal, 9).padding(.vertical, 4).background(Capsule().fill(fill))
+    }
+
+    private func section(_ title: String) -> some View {
+        Text(title.uppercased()).font(Theme.ui(10, weight: .bold)).tracking(0.6).foregroundStyle(Theme.inkMuted).padding(.top, 4)
     }
 }
 

@@ -130,19 +130,27 @@ struct ReviewView: View {
                     Text(r.insight).font(Theme.display(15, weight: .regular)).italic().opacity(0.85)
                 }
                 Text("Focus for next week").font(Theme.ui(12, weight: .semibold)).opacity(0.7).padding(.top, 4)
-                HStack(alignment: .top, spacing: 10) {
-                    ForEach(r.focus) { f in
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(f.title).font(Theme.ui(14, weight: .semibold)).fixedSize(horizontal: false, vertical: true)
-                            Text(f.why).font(Theme.ui(11)).opacity(0.75).fixedSize(horizontal: false, vertical: true)
-                            Spacer(minLength: 0)
-                            Button(added.contains(f.title) ? "Added ✓" : "Add to next week") { addFocus(f) }
-                                .buttonStyle(.plain).font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.stickerInk)
-                                .padding(.horizontal, 10).padding(.vertical, 5).background(Capsule().fill(Theme.lime))
-                                .disabled(added.contains(f.title))
+                VStack(spacing: 8) {
+                    ForEach(Array(r.focus.enumerated()), id: \.element.id) { i, f in
+                        let done = added.contains(f.title)
+                        HStack(alignment: .top, spacing: 12) {
+                            Text("\(i + 1)").font(Theme.ui(12, weight: .bold)).foregroundStyle(Theme.stickerInk)
+                                .frame(width: 24, height: 24).background(Circle().fill([Theme.lime, Theme.pink, Theme.cyan][i % 3]))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(f.title).font(Theme.ui(14, weight: .semibold)).fixedSize(horizontal: false, vertical: true)
+                                Text(f.why).font(Theme.ui(12)).opacity(0.7).fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer(minLength: 8)
+                            Button { addFocus(f) } label: {
+                                Image(systemName: done ? "checkmark" : "plus").font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(done ? ink : Theme.stickerInk)
+                                    .frame(width: 30, height: 30)
+                                    .background(Circle().fill(done ? Color.white.opacity(0.15) : Theme.lime))
+                            }
+                            .buttonStyle(.plain).disabled(done)
+                            .help(done ? "Added to next week" : "Add to next week's tasks")
                         }
                         .padding(12)
-                        .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
                         .background(RoundedRectangle(cornerRadius: 14).fill(Color.white.opacity(0.07)))
                     }
                 }
@@ -228,13 +236,18 @@ struct InsightsView: View {
                 .frame(maxWidth: .infinity).padding(.vertical, 60)
             } else {
                 moodChart(points)
-                HStack(alignment: .top, spacing: 16) {
-                    weekdayChart(points).frame(width: 380)
+                if Platform.isPhone {
+                    weekdayChart(points)
                     patternsCard(facts)
+                } else {
+                    HStack(alignment: .top, spacing: 16) {
+                        weekdayChart(points).frame(width: 380)
+                        patternsCard(facts)
+                    }
                 }
             }
         }
-        .padding(.horizontal, 24).padding(.bottom, 24)
+        .padding(.horizontal, Platform.isPhone ? 16 : 24).padding(.bottom, 24)
         .task { if ai.hasKey && store.patterns.isEmpty { await store.explain(facts) } }
     }
 
@@ -248,17 +261,20 @@ struct InsightsView: View {
                         Text("\(p.day.formatted(.dateTime.weekday().day().month())) · \(Mood.faces[p.mood]) \(Mood.words[p.mood])")
                             .font(Theme.ui(12, weight: .medium))
                     } else {
-                        Text("Hover for details").font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
+                        Text(Platform.isPhone ? "Tap for details" : "Hover for details").font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
                     }
                 }
                 Chart(points) { p in
+                    AreaMark(x: .value("Day", p.day, unit: .day), yStart: .value("Base", 1), yEnd: .value("Mood", p.mood))
+                        .interpolationMethod(.monotone)
+                        .foregroundStyle(LinearGradient(colors: [Theme.purple.opacity(0.35), Theme.purple.opacity(0.02)], startPoint: .top, endPoint: .bottom))
                     LineMark(x: .value("Day", p.day, unit: .day), y: .value("Mood", p.mood))
                         .interpolationMethod(.monotone)
                         .foregroundStyle(Theme.ink)
-                        .lineStyle(StrokeStyle(lineWidth: 2))
-                    PointMark(x: .value("Day", p.day, unit: .day), y: .value("Mood", p.mood))
-                        .foregroundStyle(Theme.ink)
-                        .symbolSize(hovered.map { $0.isSameDay(as: p.day) } == true ? 90 : 30)
+                        .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                    if hovered.map({ $0.isSameDay(as: p.day) }) == true {
+                        PointMark(x: .value("Day", p.day, unit: .day), y: .value("Mood", p.mood)).foregroundStyle(Theme.ink).symbolSize(80)
+                    }
                 }
                 .chartYScale(domain: 1...5)
                 .chartYAxis {

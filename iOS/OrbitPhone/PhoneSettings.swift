@@ -29,7 +29,7 @@ struct PhoneSettings: View {
                 Section {
                     page("Account & sync", "person.crop.circle.fill", Theme.cyan, detail: cloud.email ?? "Not signed in") { AccountSettings() }
                     page("AI", "sparkles", Theme.lime, detail: ai.hasKey ? AssistantName.current : "Add your API key") { AISettings() }
-                    page("Connections", "link", Theme.purple, detail: nil) { ConnectionsSettings() }
+                    page("Connections", "link", Theme.purple, detail: nil) { PhoneConnections() }
                     page("Notifications", "bell.fill", Theme.orange, detail: nil) { NotificationSettingsView() }
                     page("General", "gearshape.fill", Theme.card, detail: nil) { GeneralSettings() }
                 }

@@ -210,7 +210,7 @@ struct AISettings: View {
             } header: {
                 Text("Claude")
             } footer: {
-                Text("Uses \(ClaudeClient.model). The key is stored in your macOS Keychain, never in a file.")
+                Text("Uses \(ClaudeClient.model). The key is stored in your \(Platform.isPhone ? "iPhone's" : "Mac's") Keychain, never in a file.")
             }
 
             Section("Your assistant") {
@@ -223,7 +223,7 @@ struct AISettings: View {
                 Toggle(isOn: $ai.smartCaptureEnabled) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Smart capture")
-                        Text("⌥Space text is sorted by \(AssistantName.current), and one line can hold several items. Falls back to the offline parser if the API is unreachable.")
+                        Text("\(Platform.isPhone ? "Quick add" : "⌥Space") text is sorted by \(AssistantName.current), and one line can hold several items. Falls back to the offline parser if the API is unreachable.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }

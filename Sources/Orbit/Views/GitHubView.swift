@@ -67,12 +67,27 @@ struct GitHubView: View {
     }
 
     private var header: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 16) {
+                profile
+                Spacer()
+                headerActions
+            }
+            VStack(alignment: .leading, spacing: 12) {
+                profile
+                FlowLayout(spacing: 8) { headerActions }
+            }
+        }
+    }
+
+    private var profile: some View {
         HStack(spacing: 16) {
             AsyncImage(url: URL(string: gh.profile?.avatarURL ?? "")) { $0.resizable() } placeholder: { Circle().fill(Theme.card) }
                 .frame(width: 60, height: 60).clipShape(Circle())
             VStack(alignment: .leading, spacing: 3) {
-                Text(gh.profile?.name.isEmpty == false ? gh.profile!.name : "@\(gh.username)").font(Theme.display(34))
-                HStack(spacing: 10) {
+                Text(gh.profile?.name.isEmpty == false ? gh.profile!.name : "@\(gh.username)").font(Theme.display(Platform.isPhone ? 26 : 34))
+                    .lineLimit(1).minimumScaleFactor(0.7)
+                FlowLayout(spacing: 6) {
                     Text("@\(gh.username)")
                     if let p = gh.profile {
                         Text("· \(p.followers) followers · \(p.following) following")
@@ -80,23 +95,25 @@ struct GitHubView: View {
                     if !gh.hasToken { Text("· public data only").foregroundStyle(Theme.inkMuted) }
                 }
                 .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
-                if let bio = gh.profile?.bio, !bio.isEmpty { Text(bio).font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary) }
-            }
-            Spacer()
-            if gh.loading { ProgressView().controlSize(.small) }
-            else if let last = gh.lastRefresh {
-                Text("Updated \(last.formatted(.relative(presentation: .named)))").font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
-            }
-            Button { Task { await gh.refresh() } } label: { Label("Refresh", systemImage: "arrow.clockwise") }
-                .buttonStyle(SoftButtonStyle()).disabled(gh.loading)
-            if let url = gh.profile.flatMap({ URL(string: $0.htmlURL) }) {
-                Button { openURL(url) } label: { Label("Open GitHub", systemImage: "arrow.up.right") }.buttonStyle(SoftButtonStyle())
+                if let bio = gh.profile?.bio, !bio.isEmpty { Text(bio).font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true) }
             }
         }
     }
 
+    @ViewBuilder private var headerActions: some View {
+        if gh.loading { ProgressView().controlSize(.small) }
+        else if let last = gh.lastRefresh {
+            Text("Updated \(last.formatted(.relative(presentation: .named)))").font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
+        }
+        Button { Task { await gh.refresh() } } label: { Label("Refresh", systemImage: "arrow.clockwise") }
+            .buttonStyle(SoftButtonStyle()).disabled(gh.loading)
+        if let url = gh.profile.flatMap({ URL(string: $0.htmlURL) }) {
+            Button { openURL(url) } label: { Label("Open GitHub", systemImage: "arrow.up.right") }.buttonStyle(SoftButtonStyle())
+        }
+    }
+
     private var statRow: some View {
-        HStack(spacing: 12) {
+        AdaptiveStack(grid: true) {
             GHStat(value: "\(gh.repos.filter { !$0.isArchived }.count)", label: "Repositories", color: Theme.lime)
             GHStat(value: "\(gh.repos.filter { !$0.isFork }.reduce(0) { $0 + $1.stars })", label: "Stars earned", color: Theme.orange)
             GHStat(value: "\(gh.pullRequests.count)", label: "Open PRs", color: Theme.cyan)
@@ -116,6 +133,7 @@ struct GitHubView: View {
                     Spacer()
                     Text("\(gh.totalContributions) in the last year").font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
                 }
+                ScrollView(.horizontal) {
                 HStack(alignment: .top, spacing: 3) {
                     ForEach(weeks.indices, id: \.self) { w in
                         VStack(spacing: 3) {
@@ -128,6 +146,9 @@ struct GitHubView: View {
                         }
                     }
                 }
+                }
+                .scrollIndicators(.never)
+                .defaultScrollAnchor(.trailing) // the latest weeks first, when it doesn't all fit
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
@@ -142,11 +163,12 @@ struct GitHubView: View {
                     Spacer()
                     HStack(spacing: 6) {
                         Image(systemName: "magnifyingglass").foregroundStyle(Theme.inkMuted)
-                        TextField("Filter", text: $query).textFieldStyle(.plain).frame(width: 110)
+                        TextField("Filter", text: $query).textFieldStyle(.plain).frame(width: Platform.isPhone ? 80 : 110)
                     }
                     .padding(.horizontal, 10).padding(.vertical, 6)
                     .background(Capsule().fill(Theme.canvas))
                 }
+                ScrollView(.horizontal) {
                 HStack(spacing: 6) {
                     ForEach(["Active", "All", "Public", "Private", "Forks", "Archived"], id: \.self) { f in
                         Button(f) { filter = f }
@@ -157,6 +179,8 @@ struct GitHubView: View {
                             .background(Capsule().fill(filter == f ? Theme.inverse : Theme.canvas))
                     }
                 }
+                }
+                .scrollIndicators(.never)
                 if visibleRepos.isEmpty && !gh.loading { EmptyHint(symbol: "folder", text: "No repositories here.") }
                 ForEach(visibleRepos) { r in
                     Button { if let u = URL(string: r.htmlURL) { openURL(u) } } label: { RepoRow(repo: r) }

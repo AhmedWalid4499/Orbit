@@ -834,6 +834,7 @@ struct ReadingSourcesSheet: View {
     @ObservedObject private var sync = ReadingSync.shared
     @State private var busy: String?
     @State private var importingCSV = false
+    @Query private var books: [Book]
 
     var body: some View {
         ScrollView {
@@ -842,6 +843,22 @@ struct ReadingSourcesSheet: View {
                 Text("Books are matched by title and author, so syncing again never creates duplicates, and shelves you set in Orbit are never moved backwards.")
                     .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
 
+                if Platform.isPhone {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Toggle("Refresh every day", isOn: $sync.autoSync).font(Theme.ui(14, weight: .medium))
+                        HStack {
+                            if sync.lastSync > 0 {
+                                Text("Last refresh \(Date(timeIntervalSince1970: sync.lastSync).formatted(.relative(presentation: .named)))")
+                                    .font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
+                            }
+                            Spacer()
+                            Button(sync.running ? "Syncing…" : "Sync now") { Task { await sync.syncAll(context: context) } }
+                                .buttonStyle(SoftButtonStyle()).disabled(sync.running || Goodreads.userID(from: sync.goodreadsUser) == nil)
+                        }
+                    }
+                    .padding(14)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(Theme.blush))
+                } else {
                 HStack {
                     Toggle("Refresh every day automatically", isOn: $sync.autoSync).font(Theme.ui(13, weight: .medium))
                     Spacer()
@@ -854,6 +871,7 @@ struct ReadingSourcesSheet: View {
                 }
                 .padding(14)
                 .background(RoundedRectangle(cornerRadius: 14).fill(Theme.blush))
+                }
 
                 source("Goodreads", symbol: "g.circle.fill", color: Theme.peach, key: "goodreads", linked: Goodreads.userID(from: sync.goodreadsUser) != nil) {
                     Text("Orbit reads your public Goodreads shelves. Paste your profile link or user ID (goodreads.com/user/show/12345-yourname).")
@@ -868,6 +886,7 @@ struct ReadingSourcesSheet: View {
                     Button("Import library export (CSV)…") { importingCSV = true }.font(Theme.ui(11)).disabled(busy != nil)
                 }
 
+                #if os(macOS)
                 if !LocalLibraries.hasAccess { fullDiskAccessGuide }
 
                 source("Apple Books", symbol: "book.fill", color: Theme.orange, key: "apple", linked: sync.appleBooksLinked) {
@@ -898,6 +917,9 @@ struct ReadingSourcesSheet: View {
                         .disabled(busy != nil || !LocalLibraries.hasAccess)
                     }
                 }
+                #else
+                macLibrariesNote
+                #endif
 
                 HStack {
                     Spacer()
@@ -919,6 +941,27 @@ struct ReadingSourcesSheet: View {
                 sync.setResult("goodreads", error.localizedDescription)
             }
         }
+    }
+
+    /// iPhone can't read the Apple Books or Kindle libraries; Orbit on the Mac imports them and they sync here.
+    private var macLibrariesNote: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "laptopcomputer").font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.stickerInk)
+                .frame(width: 34, height: 34).background(RoundedRectangle(cornerRadius: 10).fill(Theme.cyan))
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Apple Books and Kindle").font(Theme.ui(15, weight: .semibold))
+                Text("iPhone doesn't let apps read these libraries, so Orbit on your Mac imports them and the books appear here on their own.")
+                    .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
+                let counts = (apple: books.filter { $0.sources.contains("apple-books") || $0.source == "apple-books" }.count,
+                              kindle: books.filter { $0.sources.contains("kindle") || $0.source == "kindle" }.count)
+                if counts.apple + counts.kindle > 0 {
+                    Text("\(counts.apple) from Apple Books · \(counts.kindle) from Kindle").font(Theme.ui(12, weight: .medium)).foregroundStyle(Theme.good)
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
     }
 
     /// Orbit doesn't appear in the Full Disk Access list on its own, so walk through adding it.

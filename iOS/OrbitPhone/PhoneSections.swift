@@ -179,7 +179,7 @@ struct PhoneReading: View {
                 }
                 HStack(spacing: 10) {
                     Button { adding = true } label: { Label("Add book", systemImage: "plus") }.buttonStyle(SoftButtonStyle())
-                    Button { sources = true } label: { Label("Connect & import", systemImage: "arrow.triangle.2.circlepath") }.buttonStyle(SoftButtonStyle())
+                    Button { sources = true } label: { Label("Goodreads sync", systemImage: "arrow.triangle.2.circlepath") }.buttonStyle(SoftButtonStyle())
                 }
                 ScrollView(.horizontal) {
                     HStack(spacing: 8) {

@@ -102,7 +102,7 @@ struct PhoneConnections: View {
                     Spacer()
                     Button(goodreadsUser.isEmpty ? "Connect" : "Options") { readingSources = true }.buttonStyle(SoftButtonStyle())
                 }
-                Text("Apple Books and Kindle import on the Mac; the books then sync here.").font(Theme.ui(12)).foregroundStyle(Theme.inkMuted)
+                Text("Apple Books and Kindle are imported by Orbit on your Mac, and the books then appear here on their own.").font(Theme.ui(12)).foregroundStyle(Theme.inkMuted)
             }
         }
         .sheet(isPresented: $readingSources) { ReadingSourcesSheet() }

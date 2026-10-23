@@ -526,6 +526,7 @@ final class ReadingSync: ObservableObject {
                 lastResults["goodreads"] = "Synced \(items.count) books — \(out.added) new."
             } catch { lastResults["goodreads"] = error.localizedDescription }
         }
+        guard !Platform.isPhone else { lastSync = Date.now.timeIntervalSince1970; return }  // the Mac imports these
         if appleBooksLinked { importLocal("apple", source: "apple-books", category: "Apple Books", context: context, load: AppleBooks.load) }
         if kindleLinked { importLocal("kindle", source: "kindle", category: "Kindle", context: context, load: KindleMac.load) }
         lastSync = Date.now.timeIntervalSince1970

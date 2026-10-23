@@ -46,7 +46,7 @@ struct BucketListView: View {
             VStack(alignment: .leading, spacing: 22) {
                 header
                 HStack(spacing: 0) {
-                    ForEach([("dreams", "Dreams", "sparkles"), ("goto", "Go to", "mappin.and.ellipse")], id: \.0) { key, label, symbol in
+                    ForEach([("dreams", "Dreams", "sparkles"), ("goals", "Goals", "flag.checkered"), ("goto", "Go to", "mappin.and.ellipse")], id: \.0) { key, label, symbol in
                         Button { withAnimation(.snappy) { section = key } } label: {
                             Label(label, systemImage: symbol).font(Theme.ui(14, weight: .semibold)).lineLimit(1).fixedSize()
                                 .foregroundStyle(section == key ? Theme.onInverse : Theme.ink)
@@ -61,6 +61,8 @@ struct BucketListView: View {
                 .background(Capsule().fill(Theme.card))
                 if section == "goto" {
                     GoToSection()
+                } else if section == "goals" {
+                    GoalsSection()
                 } else {
                     TripsSection(open: $openTrip)
                     if !upcoming.isEmpty { lookingForward }

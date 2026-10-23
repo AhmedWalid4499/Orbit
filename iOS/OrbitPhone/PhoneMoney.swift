@@ -47,7 +47,7 @@ struct PhoneMoney: View {
                 }
 
                 Picker("", selection: $mode) {
-                    Text("Overview").tag("overview"); Text("Calendar").tag("calendar"); Text("Subscriptions").tag("subscriptions")
+                    Text("Overview").tag("overview"); Text("Calendar").tag("calendar"); Text("Bills").tag("bills"); Text("Subs").tag("subscriptions")
                 }
                 .pickerStyle(.segmented)
 
@@ -55,6 +55,8 @@ struct PhoneMoney: View {
                     MoneyCalendar(month: month, transactions: all)
                 } else if mode == "subscriptions" {
                     SubscriptionsView()
+                } else if mode == "bills" {
+                    BillsView()
                 } else {
                     ScrollView(.horizontal) {
                         HStack(spacing: 10) {
@@ -67,6 +69,7 @@ struct PhoneMoney: View {
                     }
                     .scrollIndicators(.never)
                     autoLogCard
+                    WeeklyMoneyCard()
                     MoneyCoachCard()
                     chart
                     categories

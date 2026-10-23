@@ -26,7 +26,7 @@ struct PhoneTasks: View {
         case .all: list = open
         case .completed: return tasks.filter(\.isDone).sorted { ($0.completedAt ?? .now) > ($1.completedAt ?? .now) }
         case .area(let a): list = open.filter { $0.area == a }
-        case .reminders: return []
+        case .reminders, .shared: return []
         }
         return list.sorted {
             if $0.priority != $1.priority { return $0.priority > $1.priority }
@@ -35,7 +35,7 @@ struct PhoneTasks: View {
     }
 
     private var filters: [Filter] {
-        [.today, .upcoming, .inbox, .all, .completed] + Area.allCases.map { .area($0) } + (apple.remindersEnabled ? [.reminders] : [])
+        [.today, .upcoming, .inbox, .all, .completed, .shared] + Area.allCases.map { .area($0) } + (apple.remindersEnabled ? [.reminders] : [])
     }
 
     var body: some View {
@@ -44,7 +44,7 @@ struct PhoneTasks: View {
                 ScrollView(.horizontal) {
                     HStack(spacing: 8) {
                         ForEach(filters, id: \.self) { f in
-                            let n = f == .reminders ? apple.reminders.count : items(for: f).count
+                            let n = f == .reminders ? apple.reminders.count : f == .shared ? 0 : items(for: f).count
                             Button { withAnimation(.snappy) { filter = f } } label: {
                                 HStack(spacing: 5) {
                                     Image(systemName: f.symbol).font(.system(size: 11, weight: .semibold))
@@ -65,24 +65,28 @@ struct PhoneTasks: View {
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
 
-                HStack(spacing: 10) {
-                    Image(systemName: "plus").foregroundStyle(Theme.inkMuted)
-                    TextField("Add a task: “pay rent friday #money !!”", text: $draft)
-                        .font(Theme.ui(15)).focused($adding).submitLabel(.done).onSubmit(add)
-                    MicButton { heard in draft = heard; add() }
-                }
-                .padding(.leading, 14).padding(.trailing, 6).padding(.vertical, 6)
-                .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
-                .listRowBackground(Color.clear)
-                if !draft.isEmpty {
-                    Text(QuickParser.parse(draft).summary).font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
-                        .listRowBackground(Color.clear)
+                if filter != .shared {
+                    HStack(spacing: 10) {
+                        Image(systemName: "plus").foregroundStyle(Theme.inkMuted)
+                        TextField("Add a task: “pay rent friday #money !!”", text: $draft)
+                            .font(Theme.ui(15)).focused($adding).submitLabel(.done).onSubmit(add)
+                        MicButton { heard in draft = heard; add() }
+                    }
+                    .padding(.leading, 14).padding(.trailing, 6).padding(.vertical, 6)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
+                    .listRowBackground(Color.clear)
+                    if !draft.isEmpty {
+                        Text(QuickParser.parse(draft).summary).font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
+                            .listRowBackground(Color.clear)
+                    }
                 }
             }
             .listRowSeparator(.hidden)
 
-            if filter == .reminders {
+            if filter == .shared {
+                SharedListsView().padding(.horizontal, 16).listRowInsets(EdgeInsets()).listRowBackground(Color.clear).listRowSeparator(.hidden)
+            } else if filter == .reminders {
                 if apple.reminders.isEmpty { hint("applelogo", "No open reminders.") }
                 ForEach(apple.reminders) { ReminderRow(reminder: $0).plainRow() }
             } else if filter == .upcoming {

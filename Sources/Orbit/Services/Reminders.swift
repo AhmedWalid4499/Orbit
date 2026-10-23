@@ -23,6 +23,7 @@ final class Reminders: NSObject, ObservableObject, UNUserNotificationCenterDeleg
     @AppStorage("notify.documents") var documents = true
     @AppStorage("notify.evening") var evening = true
     @AppStorage("notify.trips") var trips = true
+    @AppStorage("notify.weeklyMoney") var weeklyMoney = true
     @AppStorage("notify.morningHour") var morningHour = 9
     @AppStorage("notify.habitHour") var habitHour = 20
     @AppStorage("notify.journalHour") var journalHour = 21
@@ -107,6 +108,20 @@ final class Reminders: NSObject, ObservableObject, UNUserNotificationCenterDeleg
                 guard let due = t.due, due >= tomorrow, due < dayAfter.adding(days: 1) else { continue }
                 add("bill-\(t.uuid.isEmpty ? t.title : t.uuid)", "Bill due tomorrow", t.title.replacingOccurrences(of: "Pay ", with: ""),
                     at: at(due.adding(days: -1), 18), route: "money")
+            }
+            // Money › Bills: a few days before (unless it's already paid), and on the day.
+            let txns = (try? context.fetch(FetchDescriptor<Transaction>())) ?? []
+            for b in (try? context.fetch(FetchDescriptor<Bill>())) ?? [] {
+                let c = BillTracker.current(b, transactions: txns, now: now)
+                guard !c.isPaid else { continue }
+                let id = b.uuid.isEmpty ? b.name : b.uuid
+                let amount = b.amount > 0 ? " (\(Fmt.money(b.amount)))" : ""
+                if b.remindDays > 0 {
+                    add("billsoon-\(id)", "\(b.name) is due in \(b.remindDays) day\(b.remindDays == 1 ? "" : "s")",
+                        "Due \(c.due.formatted(.dateTime.weekday(.wide).day().month()))\(amount).", at: at(c.due.adding(days: -b.remindDays), 10), route: "money")
+                }
+                add("billday-\(id)", "\(b.name) is due today", "Pay it today\(amount). Orbit marks it paid when the payment shows up.",
+                    at: at(c.due, 9), route: "money")
             }
         }
 
@@ -210,6 +225,19 @@ final class Reminders: NSObject, ObservableObject, UNUserNotificationCenterDeleg
             }
         }
 
+        if weeklyMoney {
+            // Sunday at 7 pm: where the money went this week.
+            var next = today
+            while cal.component(.weekday, from: next) != 1 || at(next, 19) <= now { next = next.adding(days: 1) }
+            let r = WeeklyMoney.report(transactions: (try? context.fetch(FetchDescriptor<Transaction>())) ?? [],
+                                       subscriptions: (try? context.fetch(FetchDescriptor<Subscription>())) ?? [],
+                                       bills: (try? context.fetch(FetchDescriptor<Bill>())) ?? [], now: now)
+            // Figures are only right if it's already Sunday; otherwise keep it general.
+            let body = next.isSameDay(as: today) ? WeeklyMoney.headline(r) : "See where your money went this week."
+            add("money-\(DayKey.key(next))", "Your week in money", body + (r.flags.isEmpty ? "" : " \(r.flags.count) thing\(r.flags.count == 1 ? "" : "s") to look at."),
+                at: at(next, 19), route: "money")
+        }
+
         if review {
             // Next Sunday at 6 pm.
             var next = today
@@ -280,7 +308,8 @@ struct NotificationSettingsView: View {
             Section("Remind me about") {
                 Toggle("Tasks due today and overdue tasks", isOn: $r.tasks)
                 Toggle("Events about to start", isOn: $r.events)
-                Toggle("Bills due tomorrow", isOn: $r.bills)
+                Toggle("Bills coming up and due today", isOn: $r.bills)
+                Toggle("Your week in money, Sunday evening", isOn: $r.weeklyMoney)
                 Toggle("Habits not done yet, in the evening", isOn: $r.habits)
                 Toggle("Journal check-in at night", isOn: $r.journal)
                 Toggle("Weekly review on Sunday evening", isOn: $r.review)

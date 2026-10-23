@@ -49,6 +49,8 @@ extension Snapshot {
             withDefault("calendarMode", "day") { render("calendar-day", tab: .calendar, appearance: .aqua) }
             withDefault("moneyTab", "calendar") { render("money-calendar", tab: .money, appearance: .aqua) }
             withDefault("moneyTab", "subscriptions") { render("money-subscriptions", tab: .money, appearance: .aqua) }
+            withDefault("moneyTab", "bills") { render("money-bills", tab: .money, appearance: .aqua); render("money-bills", tab: .money, appearance: .darkAqua) }
+            withDefault("bucketSection", "goals") { render("goals", tab: .bucket, appearance: .aqua); render("goals", tab: .bucket, appearance: .darkAqua) }
             render("assistant", tab: .today, appearance: .aqua) { $0.assistantOpen = true }
             // Sample profile card (made-up details), rendered the way the share button exports it.
             var demo = ProfileCard()
@@ -104,6 +106,10 @@ extension Snapshot {
             renderAlone("github-connect", width: 640, height: 520, ScrollView { GitHubConnectCard().padding(24) })
             renderAlone("tabs", width: 520, height: 720, Form { TabsSection() }.formStyle(.grouped))
             renderAlone("inbox-window", width: 520, height: 360, Form { InboxWindowControls() }.formStyle(.grouped))
+            renderAlone("memory", width: 520, height: 420, Form { MemorySection() }.formStyle(.grouped))
+            renderAlone("shared-lists", width: 760, height: 640, wait: 1, ScrollView { SharedListsView().padding(28) }.background(Theme.canvas))
+            renderAlone("bill-editor", width: 460, height: 540, BillEditor(bill: nil))
+            renderAlone("goal-editor", width: 500, height: 600, GoalEditor(goal: nil))
             if let trip = try? container.mainContext.fetch(FetchDescriptor<Trip>()).first {
                 renderAlone("trip", width: 820, height: 720, TripSheet(trip: trip))
             }

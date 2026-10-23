@@ -469,6 +469,110 @@ final class Subscription {
     var priceWentUp: Bool { previousAmount > 0 && amount > previousAmount * 1.01 }
 }
 
+// MARK: - Bills
+
+/// A bill that's due on the same day every month (rent, internet, phone). It counts as paid when you mark it,
+/// or when a matching expense comes in (a bank text, an email receipt, one you logged).
+@Model
+final class Bill {
+    /// Permanent id used to sync this item between devices.
+    var uuid: String = ""
+    var name: String = ""
+    /// Usual amount in your home currency (0 = it varies).
+    var amount: Double = 0
+    /// Day of the month it's due, 1–31 (the last day in shorter months).
+    var dueDay: Int = 1
+    /// Remind this many days before.
+    var remindDays: Int = 3
+    /// Words in the expense that mean this bill was paid, comma separated ("vodafone, vf cash"). Empty: the name.
+    var match: String = ""
+    var category: String = "Bills"
+    /// Months marked paid by hand, as yyyy-MM.
+    var paidMonths: [String] = []
+    var notes: String = ""
+    var createdAt: Date = Date.now
+
+    init(name: String, amount: Double = 0, dueDay: Int = 1) {
+        self.name = name
+        self.amount = amount
+        self.dueDay = dueDay
+        self.createdAt = .now
+    }
+
+    /// The words to look for in an expense's title.
+    var matchWords: [String] {
+        let words = (match.isEmpty ? name : match).lowercased().split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }.filter { $0.count >= 2 }
+        return words
+    }
+}
+
+// MARK: - Goals
+
+enum GoalKind: String, CaseIterable, Identifiable {
+    /// Books finished since the goal started.
+    case books
+    /// Money saved (income minus spending) since the goal started.
+    case save
+    /// Days a habit was done since the goal started.
+    case habit
+    /// A checklist of steps (also used for bucket-list dreams).
+    case steps
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .books: "Read books"
+        case .save: "Save money"
+        case .habit: "Keep a habit"
+        case .steps: "Steps"
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .books: "books.vertical.fill"
+        case .save: "banknote.fill"
+        case .habit: "flame.fill"
+        case .steps: "checklist"
+        }
+    }
+}
+
+/// A goal whose progress fills in by itself from Reading, Money or a habit, or from ticking off steps.
+@Model
+final class Goal {
+    /// Permanent id used to sync this item between devices.
+    var uuid: String = ""
+    var title: String = ""
+    var kindRaw: String = GoalKind.steps.rawValue
+    /// Books, amount of money or days. Steps goals use the number of steps.
+    var target: Double = 0
+    /// Progress counts from this day.
+    var start: Date = Date.now
+    var deadline: Date? = nil
+    /// The habit a habit goal follows.
+    var habitUUID: String = ""
+    /// The bucket-list dream this goal makes happen ("" if none).
+    var bucketUUID: String = ""
+    var steps: [String] = []
+    /// Steps from `steps` that are done.
+    var stepsDone: [String] = []
+    var doneAt: Date? = nil
+    var createdAt: Date = Date.now
+
+    init(title: String, kind: GoalKind = .steps, target: Double = 0) {
+        self.title = title
+        self.kindRaw = kind.rawValue
+        self.target = target
+        self.start = Date.now.startOfDay
+        self.createdAt = .now
+    }
+
+    var kind: GoalKind {
+        get { GoalKind(rawValue: kindRaw) ?? .steps }
+        set { kindRaw = newValue.rawValue }
+    }
+}
+
 // MARK: - Documents
 
 enum DocKind: String, CaseIterable, Codable, Identifiable {

@@ -18,7 +18,8 @@ enum Snapshot {
     /// In demo mode, your own settings (name, what you call your AI, budget) are covered by sample ones for this run only.
     nonisolated static func applyDemoDefaults() {
         guard isDemo else { return }
-        let sample: [String: Any] = ["userName": "Alex Morgan", "assistantName": "Ask", "monthlyBudget": 6000.0, "profileCard": "", "readingGoal": 24]
+        let sample: [String: Any] = ["userName": "Alex Morgan", "assistantName": "Ask", "monthlyBudget": 6000.0, "profileCard": "", "readingGoal": 24,
+                                     "assistant.memory": #"["Vegetarian","Gym on Tuesdays and Thursdays","Prefers cafés in Zamalek","Sister Mona, birthday 12 March"]"#]
         // Keep launch options (-open, -moneyTab…) that are already in the argument domain.
         let args = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
         UserDefaults.standard.setVolatileDomain(sample.merging(args) { _, launch in launch }, forName: UserDefaults.argumentDomain)
@@ -156,6 +157,32 @@ enum Snapshot {
             d.issuer = issuer; d.number = "4821"
             ctx.insert(d)
         }
+
+        // Bills (one already paid by a bank text) and goals that fill in from the data above.
+        for (dBack, t, a, c) in [(3, "Vodafone bill", -350.0, "Bills"), (5, "Talabat", -420.0, "Food"), (9, "Carrefour", -1640.0, "Food"),
+                                 (10, "Uber", -240.0, "Transport"), (11, "Zara", -1900.0, "Shopping"), (12, "Talabat", -380.0, "Food")] {
+            let x = Transaction(title: t, amount: a, category: c, date: today.adding(days: -dBack).adding(minutes: 13 * 60))
+            x.source = "sms"
+            ctx.insert(x)
+        }
+        let pay = Transaction(title: "Salary", amount: 18000, category: "Income", date: today.startOfMonth.adding(minutes: 10 * 60)); pay.source = "sms"
+        ctx.insert(pay)
+        let dom = Calendar.current.component(.day, from: today)
+        func day(_ ahead: Int) -> Int { Calendar.current.component(.day, from: today.adding(days: ahead)) }
+        for (n, amt, d, match) in [("Rent", 8000.0, day(4), "rent"), ("Internet", 650.0, day(9), "we, telecom egypt"),
+                                   ("Vodafone", 350.0, max(1, dom - 2), "vodafone"), ("Electricity", 900.0, day(18), "electricity")] {
+            let b = Bill(name: n, amount: amt, dueDay: d); b.match = match
+            ctx.insert(b)
+        }
+        let readGoal = Goal(title: "Read 24 books this year", kind: .books, target: 24); readGoal.start = today.startOfYear
+        readGoal.deadline = Calendar.current.date(from: DateComponents(year: Calendar.current.component(.year, from: today), month: 12, day: 31))
+        ctx.insert(readGoal)
+        let save = Goal(title: "Save for a new laptop", kind: .save, target: 40000); save.start = today.startOfMonth; save.deadline = today.adding(days: 120)
+        ctx.insert(save)
+        let norway = Goal(title: "Northern lights in Norway", kind: .steps)
+        norway.steps = ["Pick dates in February", "Book flights to Tromsø", "Find a cabin", "Buy thermal layers"]
+        norway.stepsDone = ["Pick dates in February"]; norway.target = 4; norway.deadline = today.adding(days: 23)
+        ctx.insert(norway)
 
         // Focus blocks this week, tomorrow's plan, and a trip with bookings.
         for (dayBack, mins) in [(0, 25), (0, 50), (1, 25), (2, 25), (3, 50)] {

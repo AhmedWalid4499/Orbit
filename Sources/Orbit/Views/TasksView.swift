@@ -3,7 +3,7 @@ import SwiftData
 
 struct TasksView: View {
     enum Filter: Hashable {
-        case today, upcoming, inbox, all, completed, area(Area), reminders
+        case today, upcoming, inbox, all, completed, area(Area), reminders, shared
 
         var title: String {
             switch self {
@@ -14,6 +14,7 @@ struct TasksView: View {
             case .completed: "Completed"
             case .area(let a): a.title
             case .reminders: "Apple Reminders"
+            case .shared: "Shared lists"
             }
         }
 
@@ -26,6 +27,7 @@ struct TasksView: View {
             case .completed: "checkmark.circle.fill"
             case .area(let a): a.symbol
             case .reminders: "applelogo"
+            case .shared: "person.2.fill"
             }
         }
     }
@@ -50,7 +52,7 @@ struct TasksView: View {
         case .all: list = open
         case .completed: return tasks.filter(\.isDone).sorted { ($0.completedAt ?? .now) > ($1.completedAt ?? .now) }
         case .area(let a): list = open.filter { $0.area == a }
-        case .reminders: return []
+        case .reminders, .shared: return []
         }
         return list.sorted {
             if $0.priority != $1.priority { return $0.priority > $1.priority }
@@ -64,15 +66,17 @@ struct TasksView: View {
             VStack(alignment: .leading, spacing: 20) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(filter.title).font(Theme.display(38))
-                    Text("\(filter == .reminders ? apple.reminders.count : items(for: filter).count)")
+                    Text(filter == .shared ? "" : "\(filter == .reminders ? apple.reminders.count : items(for: filter).count)")
                         .font(Theme.display(38, weight: .regular))
                         .foregroundStyle(Theme.inkMuted)
                     Spacer()
                 }
-                if filter != .reminders && filter != .completed { addBar }
+                if filter != .reminders && filter != .completed && filter != .shared { addBar }
                 ScrollView {
                     LazyVStack(spacing: 8) {
-                        if filter == .reminders {
+                        if filter == .shared {
+                            SharedListsView()
+                        } else if filter == .reminders {
                             remindersList
                         } else if filter == .upcoming {
                             upcomingGrouped
@@ -105,6 +109,8 @@ struct TasksView: View {
                         filter = .area(a)
                     }
                 }
+                FilterRow(filter: .shared, count: nil, selected: filter == .shared) { filter = .shared }
+                    .padding(.top, 14)
                 Text("Connected").font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkMuted)
                     .padding(.top, 18).padding(.bottom, 4).padding(.leading, 12)
                 if apple.remindersEnabled {

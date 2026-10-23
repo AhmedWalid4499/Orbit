@@ -255,6 +255,7 @@ struct AISettings: View {
                 Text("What you call your AI around Orbit: the top-bar button, the journal and the morning brief. It's “Ask” unless you rename it.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            MemorySection()
             VoiceSection()
             Section("Features") {
                 Toggle(isOn: $ai.smartCaptureEnabled) {

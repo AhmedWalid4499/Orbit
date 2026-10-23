@@ -5,7 +5,8 @@ import SwiftData
 enum OrbitSchema {
     static let models: [any PersistentModel.Type] = [TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self,
                                                      BookCategory.self, BucketItem.self, ReadingSession.self, Highlight.self, Subscription.self,
-                                                     DocItem.self, FocusSession.self, DayPlan.self, Trip.self, Booking.self]
+                                                     DocItem.self, FocusSession.self, DayPlan.self, Trip.self, Booking.self,
+                                                     Bill.self, Goal.self]
     static var schema: Schema { Schema(models) }
 }
 

@@ -66,7 +66,10 @@ struct MoneyView: View {
                     MoneyCalendar(month: month, transactions: all)
                 } else if mode == "subscriptions" {
                     SubscriptionsView()
+                } else if mode == "bills" {
+                    BillsView()
                 } else {
+                    WeeklyMoneyCard()
                     MoneyCoachCard()
                     HStack(alignment: .top, spacing: 20) {
                         chartCard
@@ -96,7 +99,7 @@ struct MoneyView: View {
         HStack(spacing: 12) {
             Text(month.formatted(.dateTime.month(.wide).year())).font(Theme.display(38)).lineLimit(1).minimumScaleFactor(0.7)
             HStack(spacing: 2) {
-                ForEach([("Overview", "overview"), ("Calendar", "calendar"), ("Subscriptions", "subscriptions")], id: \.1) { label, key in
+                ForEach([("Overview", "overview"), ("Calendar", "calendar"), ("Bills", "bills"), ("Subscriptions", "subscriptions")], id: \.1) { label, key in
                     Button(label) { withAnimation(.snappy) { mode = key } }
                         .buttonStyle(.plain)
                         .font(Theme.ui(13, weight: .semibold)).lineLimit(1).fixedSize()

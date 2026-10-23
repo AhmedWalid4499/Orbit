@@ -183,7 +183,7 @@ private struct SyncKind {
     let make: (ModelContext) -> any PersistentModel
 }
 
-private enum J {
+enum J {
     static let iso = ISO8601DateFormatter()
     static func date(_ d: Date?) -> Any { d.map { iso.string(from: $0) } ?? NSNull() }
     static func date(_ v: Any?) -> Date? { (v as? String).flatMap { iso.date(from: $0) } }
@@ -372,6 +372,28 @@ private let syncKinds: [SyncKind] = [
                  b.amount = J.num(d["amount"]); b.source = J.str(d["source"]); b.sourceID = J.str(d["sourceID"])
                  b.createdAt = J.date(d["createdAt"]) ?? b.createdAt },
              make: { let b = Booking(title: ""); $0.insert(b); return b }),
+    SyncKind(kind: "bill",
+             fetch: { (try? $0.fetch(FetchDescriptor<Bill>())) ?? [] }, uuid: { ($0 as! Bill).uuid },
+             encode: { m in let b = m as! Bill
+                 return ["name": b.name, "amount": b.amount, "dueDay": b.dueDay, "remindDays": b.remindDays, "match": b.match,
+                         "category": b.category, "paidMonths": b.paidMonths, "notes": b.notes, "createdAt": J.date(b.createdAt)] },
+             apply: { d, m in let b = m as! Bill
+                 b.name = J.str(d["name"]); b.amount = J.num(d["amount"]); b.dueDay = max(1, J.int(d["dueDay"]))
+                 b.remindDays = J.int(d["remindDays"]); b.match = J.str(d["match"]); b.category = J.str(d["category"])
+                 b.paidMonths = J.strings(d["paidMonths"]); b.notes = J.str(d["notes"]); b.createdAt = J.date(d["createdAt"]) ?? b.createdAt },
+             make: { let b = Bill(name: ""); $0.insert(b); return b }),
+    SyncKind(kind: "goal",
+             fetch: { (try? $0.fetch(FetchDescriptor<Goal>())) ?? [] }, uuid: { ($0 as! Goal).uuid },
+             encode: { m in let g = m as! Goal
+                 return ["title": g.title, "kind": g.kindRaw, "target": g.target, "start": J.date(g.start), "deadline": J.date(g.deadline),
+                         "habitUUID": g.habitUUID, "bucketUUID": g.bucketUUID, "steps": g.steps, "stepsDone": g.stepsDone,
+                         "doneAt": J.date(g.doneAt), "createdAt": J.date(g.createdAt)] },
+             apply: { d, m in let g = m as! Goal
+                 g.title = J.str(d["title"]); g.kindRaw = J.str(d["kind"]); g.target = J.num(d["target"]); g.start = J.date(d["start"]) ?? g.start
+                 g.deadline = J.date(d["deadline"]); g.habitUUID = J.str(d["habitUUID"]); g.bucketUUID = J.str(d["bucketUUID"])
+                 g.steps = J.strings(d["steps"]); g.stepsDone = J.strings(d["stepsDone"]); g.doneAt = J.date(d["doneAt"])
+                 g.createdAt = J.date(d["createdAt"]) ?? g.createdAt },
+             make: { let g = Goal(title: ""); $0.insert(g); return g }),
 ]
 
 /// Preferences that follow you between Macs (API keys and sign-ins never leave the Keychain).
@@ -382,7 +404,8 @@ private let syncedSettings = ["monthlyBudget", "readingGoal", "currencyCode", "a
                               "notify.tasks", "notify.events", "notify.bills", "notify.habits", "notify.journal", "notify.review",
                               "notify.subscriptions", "notify.documents", "notify.evening", "notify.trips", "notify.morningHour",
                               "notify.habitHour", "notify.journalHour", "notify.eventLead",
-                              "merchantRules", "categoryBudgets", "places.home", "places.work", "hiddenTabs", "inbox.windowHours", "inbox.everyHours", "notify.budgets", "notify.bigCharges", "spendAlerts.sent"]
+                              "merchantRules", "categoryBudgets", "places.home", "places.work", "hiddenTabs", "inbox.windowHours", "inbox.everyHours", "notify.budgets", "notify.bigCharges", "spendAlerts.sent",
+                              "assistant.memory", "notify.weeklyMoney"]
 
 // MARK: - Sync engine
 
@@ -510,6 +533,8 @@ final class CloudSync: ObservableObject {
         case let x as DayPlan: x.uuid = id
         case let x as Trip: x.uuid = id
         case let x as Booking: x.uuid = id
+        case let x as Bill: x.uuid = id
+        case let x as Goal: x.uuid = id
         default: break
         }
     }
@@ -635,7 +660,7 @@ final class CloudSync: ObservableObject {
         return rows.count
     }
 
-    private func rest(_ url: URL, method: String, body: Any? = nil, prefer: String? = nil) async throws -> Any? {
+    func rest(_ url: URL, method: String, body: Any? = nil, prefer: String? = nil) async throws -> Any? {
         var req = URLRequest(url: url)
         req.httpMethod = method
         req.timeoutInterval = 60

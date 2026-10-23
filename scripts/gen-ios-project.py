@@ -5,6 +5,10 @@ The home-screen widgets reuse Widgets/OrbitWidgets.swift.
 
   python3 scripts/gen-ios-project.py               # app + widgets
   python3 scripts/gen-ios-project.py --no-widgets  # app only (Apple doesn't give free accounts the App Group widgets need)
+  python3 scripts/gen-ios-project.py --no-watch    # leave out the Apple Watch app
+
+The Apple Watch app (iOS/OrbitWatch, with complications in iOS/OrbitWatchWidgets) is embedded in the iPhone app and
+talks to it over WatchConnectivity; iOS/Shared holds the types both sides use.
 """
 import hashlib, pathlib, sys
 
@@ -14,6 +18,7 @@ VERSION = (ROOT / "VERSION").read_text().strip()
 TEAM = "Y2K55S3UA9"
 BUNDLE_ID = "com.ahmedwalid.orbit"
 WIDGETS = "--no-widgets" not in sys.argv
+WATCH = "--no-watch" not in sys.argv
 
 # Shared Mac files that can't run on iPhone (Mac-only windows, hotkeys, updater).
 MAC_ONLY_SERVICES = ["Capture.swift", "Updater.swift", "VoiceCapture.swift"]
@@ -36,6 +41,9 @@ def settings_text(d, indent=4):
 
 T_APP, T_WID = oid("target.app"), oid("target.widgets")
 P_APP, P_WID = oid("product.app"), oid("product.widgets")
+T_WATCH, T_WWID = oid("target.watch"), oid("target.watchwidgets")
+P_WATCH, P_WWID = oid("product.watch"), oid("product.watchwidgets")
+B_EMBED_WATCH, B_EMBED_WWID = oid("build.embed.watch"), oid("build.embed.watchwidgets")
 G_MAIN, G_PRODUCTS = oid("group.main"), oid("group.products")
 F_SUPABASE, B_SUPABASE = oid("file.supabase"), oid("build.supabase")
 # The signed Shortcuts the app shares (scripts/make-shortcuts.py), copied in as a folder.
@@ -43,16 +51,20 @@ F_SHORTCUTS, B_SHORTCUTS = oid("file.shortcuts"), oid("build.shortcuts")
 B_EMBED = oid("build.embed.widgets")
 PROJECT = oid("project")
 
-# name: (path, source tree, target, files excluded from that target)
+# name: (path, source tree, targets, files excluded from the first target)
 SYNC = {
-    "OrbitPhone": ("OrbitPhone", '"<group>"', T_APP, []),
-    "Models": ("../Sources/Orbit/Models", "SOURCE_ROOT", T_APP, []),
-    "Design": ("../Sources/Orbit/Design", "SOURCE_ROOT", T_APP, []),
-    "Services": ("../Sources/Orbit/Services", "SOURCE_ROOT", T_APP, MAC_ONLY_SERVICES),
-    "Views": ("../Sources/Orbit/Views", "SOURCE_ROOT", T_APP, MAC_ONLY_VIEWS),
+    "OrbitPhone": ("OrbitPhone", '"<group>"', [T_APP], []),
+    "Models": ("../Sources/Orbit/Models", "SOURCE_ROOT", [T_APP], []),
+    "Design": ("../Sources/Orbit/Design", "SOURCE_ROOT", [T_APP], []),
+    "Services": ("../Sources/Orbit/Services", "SOURCE_ROOT", [T_APP], MAC_ONLY_SERVICES),
+    "Views": ("../Sources/Orbit/Views", "SOURCE_ROOT", [T_APP], MAC_ONLY_VIEWS),
+    "Shared": ("Shared", '"<group>"', [T_APP] + ([T_WATCH, T_WWID] if WATCH else []), []),
 }
 if WIDGETS:
-    SYNC["Widgets"] = ("../Widgets", "SOURCE_ROOT", T_WID, ["Info.plist", "OrbitWidgets.entitlements"])
+    SYNC["Widgets"] = ("../Widgets", "SOURCE_ROOT", [T_WID], ["Info.plist", "OrbitWidgets.entitlements"])
+if WATCH:
+    SYNC["OrbitWatch"] = ("OrbitWatch", '"<group>"', [T_WATCH], [])
+    SYNC["OrbitWatchWidgets"] = ("OrbitWatchWidgets", '"<group>"', [T_WWID], [])
 
 project_common = {
     "ALWAYS_SEARCH_USER_PATHS": "NO", "CLANG_ENABLE_MODULES": "YES", "CLANG_ENABLE_OBJC_ARC": "YES", "COPY_PHASE_STRIP": "NO",
@@ -111,8 +123,40 @@ if WIDGETS:
     configs[oid("cfg.wid.debug")] = ("Debug", widgets)
     configs[oid("cfg.wid.release")] = ("Release", widgets)
 
+watch_common = {
+    "CODE_SIGN_STYLE": "Automatic", "CURRENT_PROJECT_VERSION": "1", "DEVELOPMENT_TEAM": TEAM, "MARKETING_VERSION": VERSION,
+    "SDKROOT": "watchos", "SUPPORTED_PLATFORMS": "watchos watchsimulator", "TARGETED_DEVICE_FAMILY": "4",
+    "WATCHOS_DEPLOYMENT_TARGET": "10.0", "SWIFT_EMIT_LOC_STRINGS": "NO", "GENERATE_INFOPLIST_FILE": "YES",
+    "INFOPLIST_KEY_CFBundleDisplayName": "Orbit", "SKIP_INSTALL": "YES",
+}
+watch_app = {
+    **watch_common,
+    "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
+    "INFOPLIST_KEY_WKCompanionAppBundleIdentifier": BUNDLE_ID,
+    "INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp": "NO",
+    "INFOPLIST_KEY_UISupportedInterfaceOrientations": "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown",
+    "LD_RUNPATH_SEARCH_PATHS": "$(inherited) @executable_path/Frameworks",
+    "PRODUCT_BUNDLE_IDENTIFIER": BUNDLE_ID + ".watchkitapp",
+    "PRODUCT_NAME": "OrbitWatch",
+}
+watch_widgets = {
+    **watch_common,
+    "INFOPLIST_FILE": "Support/OrbitWidgets-Info.plist",
+    "LD_RUNPATH_SEARCH_PATHS": "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks",
+    "PRODUCT_BUNDLE_IDENTIFIER": BUNDLE_ID + ".watchkitapp.widgets",
+    "PRODUCT_NAME": "OrbitWatchWidgets",
+}
+if WIDGETS:  # the complications read the watch app's data through the app group
+    watch_app["CODE_SIGN_ENTITLEMENTS"] = "Support/OrbitWatch.entitlements"
+    watch_widgets["CODE_SIGN_ENTITLEMENTS"] = "Support/OrbitWatchWidgets.entitlements"
+if WATCH:
+    for key, (n, cfg) in {"watch": ("OrbitWatch", watch_app), "wwid": ("OrbitWatchWidgets", watch_widgets)}.items():
+        configs[oid(f"cfg.{key}.debug")] = ("Debug", cfg)
+        configs[oid(f"cfg.{key}.release")] = ("Release", cfg)
+
 exceptions = sync_groups = ""
-for name, (path, tree, target, excl) in SYNC.items():
+for name, (path, tree, targets_, excl) in SYNC.items():
+    target = targets_[0]
     gid = oid("sync." + name)
     exc_ref = ""
     if excl:
@@ -125,7 +169,7 @@ for name, (path, tree, target, excl) in SYNC.items():
 
 
 def groups_for(target):
-    return ", ".join(oid("sync." + n) for n, v in SYNC.items() if v[2] == target)
+    return ", ".join(oid("sync." + n) for n, v in SYNC.items() if target in v[2])
 
 
 def phase(kind, pid, files="", extra=""):
@@ -154,8 +198,20 @@ file_refs = (f"\t\t{F_SHORTCUTS} /* Shortcuts */ = {{isa = PBXFileReference; las
              f"\t\t{F_SUPABASE} /* Supabase.json */ = {{isa = PBXFileReference; lastKnownFileType = text.json; name = Supabase.json; path = ../Support/Supabase.json; sourceTree = SOURCE_ROOT; }};\n"
              f"\t\t{P_APP} /* Orbit.app */ = {{isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Orbit.app; sourceTree = BUILT_PRODUCTS_DIR; }};\n")
 targets = ""
-extra_sections = ""
+proxies = deps_text = ""
 app_deps = ""
+
+
+def depend(name, target):
+    """A target dependency on `target`; returns the line for the dependent target's list."""
+    global proxies, deps_text
+    proxy, dep = oid("proxy." + name), oid("dep." + name)
+    proxies += (f"\t\t{proxy} = {{\n\t\t\tisa = PBXContainerItemProxy;\n\t\t\tcontainerPortal = {PROJECT};\n"
+                f"\t\t\tproxyType = 1;\n\t\t\tremoteGlobalIDString = {target};\n\t\t\tremoteInfo = {name};\n\t\t}};\n")
+    deps_text += f"\t\t{dep} = {{\n\t\t\tisa = PBXTargetDependency;\n\t\t\ttarget = {target};\n\t\t\ttargetProxy = {proxy};\n\t\t}};\n"
+    return f"\t\t\t\t{dep},\n"
+
+
 if WIDGETS:
     wid_phases = [oid("wid.sources"), oid("wid.frameworks"), oid("wid.resources")]
     embed = oid("app.embed")
@@ -167,13 +223,34 @@ if WIDGETS:
     build_files += f"\t\t{B_EMBED} /* OrbitWidgets.appex */ = {{isa = PBXBuildFile; fileRef = {P_WID}; settings = {{ATTRIBUTES = (RemoveHeadersOnCopy, ); }}; }};\n"
     products += f"\t\t\t\t{P_WID} /* OrbitWidgets.appex */,\n"
     file_refs += f"\t\t{P_WID} /* OrbitWidgets.appex */ = {{isa = PBXFileReference; explicitFileType = \"wrapper.app-extension\"; includeInIndex = 0; path = OrbitWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; }};\n"
-    proxy, dep = oid("proxy.widgets"), oid("dep.widgets")
-    extra_sections += (f"/* Begin PBXContainerItemProxy section */\n\t\t{proxy} = {{\n\t\t\tisa = PBXContainerItemProxy;\n\t\t\tcontainerPortal = {PROJECT};\n"
-                       f"\t\t\tproxyType = 1;\n\t\t\tremoteGlobalIDString = {T_WID};\n\t\t\tremoteInfo = OrbitWidgets;\n\t\t}};\n/* End PBXContainerItemProxy section */\n\n"
-                       f"/* Begin PBXTargetDependency section */\n\t\t{dep} = {{\n\t\t\tisa = PBXTargetDependency;\n\t\t\ttarget = {T_WID};\n\t\t\ttargetProxy = {proxy};\n\t\t}};\n"
-                       "/* End PBXTargetDependency section */\n\n")
-    app_deps = f"\t\t\t\t{dep},\n"
+    app_deps += depend("OrbitWidgets", T_WID)
     targets += native(T_WID, "OrbitWidgets", oid("cl.wid"), wid_phases, groups_for(T_WID), P_WID, "com.apple.product-type.app-extension")
+if WATCH:
+    w_phases = [oid("watch.sources"), oid("watch.frameworks"), oid("watch.resources"), oid("watch.embed")]
+    ww_phases = [oid("wwid.sources"), oid("wwid.frameworks"), oid("wwid.resources")]
+    embed_watch = oid("app.embed.watch")
+    app_phases.append(embed_watch)
+    phases_text += (phase("PBXSourcesBuildPhase", w_phases[0]) + phase("PBXFrameworksBuildPhase", w_phases[1])
+                    + phase("PBXResourcesBuildPhase", w_phases[2])
+                    + phase("PBXCopyFilesBuildPhase", w_phases[3], f"\t\t\t\t{B_EMBED_WWID} /* OrbitWatchWidgets.appex in Embed Foundation Extensions */,\n",
+                            '\t\t\tdstPath = "";\n\t\t\tdstSubfolderSpec = 13;\n\t\t\tname = "Embed Foundation Extensions";\n')
+                    + phase("PBXSourcesBuildPhase", ww_phases[0]) + phase("PBXFrameworksBuildPhase", ww_phases[1])
+                    + phase("PBXResourcesBuildPhase", ww_phases[2])
+                    + phase("PBXCopyFilesBuildPhase", embed_watch, f"\t\t\t\t{B_EMBED_WATCH} /* OrbitWatch.app in Embed Watch Content */,\n",
+                            '\t\t\tdstPath = "$(CONTENTS_FOLDER_PATH)/Watch";\n\t\t\tdstSubfolderSpec = 16;\n\t\t\tname = "Embed Watch Content";\n'))
+    build_files += (f"\t\t{B_EMBED_WATCH} /* OrbitWatch.app */ = {{isa = PBXBuildFile; fileRef = {P_WATCH}; settings = {{ATTRIBUTES = (RemoveHeadersOnCopy, ); }}; }};\n"
+                    f"\t\t{B_EMBED_WWID} /* OrbitWatchWidgets.appex */ = {{isa = PBXBuildFile; fileRef = {P_WWID}; settings = {{ATTRIBUTES = (RemoveHeadersOnCopy, ); }}; }};\n")
+    products += f"\t\t\t\t{P_WATCH} /* OrbitWatch.app */,\n\t\t\t\t{P_WWID} /* OrbitWatchWidgets.appex */,\n"
+    file_refs += (f"\t\t{P_WATCH} /* OrbitWatch.app */ = {{isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OrbitWatch.app; sourceTree = BUILT_PRODUCTS_DIR; }};\n"
+                  f"\t\t{P_WWID} /* OrbitWatchWidgets.appex */ = {{isa = PBXFileReference; explicitFileType = \"wrapper.app-extension\"; includeInIndex = 0; path = OrbitWatchWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; }};\n")
+    watch_deps = depend("OrbitWatchWidgets", T_WWID)
+    app_deps += depend("OrbitWatch", T_WATCH)
+    targets += native(T_WATCH, "OrbitWatch", oid("cl.watch"), w_phases, groups_for(T_WATCH), P_WATCH, "com.apple.product-type.application", watch_deps)
+    targets += native(T_WWID, "OrbitWatchWidgets", oid("cl.wwid"), ww_phases, groups_for(T_WWID), P_WWID, "com.apple.product-type.app-extension")
+extra_sections = ""
+if proxies:
+    extra_sections = (f"/* Begin PBXContainerItemProxy section */\n{proxies}/* End PBXContainerItemProxy section */\n\n"
+                      f"/* Begin PBXTargetDependency section */\n{deps_text}/* End PBXTargetDependency section */\n\n")
 targets = native(T_APP, "OrbitPhone", oid("cl.app"), app_phases, groups_for(T_APP), P_APP, "com.apple.product-type.application", app_deps) + targets
 
 cfg_text = "".join(f"\t\t{k} /* {n} */ = {{\n\t\t\tisa = XCBuildConfiguration;\n\t\t\tbuildSettings = {{\n{settings_text(s)}\n\t\t\t}};\n\t\t\tname = {n};\n\t\t}};\n"
@@ -182,10 +259,12 @@ cfg_lists = cfg_list(oid("cl.project"), "Build configuration list for PBXProject
 cfg_lists += cfg_list(oid("cl.app"), "OrbitPhone", oid("cfg.app.debug"), oid("cfg.app.release"))
 if WIDGETS:
     cfg_lists += cfg_list(oid("cl.wid"), "OrbitWidgets", oid("cfg.wid.debug"), oid("cfg.wid.release"))
-all_targets = f"\t\t\t\t{T_APP} /* OrbitPhone */,\n" + (f"\t\t\t\t{T_WID} /* OrbitWidgets */,\n" if WIDGETS else "")
-attrs = f"\t\t\t\t\t{T_APP} = {{\n\t\t\t\t\t\tCreatedOnToolsVersion = 27.1;\n\t\t\t\t\t}};\n"
-if WIDGETS:
-    attrs += f"\t\t\t\t\t{T_WID} = {{\n\t\t\t\t\t\tCreatedOnToolsVersion = 27.1;\n\t\t\t\t\t}};\n"
+if WATCH:
+    cfg_lists += cfg_list(oid("cl.watch"), "OrbitWatch", oid("cfg.watch.debug"), oid("cfg.watch.release"))
+    cfg_lists += cfg_list(oid("cl.wwid"), "OrbitWatchWidgets", oid("cfg.wwid.debug"), oid("cfg.wwid.release"))
+target_ids = [(T_APP, "OrbitPhone")] + ([(T_WID, "OrbitWidgets")] if WIDGETS else []) + ([(T_WATCH, "OrbitWatch"), (T_WWID, "OrbitWatchWidgets")] if WATCH else [])
+all_targets = "".join(f"\t\t\t\t{t} /* {n} */,\n" for t, n in target_ids)
+attrs = "".join(f"\t\t\t\t\t{t} = {{\n\t\t\t\t\t\tCreatedOnToolsVersion = 27.1;\n\t\t\t\t\t}};\n" for t, _ in target_ids)
 main_children = "".join(f"\t\t\t\t{oid('sync.' + n)} /* {n} */,\n" for n in SYNC) + f"\t\t\t\t{F_SUPABASE} /* Supabase.json */,\n\t\t\t\t{F_SHORTCUTS} /* Shortcuts */,\n\t\t\t\t{G_PRODUCTS} /* Products */,\n"
 
 text = f"""// !$*UTF8*$!

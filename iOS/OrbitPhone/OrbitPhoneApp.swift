@@ -27,6 +27,7 @@ struct OrbitPhoneApp: App {
             }
         }
         OrbitStore.container = container
+        WatchBridge.shared.activate()
     }
 
     var body: some Scene {

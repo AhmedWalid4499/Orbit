@@ -78,6 +78,7 @@ struct PhoneRoot: View {
                 await apple.requestAccessIfEnabled()
                 await Reminders.shared.reschedule(context: context, apple: apple)
                 WidgetBridge.update(context: context, apple: apple)
+                WatchBridge.shared.push(context: context, apple: apple)
                 if rounds % 30 == 0 {
                     await AIAssistant.shared.refreshBrief(context: context, apple: apple)
                     await ReadingSync.shared.syncIfDue(context: context)

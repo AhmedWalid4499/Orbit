@@ -10,23 +10,49 @@
 		C017D2919C0386AA2299BA02 /* Supabase.json in Resources */ = {isa = PBXBuildFile; fileRef = 77750F7AF45EE6CFDA2C270F; };
 		927110F77524B8AC7D63938E /* Shortcuts in Resources */ = {isa = PBXBuildFile; fileRef = B84465C1E9C07D3CEAAF2E22; };
 		085706BCEDADEDE7CAD25515 /* OrbitWidgets.appex */ = {isa = PBXBuildFile; fileRef = 93096A8554F87E20FFED0946; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		D438CC9AC54FA7DF2316353E /* OrbitWatch.app */ = {isa = PBXBuildFile; fileRef = 5E99D4633A28B788BB2EEF6C; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		8BB56B17A43738B0F42B227C /* OrbitWatchWidgets.appex */ = {isa = PBXBuildFile; fileRef = F908C99AC95C58E31931ADDB; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		B3F5442CF85D0A2E06266A84 = {
+		641F998986B4FD4A846405D2 = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 46F86FAA6BBF9AC94A7E4595;
 			proxyType = 1;
 			remoteGlobalIDString = DF2A519F926ADFD68ADBB831;
 			remoteInfo = OrbitWidgets;
 		};
+		D03F6C5164D730CB560F699E = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 46F86FAA6BBF9AC94A7E4595;
+			proxyType = 1;
+			remoteGlobalIDString = 3C989CAA8F5A2D4613398FED;
+			remoteInfo = OrbitWatchWidgets;
+		};
+		1BB38F37E8CBEA9EC891619B = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 46F86FAA6BBF9AC94A7E4595;
+			proxyType = 1;
+			remoteGlobalIDString = 6A3E86F153968EFFFE4AAA15;
+			remoteInfo = OrbitWatch;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXTargetDependency section */
-		45C902724C965743E206AAA1 = {
+		469315A7D6D9EE979959030B = {
 			isa = PBXTargetDependency;
 			target = DF2A519F926ADFD68ADBB831;
-			targetProxy = B3F5442CF85D0A2E06266A84;
+			targetProxy = 641F998986B4FD4A846405D2;
+		};
+		A84639851224053A63958A48 = {
+			isa = PBXTargetDependency;
+			target = 3C989CAA8F5A2D4613398FED;
+			targetProxy = D03F6C5164D730CB560F699E;
+		};
+		B8475C5D338DD6A3A522BF0B = {
+			isa = PBXTargetDependency;
+			target = 6A3E86F153968EFFFE4AAA15;
+			targetProxy = 1BB38F37E8CBEA9EC891619B;
 		};
 /* End PBXTargetDependency section */
 
@@ -35,6 +61,8 @@
 		77750F7AF45EE6CFDA2C270F /* Supabase.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = Supabase.json; path = ../Support/Supabase.json; sourceTree = SOURCE_ROOT; };
 		996AD237BC284D463E664FFE /* Orbit.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Orbit.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		93096A8554F87E20FFED0946 /* OrbitWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = OrbitWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		5E99D4633A28B788BB2EEF6C /* OrbitWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OrbitWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F908C99AC95C58E31931ADDB /* OrbitWatchWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = OrbitWatchWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -71,7 +99,10 @@
 		ABF7BF45D987E32092E49853 /* Design */ = {isa = PBXFileSystemSynchronizedRootGroup; name = Design; path = ../Sources/Orbit/Design; sourceTree = SOURCE_ROOT; };
 		D90B90564FA1EF9598AE0BF3 /* Services */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (96098859D1A9C4691EA41199, ); name = Services; path = ../Sources/Orbit/Services; sourceTree = SOURCE_ROOT; };
 		E0F3E530424CA91708A81DDB /* Views */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (B64CB8D5845BF45F231CFE8B, ); name = Views; path = ../Sources/Orbit/Views; sourceTree = SOURCE_ROOT; };
+		A5A41521C68A91FEFD5C8725 /* Shared */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Shared; sourceTree = "<group>"; };
 		4B317CD147FD1A4E63DD8E1F /* Widgets */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (DAFC46CFA00E15CDFA30A692, ); name = Widgets; path = ../Widgets; sourceTree = SOURCE_ROOT; };
+		04538CA2BB1CFDEA53B9AD70 /* OrbitWatch */ = {isa = PBXFileSystemSynchronizedRootGroup; path = OrbitWatch; sourceTree = "<group>"; };
+		FE07777B5FD2005677D64834 /* OrbitWatchWidgets */ = {isa = PBXFileSystemSynchronizedRootGroup; path = OrbitWatchWidgets; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin build phases */
@@ -130,6 +161,70 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A02924A3F24776C0D7E94BB0 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		22290C6F23EE4F7FD2E0D782 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7D104A1A99F58327B308BF01 = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A0B97E9980A6B5469D2AF28D = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			name = "Embed Foundation Extensions";
+			files = (
+				8BB56B17A43738B0F42B227C /* OrbitWatchWidgets.appex in Embed Foundation Extensions */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D2A9823D2C1CCAEB271A951B = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0BDCE4933BE0D768D6D7B04C = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E389751253FD1E35B6F8CDB6 = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5CCDAE42D6F5CB99F564AA62 = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			name = "Embed Watch Content";
+			files = (
+				D438CC9AC54FA7DF2316353E /* OrbitWatch.app in Embed Watch Content */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End build phases */
 
 /* Begin PBXGroup section */
@@ -141,7 +236,10 @@
 				ABF7BF45D987E32092E49853 /* Design */,
 				D90B90564FA1EF9598AE0BF3 /* Services */,
 				E0F3E530424CA91708A81DDB /* Views */,
+				A5A41521C68A91FEFD5C8725 /* Shared */,
 				4B317CD147FD1A4E63DD8E1F /* Widgets */,
+				04538CA2BB1CFDEA53B9AD70 /* OrbitWatch */,
+				FE07777B5FD2005677D64834 /* OrbitWatchWidgets */,
 				77750F7AF45EE6CFDA2C270F /* Supabase.json */,
 				B84465C1E9C07D3CEAAF2E22 /* Shortcuts */,
 				113236722DEE1DC96F378B9D /* Products */,
@@ -153,6 +251,8 @@
 			children = (
 				996AD237BC284D463E664FFE /* Orbit.app */,
 				93096A8554F87E20FFED0946 /* OrbitWidgets.appex */,
+				5E99D4633A28B788BB2EEF6C /* OrbitWatch.app */,
+				F908C99AC95C58E31931ADDB /* OrbitWatchWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -168,14 +268,16 @@
 				373BADBBA0722772BA1A53C9,
 				F44E03EA52FB7FD8D73022C2,
 				6AB1A6F5C6A62D1C70CEC284,
+				5CCDAE42D6F5CB99F564AA62,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				45C902724C965743E206AAA1,
+				469315A7D6D9EE979959030B,
+				B8475C5D338DD6A3A522BF0B,
 			);
 			fileSystemSynchronizedGroups = (
-				EB8F231D387E50C10090B5F2, DA4BD2639D547A95407459A9, ABF7BF45D987E32092E49853, D90B90564FA1EF9598AE0BF3, E0F3E530424CA91708A81DDB,
+				EB8F231D387E50C10090B5F2, DA4BD2639D547A95407459A9, ABF7BF45D987E32092E49853, D90B90564FA1EF9598AE0BF3, E0F3E530424CA91708A81DDB, A5A41521C68A91FEFD5C8725,
 			);
 			name = OrbitPhone;
 			packageProductDependencies = (
@@ -206,6 +308,52 @@
 			productReference = 93096A8554F87E20FFED0946;
 			productType = "com.apple.product-type.app-extension";
 		};
+		6A3E86F153968EFFFE4AAA15 /* OrbitWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 77AA343AE19F8CF2837DDF0D;
+			buildPhases = (
+				A02924A3F24776C0D7E94BB0,
+				22290C6F23EE4F7FD2E0D782,
+				7D104A1A99F58327B308BF01,
+				A0B97E9980A6B5469D2AF28D,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A84639851224053A63958A48,
+			);
+			fileSystemSynchronizedGroups = (
+				A5A41521C68A91FEFD5C8725, 04538CA2BB1CFDEA53B9AD70,
+			);
+			name = OrbitWatch;
+			packageProductDependencies = (
+			);
+			productName = OrbitWatch;
+			productReference = 5E99D4633A28B788BB2EEF6C;
+			productType = "com.apple.product-type.application";
+		};
+		3C989CAA8F5A2D4613398FED /* OrbitWatchWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E9E18C2B4C3D10F8917C1D04;
+			buildPhases = (
+				D2A9823D2C1CCAEB271A951B,
+				0BDCE4933BE0D768D6D7B04C,
+				E389751253FD1E35B6F8CDB6,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A5A41521C68A91FEFD5C8725, FE07777B5FD2005677D64834,
+			);
+			name = OrbitWatchWidgets;
+			packageProductDependencies = (
+			);
+			productName = OrbitWatchWidgets;
+			productReference = F908C99AC95C58E31931ADDB;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -220,6 +368,12 @@
 						CreatedOnToolsVersion = 27.1;
 					};
 					DF2A519F926ADFD68ADBB831 = {
+						CreatedOnToolsVersion = 27.1;
+					};
+					6A3E86F153968EFFFE4AAA15 = {
+						CreatedOnToolsVersion = 27.1;
+					};
+					3C989CAA8F5A2D4613398FED = {
 						CreatedOnToolsVersion = 27.1;
 					};
 				};
@@ -240,6 +394,8 @@
 			targets = (
 				F01C2E624E08A72BC055B46F /* OrbitPhone */,
 				DF2A519F926ADFD68ADBB831 /* OrbitWidgets */,
+				6A3E86F153968EFFFE4AAA15 /* OrbitWatch */,
+				3C989CAA8F5A2D4613398FED /* OrbitWatchWidgets */,
 			);
 		};
 /* End PBXProject section */
@@ -295,7 +451,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.18.0;
+				MARKETING_VERSION = 1.19.0;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -328,7 +484,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.18.0;
+				MARKETING_VERSION = 1.19.0;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -361,7 +517,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.18.0;
+				MARKETING_VERSION = 1.19.0;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -383,7 +539,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.18.0;
+				MARKETING_VERSION = 1.19.0;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -396,6 +552,104 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.ahmedwalid.orbit.widgets;
 				PRODUCT_NAME = OrbitWidgets;
 				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		2F9F394E857F78F2230E31F2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Y2K55S3UA9;
+				MARKETING_VERSION = 1.19.0;
+				SDKROOT = watchos;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Orbit;
+				SKIP_INSTALL = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.ahmedwalid.orbit;
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.ahmedwalid.orbit.watchkitapp;
+				PRODUCT_NAME = OrbitWatch;
+				CODE_SIGN_ENTITLEMENTS = Support/OrbitWatch.entitlements;
+			};
+			name = Debug;
+		};
+		65A4DC7FA84F275A65C8DCEE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Y2K55S3UA9;
+				MARKETING_VERSION = 1.19.0;
+				SDKROOT = watchos;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Orbit;
+				SKIP_INSTALL = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.ahmedwalid.orbit;
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.ahmedwalid.orbit.watchkitapp;
+				PRODUCT_NAME = OrbitWatch;
+				CODE_SIGN_ENTITLEMENTS = Support/OrbitWatch.entitlements;
+			};
+			name = Release;
+		};
+		E3898C49AF02FA5A1F3BE121 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Y2K55S3UA9;
+				MARKETING_VERSION = 1.19.0;
+				SDKROOT = watchos;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Orbit;
+				SKIP_INSTALL = YES;
+				INFOPLIST_FILE = "Support/OrbitWidgets-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.ahmedwalid.orbit.watchkitapp.widgets;
+				PRODUCT_NAME = OrbitWatchWidgets;
+				CODE_SIGN_ENTITLEMENTS = Support/OrbitWatchWidgets.entitlements;
+			};
+			name = Debug;
+		};
+		C7664E2168699F77F59A5287 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Y2K55S3UA9;
+				MARKETING_VERSION = 1.19.0;
+				SDKROOT = watchos;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Orbit;
+				SKIP_INSTALL = YES;
+				INFOPLIST_FILE = "Support/OrbitWidgets-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.ahmedwalid.orbit.watchkitapp.widgets;
+				PRODUCT_NAME = OrbitWatchWidgets;
+				CODE_SIGN_ENTITLEMENTS = Support/OrbitWatchWidgets.entitlements;
 			};
 			name = Release;
 		};
@@ -425,6 +679,24 @@
 			buildConfigurations = (
 				78C9A8FDE81EF2963EF240D5 /* Debug */,
 				3C49F9097FDD7AE50FF61C7D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		77AA343AE19F8CF2837DDF0D /* OrbitWatch */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2F9F394E857F78F2230E31F2 /* Debug */,
+				65A4DC7FA84F275A65C8DCEE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E9E18C2B4C3D10F8917C1D04 /* OrbitWatchWidgets */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E3898C49AF02FA5A1F3BE121 /* Debug */,
+				C7664E2168699F77F59A5287 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

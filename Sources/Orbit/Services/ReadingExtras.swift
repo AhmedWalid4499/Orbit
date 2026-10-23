@@ -239,6 +239,6 @@ struct FinishedReadingSheet: View {
                 .buttonStyle(PrimaryButtonStyle()).frame(width: 110).keyboardShortcut(.defaultAction)
             }
         }
-        .padding(26).frame(width: 380)
+        .padding(26).sheetFrame(width: 380)
     }
 }

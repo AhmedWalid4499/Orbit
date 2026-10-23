@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 // Visual language: white canvas, soft grey cards, bold serif numerals,
 // pill navigation and saturated "sticker" colours per life area.
@@ -11,20 +10,12 @@ extension Color {
                   green: Double((hex >> 8) & 0xFF) / 255,
                   blue: Double(hex & 0xFF) / 255)
     }
-
-    /// A colour that switches between light and dark appearance.
-    init(light: UInt32, dark: UInt32) {
-        self.init(nsColor: NSColor(name: nil) { appearance in
-            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            let hex = isDark ? dark : light
-            return NSColor(srgbRed: CGFloat((hex >> 16) & 0xFF) / 255,
-                           green: CGFloat((hex >> 8) & 0xFF) / 255,
-                           blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
-        })
-    }
 }
 
 enum Theme {
+    /// Side margin of full pages: roomy on the Mac, tighter on a phone.
+    static var pagePadding: CGFloat { Platform.isPhone ? 16 : 32 }
+
     // Neutrals
     static let canvas = Color(light: 0xFFFFFF, dark: 0x111113)
     static let card = Color(light: 0xF2F2F2, dark: 0x1E1E21)
@@ -247,5 +238,47 @@ enum Fmt {
         let days = cal.dateComponents([.day], from: Date.now.startOfDay, to: d.startOfDay).day ?? 0
         if days > 0 && days < 7 { return d.formatted(.dateTime.weekday(.wide)) }
         return d.formatted(.dateTime.day().month(.abbreviated))
+    }
+}
+
+/// The app icon drawn in SwiftUI: black squircle, lime ring, pink moon.
+struct OrbitMark: View {
+    var size: CGFloat = 56
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: size * 0.225, style: .continuous).fill(Color(hex: 0x121212))
+            Circle().stroke(Theme.lime, lineWidth: size * 0.075).padding(size * 0.25)
+            Circle().fill(Theme.pink).frame(width: size * 0.16, height: size * 0.16)
+                .offset(x: size * 0.25, y: -size * 0.25)
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+/// Your profile photo, or your initials on a gradient.
+struct Avatar: View {
+    let name: String
+    var size: CGFloat = 44
+    @ObservedObject private var profile = ProfileStore.shared
+
+    var initials: String {
+        name.split(separator: " ").prefix(2).compactMap(\.first).map(String.init).joined().uppercased()
+    }
+
+    var body: some View {
+        Group {
+            if let photo = profile.photo {
+                photo.swiftUI.resizable().scaledToFill()
+            } else {
+                Text(initials.isEmpty ? "Me" : initials)
+                    .font(Theme.ui(size * 0.36, weight: .bold))
+                    .foregroundStyle(Theme.stickerInk)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(LinearGradient(colors: [Theme.pink, Theme.purple], startPoint: .topLeading, endPoint: .bottomTrailing))
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
     }
 }

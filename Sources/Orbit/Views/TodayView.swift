@@ -1,46 +1,6 @@
 import SwiftUI
 import SwiftData
 
-/// One entry on a calendar, either from Orbit or from Apple Calendar.
-struct CalEntry: Identifiable, Hashable {
-    enum Source: Hashable { case local(PersistentIdentifier), apple(calendar: String), google(calendar: String) }
-    let id: String
-    let title: String
-    let start: Date
-    let end: Date
-    let isAllDay: Bool
-    let area: Area?
-    let tint: Color
-    let source: Source
-
-    /// Name of the Apple or Google calendar it came from (nil for Orbit's own events).
-    var calendarName: String? {
-        switch source {
-        case .apple(let c): c
-        case .google(let c): c
-        case .local: nil
-        }
-    }
-
-    static func merge(local: [EventItem], apple: [AppleEvent], google: [GoogleEvent] = []) -> [CalEntry] {
-        let mine = local.map {
-            CalEntry(id: "\($0.persistentModelID.hashValue)", title: $0.title, start: $0.start, end: $0.end,
-                     isAllDay: false, area: $0.area, tint: $0.area.color, source: .local($0.persistentModelID))
-        }
-        let theirs = apple.map {
-            CalEntry(id: "apple-\($0.id)-\($0.start.timeIntervalSince1970)", title: $0.title, start: $0.start, end: $0.end,
-                     isAllDay: $0.isAllDay, area: nil, tint: $0.color, source: .apple(calendar: $0.calendarName))
-        }
-        // Skip Google events that macOS Calendar already shows (same title and start), e.g. if the account is also in Internet Accounts.
-        let appleKeys = Set(apple.map { "\($0.title.lowercased())|\(Int($0.start.timeIntervalSince1970))" })
-        let fromGoogle = google.filter { !appleKeys.contains("\($0.title.lowercased())|\(Int($0.start.timeIntervalSince1970))") }.map {
-            CalEntry(id: "google-\($0.id)-\($0.start.timeIntervalSince1970)", title: $0.title, start: $0.start, end: $0.end,
-                     isAllDay: $0.isAllDay, area: nil, tint: $0.color, source: .google(calendar: $0.calendarName))
-        }
-        return (mine + theirs + fromGoogle).sorted { $0.start < $1.start }
-    }
-}
-
 struct TodayView: View {
     @Environment(\.modelContext) private var context
     @EnvironmentObject private var apple: AppleSync
@@ -418,7 +378,7 @@ struct TodayView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Connect Gmail and \(AssistantName.current) sums up both inboxes for you: what needs a reply, what matters, what can wait.")
                             .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
-                        SettingsLink { Text("Connect Gmail") }.buttonStyle(SoftButtonStyle())
+                        OpenSettingsLink { Text("Connect Gmail") }.buttonStyle(SoftButtonStyle())
                     }
                     Spacer(minLength: 0)
                 } else {
@@ -550,7 +510,7 @@ struct TodayView: View {
     }
 }
 
-private struct AgendaRow: View {
+struct AgendaRow: View {
     let entry: CalEntry
     var dim = false
 
@@ -580,7 +540,7 @@ private struct AgendaRow: View {
     }
 }
 
-private struct MailRow: View {
+struct MailRow: View {
     let item: InboxDigest.Item
     let tint: Color
     let multi: Bool
@@ -618,7 +578,7 @@ private struct MailRow: View {
 }
 
 /// Small colourful stat tile in the Today row; tapping jumps to that area.
-private struct StatTile: View {
+struct StatTile: View {
     let value: String
     let label: String
     let symbol: String
@@ -761,7 +721,7 @@ struct ReminderRow: View {
 
 // MARK: - Claude morning brief
 
-private struct BriefCard: View {
+struct BriefCard: View {
     @Environment(\.modelContext) private var context
     @EnvironmentObject private var apple: AppleSync
     @ObservedObject private var ai = AIAssistant.shared
@@ -793,7 +753,7 @@ private struct BriefCard: View {
                     .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
             }
             Spacer()
-            SettingsLink { Text("Set up") }.buttonStyle(SoftButtonStyle())
+            OpenSettingsLink { Text("Set up") }.buttonStyle(SoftButtonStyle())
         }
         .padding(16)
         .background(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous).strokeBorder(Theme.line, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])))

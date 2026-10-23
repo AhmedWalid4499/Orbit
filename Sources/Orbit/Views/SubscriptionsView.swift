@@ -22,7 +22,7 @@ struct SubscriptionsView: View {
     var body: some View {
         let monthly = SubscriptionTracker.monthlyTotal(active)
         VStack(alignment: .leading, spacing: 18) {
-            HStack(spacing: 12) {
+            AdaptiveStack(grid: true) {
                 tile(Fmt.money(monthly), "Per month", Theme.lime)
                 tile(Fmt.money(monthly * 12), "Per year", Theme.orange)
                 tile("\(active.filter { $0.status == "active" }.count)", "Active", Theme.cyan)
@@ -43,9 +43,7 @@ struct SubscriptionsView: View {
                 }
             }
 
-            HStack {
-                Text("Subscriptions").font(Theme.display(22))
-                Spacer()
+            PageHeader(title: "Subscriptions") {
                 Button { SubscriptionTracker.detect(context: context) } label: { Label("Find in my transactions", systemImage: "sparkle.magnifyingglass") }
                     .buttonStyle(SoftButtonStyle())
                 Button { state.openAssistant(with: "Look at my subscriptions and tell me which ones I could cancel or downgrade to save money.") } label: {
@@ -136,7 +134,7 @@ struct SubscriptionsView: View {
     }
 }
 
-private struct SubscriptionEditor: View {
+struct SubscriptionEditor: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     let sub: Subscription?
@@ -187,7 +185,7 @@ private struct SubscriptionEditor: View {
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
-        .padding(26).frame(width: 480)
+        .padding(26).sheetFrame(width: 480)
         .onAppear {
             guard let s = sub else { return }
             name = s.name; amount = s.amount.formatted(.number.precision(.fractionLength(0...2)).grouping(.never)); cycle = s.cycle

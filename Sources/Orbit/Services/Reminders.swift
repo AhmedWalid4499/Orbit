@@ -2,8 +2,10 @@ import Foundation
 import SwiftUI
 import SwiftData
 import UserNotifications
+#if os(macOS)
 import ServiceManagement
 import AppKit
+#endif
 
 /// Native Mac notifications: tasks due, events starting soon, bills due tomorrow, habit and journal nudges,
 /// and the Sunday weekly review. The next two days are scheduled ahead, so alerts still arrive if Orbit is closed.
@@ -232,12 +234,15 @@ final class Reminders: NSObject, ObservableObject, UNUserNotificationCenterDeleg
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
         let route = response.notification.request.content.userInfo["route"] as? String
         await MainActor.run {
+            #if os(macOS)
             NSApp.activate(ignoringOtherApps: true)
             NSApp.windows.first { $0.canBecomeMain }?.makeKeyAndOrderFront(nil)
+            #endif
             self.route = route
         }
     }
 
+    #if os(macOS)
     // MARK: Open at login
 
     var openAtLogin: Bool {
@@ -247,6 +252,7 @@ final class Reminders: NSObject, ObservableObject, UNUserNotificationCenterDeleg
             objectWillChange.send()
         }
     }
+    #endif
 }
 
 /// Notification preferences, shown in Settings › Notifications.
@@ -262,7 +268,7 @@ struct NotificationSettingsView: View {
                     HStack {
                         Button("Allow notifications") { Task { await r.requestAuthorization() } }
                         Button("Open System Settings") {
-                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")!)
+                            Platform.open(URL(string: Platform.isPhone ? "app-settings:" : "x-apple.systempreferences:com.apple.Notifications-Settings.extension")!)
                         }
                     }
                 }
@@ -285,11 +291,13 @@ struct NotificationSettingsView: View {
                 Picker("Journal check-in", selection: $r.journalHour) { ForEach(18..<24) { Text("\($0):00").tag($0) } }
                 Picker("Before events", selection: $r.eventLead) { ForEach([5, 10, 15, 30], id: \.self) { Text("\($0) min").tag($0) } }
             }
+            #if os(macOS)
             Section {
                 Toggle("Open Orbit when I log in", isOn: Binding(get: { r.openAtLogin }, set: { r.openAtLogin = $0 }))
                 Text("Orbit schedules the next two days of reminders ahead, so they arrive even when it's closed. Opening it at login keeps them up to date.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            #endif
             Section {
                 Toggle("Play a little chime when Orbit opens", isOn: $launchSound)
             }

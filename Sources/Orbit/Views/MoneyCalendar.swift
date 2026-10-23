@@ -134,7 +134,7 @@ struct MoneyCalendar: View {
     }
 }
 
-private struct DueRow: View {
+struct DueRow: View {
     let item: DuePayment
 
     var body: some View {
@@ -153,7 +153,7 @@ private struct DueRow: View {
     }
 }
 
-private struct MoneyDayCell: View {
+struct MoneyDayCell: View {
     let day: Date
     let inMonth: Bool
     let spent: Double

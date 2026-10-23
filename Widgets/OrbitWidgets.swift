@@ -4,7 +4,11 @@ import SwiftUI
 // Orbit's desktop widgets. Built by scripts/build-widgets.sh into Orbit.app/Contents/PlugIns/OrbitWidgets.appex.
 // The app writes widget.json into the shared app-group folder (WidgetBridge.swift); keep these types in step with it.
 
+#if os(iOS)
+let appGroup = "group.com.ahmedwalid.orbit"
+#else
 let appGroup = "Y2K55S3UA9.com.personal.orbit"
+#endif
 
 struct WidgetSnapshot: Codable {
     struct Event: Codable { let title: String; let start: Date; let end: Date; let allDay: Bool; let color: String }

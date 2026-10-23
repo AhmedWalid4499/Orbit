@@ -6,14 +6,12 @@ struct HabitsView: View {
     @Query(sort: \Habit.createdAt) private var habits: [Habit]
     @State private var adding = false
 
-    private let columns = [GridItem(.adaptive(minimum: 320, maximum: 520), spacing: 20)]
+    private let columns = [GridItem(.adaptive(minimum: Platform.isPhone ? 280 : 320, maximum: 520), spacing: 20)]
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Habits").font(Theme.display(38))
-                    Spacer()
+                PageHeader(title: "Habits", size: 38, isPage: true) {
                     Button { adding = true } label: { Label("New habit", systemImage: "plus") }
                         .buttonStyle(SoftButtonStyle())
                 }
@@ -24,7 +22,7 @@ struct HabitsView: View {
                     ForEach(habits) { HabitCard(habit: $0) }
                 }
             }
-            .padding(.horizontal, 32)
+            .padding(.horizontal, Theme.pagePadding)
             .padding(.top, 10)
             .padding(.bottom, 32)
         }
@@ -33,7 +31,7 @@ struct HabitsView: View {
     }
 }
 
-private struct HabitCard: View {
+struct HabitCard: View {
     @Environment(\.modelContext) private var context
     @Bindable var habit: Habit
 
@@ -117,7 +115,7 @@ private struct HabitCard: View {
     }
 }
 
-private struct NewHabitSheet: View {
+struct NewHabitSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @State private var name = ""
@@ -159,6 +157,6 @@ private struct NewHabitSheet: View {
             }
         }
         .padding(28)
-        .frame(width: 440)
+        .sheetFrame(width: 440)
     }
 }

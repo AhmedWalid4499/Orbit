@@ -7,7 +7,7 @@ import Foundation
 
 @MainActor
 private func orbitContext() throws -> ModelContext {
-    guard let container = CapturePanel.shared.container else { throw IntentError.message("Orbit isn't ready yet. Try again in a moment.") }
+    guard let container = OrbitStore.container else { throw IntentError.message("Orbit isn't ready yet. Try again in a moment.") }
     return container.mainContext
 }
 

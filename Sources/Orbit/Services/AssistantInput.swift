@@ -1,6 +1,5 @@
 import Foundation
 import SwiftUI
-import AppKit
 import AVFoundation
 import Speech
 import UniformTypeIdentifiers
@@ -56,13 +55,19 @@ struct ChatAttachment: Identifiable, Equatable {
         }
         if type?.conforms(to: .image) == true {
             // Shrink big photos (and convert HEIC and friends) to a JPEG Claude reads well.
-            guard let image = NSImage(contentsOf: url), let jpeg = Self.jpeg(image, maxSide: 1800) else {
+            guard let image = PlatformImage.load(url), let jpeg = image.jpeg(maxSide: 1800) else {
                 throw CloudError("Couldn't open the image “\(name)”.")
             }
             return ChatAttachment(name: name, kind: .image, payload: jpeg.base64EncodedString(), mediaType: "image/jpeg")
         }
         var text: String?
-        if ["docx", "doc", "rtf", "rtfd", "odt", "html", "htm", "webarchive"].contains(ext) {
+        #if os(macOS)
+        let rich = ["docx", "doc", "rtf", "rtfd", "odt", "html", "htm", "webarchive"]
+        #else
+        let rich = ["rtf", "rtfd", "html", "htm"]
+        if ["docx", "doc", "odt"].contains(ext) { throw CloudError("Word files can be read on the Mac. On iPhone, share it as a PDF instead.") }
+        #endif
+        if rich.contains(ext) {
             text = (try? NSAttributedString(url: url, options: [:], documentAttributes: nil))?.string
         }
         if text == nil { text = try? String(contentsOf: url, encoding: .utf8) }
@@ -71,22 +76,6 @@ struct ChatAttachment: Identifiable, Equatable {
             throw CloudError("Couldn't read “\(name)”. PDFs, images, Word and text files work.")
         }
         return ChatAttachment(name: name, kind: .text, payload: String(t.prefix(150_000)), mediaType: "text/plain")
-    }
-
-    private static func jpeg(_ image: NSImage, maxSide: CGFloat) -> Data? {
-        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
-        let w = CGFloat(cg.width), h = CGFloat(cg.height)
-        let scale = min(1, maxSide / max(w, h))
-        let size = NSSize(width: (w * scale).rounded(), height: (h * scale).rounded())
-        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width), pixelsHigh: Int(size.height),
-                                         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-                                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-        NSColor.white.setFill(); NSRect(origin: .zero, size: size).fill()
-        NSImage(cgImage: cg, size: size).draw(in: NSRect(origin: .zero, size: size))
-        NSGraphicsContext.restoreGraphicsState()
-        return rep.representation(using: .jpeg, properties: [.compressionFactor: 0.82])
     }
 }
 
@@ -123,6 +112,12 @@ final class Dictation: ObservableObject {
         req.addsPunctuation = true
         if recognizer.supportsOnDeviceRecognition { req.requiresOnDeviceRecognition = true }
         request = req
+        #if os(iOS)
+        // The phone needs the microphone switched on (and other audio ducked) before listening.
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .defaultToSpeaker, .allowBluetoothHFP])
+        try? session.setActive(true, options: .notifyOthersOnDeactivation)
+        #endif
         let input = engine.inputNode
         input.removeTap(onBus: 0)
         input.installTap(onBus: 0, bufferSize: 1024, format: input.outputFormat(forBus: 0)) { [weak self] buffer, _ in
@@ -174,6 +169,9 @@ final class Dictation: ObservableObject {
         recognition = nil
         request = nil
         level = 0
+        #if os(iOS)
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        #endif
         let heard = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let done = onFinish
         onFinish = nil
@@ -226,6 +224,10 @@ final class Speaker: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
         u.rate = AVSpeechUtteranceDefaultSpeechRate * 1.02
         onDone = then
         speaking = true
+        #if os(iOS)
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+        try? AVAudioSession.sharedInstance().setActive(true)
+        #endif
         synth.speak(u)
     }
 

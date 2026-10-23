@@ -2,74 +2,6 @@ import SwiftUI
 import SwiftData
 import AppKit
 
-enum Tab: String, CaseIterable, Identifiable {
-    case today, calendar, tasks, habits, bucket, money, notes, reading, documents, github
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .notes:
-            return "Journal & Notes"
-        case .reading:
-            let first = (UserDefaults.standard.string(forKey: "userName") ?? NSFullUserName())
-                .split(separator: " ").first.map(String.init) ?? ""
-            return first.isEmpty ? "Reading" : "\(first)'s Reading"
-        case .github:
-            return "GitHub"
-        case .bucket:
-            return "Bucket list"
-        case .documents:
-            return "Documents"
-        default:
-            return rawValue.capitalized
-        }
-    }
-
-    var symbol: String {
-        switch self {
-        case .today: "sun.max.fill"
-        case .calendar: "calendar"
-        case .tasks: "checklist"
-        case .habits: "flame.fill"
-        case .money: "creditcard.fill"
-        case .notes: "book.pages.fill"
-        case .reading: "books.vertical.fill"
-        case .bucket: "mountain.2.fill"
-        case .documents: "doc.text.fill"
-        case .github: "chevron.left.forwardslash.chevron.right"
-        }
-    }
-
-    /// Nav groups: day, plan, life.
-    static let groups: [[Tab]] = [[.today], [.calendar, .tasks, .habits, .bucket], [.money, .notes, .reading, .documents, .github]]
-
-    /// ⌘1…⌘9 for the first nine tabs (there's no ⌘10).
-    var shortcutNumber: Int? { let i = Tab.allCases.firstIndex(of: self)! + 1; return i <= 9 ? i : nil }
-}
-
-@MainActor
-final class AppState: ObservableObject {
-    /// The window's state, for things that start outside a view (voice capture, notifications).
-    static weak var current: AppState?
-    init() { if AppState.current == nil { AppState.current = self } }
-
-    @Published var tab: Tab = .today
-    @Published var searchOpen = false
-    @Published var settingsOpen = false
-    @Published var openTodayJournal = false
-    @Published var assistantOpen = false
-    @Published var reviewOpen = false
-    @Published var cardOpen = false
-    @Published var planOpen = false
-    /// A message to send as soon as the assistant opens (e.g. from "Discuss with Claude").
-    @Published var assistantSeed: String?
-
-    func openAssistant(with message: String? = nil) {
-        assistantSeed = message
-        assistantOpen = true
-    }
-}
-
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotKey: HotKey?
 
@@ -132,7 +64,7 @@ struct OrbitApp: App {
         if UserDefaults.standard.string(forKey: "userName") == nil {
             UserDefaults.standard.set(NSFullUserName(), forKey: "userName")
         }
-        let schema = Schema([TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self, BookCategory.self, BucketItem.self, ReadingSession.self, Highlight.self, Subscription.self, DocItem.self, FocusSession.self, DayPlan.self, Trip.self, Booking.self])
+        let schema = OrbitSchema.schema
         let url = URL.applicationSupportDirectory.appending(path: "Orbit", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         let config = ModelConfiguration(schema: schema, url: url.appending(path: "Orbit.store"))
@@ -142,6 +74,7 @@ struct OrbitApp: App {
             fatalError("Could not open data store: \(error)")
         }
         CapturePanel.shared.container = container
+        OrbitStore.container = container
         BookLibrary.migrateLibrariesIfNeeded(context: container.mainContext)
     }
 

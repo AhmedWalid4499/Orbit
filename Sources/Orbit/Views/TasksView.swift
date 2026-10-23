@@ -170,7 +170,7 @@ struct TasksView: View {
     }
 }
 
-private struct FilterRow: View {
+struct FilterRow: View {
     let filter: TasksView.Filter
     let count: Int?
     let selected: Bool
@@ -252,7 +252,7 @@ struct TaskEditor: View {
             }
         }
         .padding(28)
-        .frame(width: 520)
+        .sheetFrame(width: 520)
         .onAppear { hasDue = task.due != nil }
         .onChange(of: hasDue) { _, on in task.due = on ? (task.due ?? .now.startOfDay) : nil }
     }

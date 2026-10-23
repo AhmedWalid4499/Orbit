@@ -20,12 +20,13 @@ struct ReviewView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                Text(section == "week" ? "Week in review" : "Mood & life insights").font(Theme.display(28))
+                Text(section == "week" ? "Week in review" : "Mood & life insights").font(Theme.display(Platform.isPhone ? 22 : 28))
+                    .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                 Spacer()
                 HStack(spacing: 2) {
                     ForEach([("week", "This week"), ("insights", "Insights")], id: \.0) { id, title in
                         Button(title) { withAnimation(.snappy) { section = id } }
-                            .buttonStyle(.plain).font(Theme.ui(13, weight: .semibold))
+                            .buttonStyle(.plain).font(Theme.ui(13, weight: .semibold)).lineLimit(1).fixedSize()
                             .foregroundStyle(section == id ? Theme.onInverse : Theme.ink)
                             .padding(.horizontal, 14).padding(.vertical, 7)
                             .background(Capsule().fill(section == id ? Theme.inverse : .clear))
@@ -35,13 +36,13 @@ struct ReviewView: View {
                 Button { dismiss() } label: { Image(systemName: "xmark").font(.system(size: 13, weight: .bold)) }
                     .buttonStyle(.plain).keyboardShortcut(.cancelAction)
             }
-            .padding(24)
+            .padding(Platform.isPhone ? 16 : 24)
             ScrollView {
                 if section == "week" { weekView } else { InsightsView() }
             }
             .scrollIndicators(.never)
         }
-        .frame(width: 920, height: 740)
+        .sheetFrame(width: 920, height: 740)
         .background(Theme.canvas)
         .onAppear { store.load(week: week) }
     }
@@ -62,7 +63,7 @@ struct ReviewView: View {
             }
             .buttonStyle(.plain)
 
-            HStack(spacing: 12) {
+            AdaptiveStack(grid: true) {
                 tile("\(s.tasksDone.count)", "Tasks done", Theme.pink)
                 tile(habitPct.map { "\($0)%" } ?? "—", "Habits kept", Theme.lime)
                 tile(Fmt.money(s.spent), "Spent this week", Theme.cyan)
@@ -78,7 +79,7 @@ struct ReviewView: View {
                     .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
             }
 
-            HStack(alignment: .top, spacing: 16) {
+            AdaptiveStack(spacing: 16) {
                 listCard("Finished", items: s.tasksDone + s.booksFinished.map { "📖 \($0)" } + s.bucketDone.map { "⛰ \($0)" },
                          empty: "Nothing ticked off this week.")
                 listCard("Habits", items: s.habits.map { "\($0.name): \($0.done) of \($0.target)" }, empty: "No habits yet.")
@@ -86,7 +87,7 @@ struct ReviewView: View {
                          + s.topCategories.map { "\($0.0): \(Fmt.money($0.1))" }, empty: "")
             }
         }
-        .padding(.horizontal, 24).padding(.bottom, 24)
+        .padding(.horizontal, Platform.isPhone ? 16 : 24).padding(.bottom, 24)
         .task(id: week) { if ai.hasKey { await store.reflect(on: s) } }
     }
 
@@ -206,7 +207,7 @@ struct ReviewView: View {
 
 // MARK: - Insights
 
-private struct InsightsView: View {
+struct InsightsView: View {
     @Environment(\.modelContext) private var context
     @EnvironmentObject private var apple: AppleSync
     @ObservedObject private var store = ReviewStore.shared

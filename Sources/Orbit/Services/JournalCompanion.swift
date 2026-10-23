@@ -36,7 +36,7 @@ enum JournalCompanion {
     private struct WriteUp: Decodable { let entry: String; let mood: Int }
 
     static func systemPrompt(context: ModelContext, apple: AppleSync) -> String {
-        let name = (UserDefaults.standard.string(forKey: "userName") ?? NSFullUserName())
+        let name = (Platform.userName)
             .split(separator: " ").first.map(String.init) ?? "there"
         return """
         You are \(AssistantName.current), a gentle, warm journaling companion inside \(name)'s personal organizer app. You help \(name) unwind and reflect on today through a calm, unhurried conversation, so their journal entry almost writes itself.

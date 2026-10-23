@@ -7,7 +7,11 @@ import WidgetKit
 /// (Widgets/OrbitWidgets.swift has the matching WidgetSnapshot type; keep them in step).
 @MainActor
 enum WidgetBridge {
+    #if os(iOS)
+    static let appGroup = "group.com.ahmedwalid.orbit"
+    #else
     static let appGroup = "Y2K55S3UA9.com.personal.orbit"
+    #endif
 
     private struct WidgetSnapshot: Codable {
         struct Event: Codable { let title: String; let start: Date; let end: Date; let allDay: Bool; let color: String }
@@ -27,8 +31,12 @@ enum WidgetBridge {
 
     private static var lastWritten: Data?
 
-    static var folder: URL {
+    static var folder: URL? {
+        #if os(iOS)
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup)
+        #else
         URL.homeDirectory.appending(path: "Library/Group Containers/\(appGroup)", directoryHint: .isDirectory)
+        #endif
     }
 
     static func update(context: ModelContext, apple: AppleSync) {
@@ -49,7 +57,7 @@ enum WidgetBridge {
 
         let snap = WidgetSnapshot(
             generatedAt: now,
-            userName: UserDefaults.standard.string(forKey: "userName") ?? NSFullUserName(),
+            userName: Platform.userName,
             events: entries.map { .init(title: $0.title, start: $0.start, end: $0.end, allDay: $0.isAllDay, color: hex($0.tint)) },
             tasks: tasks.prefix(8).map { .init(title: $0.title, area: $0.areaRaw, overdue: $0.isOverdue, priority: $0.priority) },
             habits: habits.map { .init(name: $0.name, symbol: $0.symbol, done: $0.isDone(on: today), streak: $0.currentStreak, color: hex($0.area.color)) },
@@ -62,13 +70,11 @@ enum WidgetBridge {
         var comparable = snap; comparable.generatedAt = .distantPast
         guard let key = try? enc.encode(comparable), key != lastWritten, let data = try? enc.encode(snap) else { return }
         lastWritten = key
+        guard let folder else { return } // iPhone builds without the app group (free accounts) have no widgets
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try? data.write(to: folder.appending(path: "widget.json"), options: .atomic)
         WidgetCenter.shared.reloadAllTimelines()
     }
 
-    private static func hex(_ c: Color) -> String {
-        guard let ns = NSColor(c).usingColorSpace(.sRGB) else { return "#F7C2EC" }
-        return String(format: "#%02X%02X%02X", Int(ns.redComponent * 255), Int(ns.greenComponent * 255), Int(ns.blueComponent * 255))
-    }
+    private static func hex(_ c: Color) -> String { c.hexString ?? "#F7C2EC" }
 }

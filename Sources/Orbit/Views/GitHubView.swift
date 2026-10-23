@@ -47,7 +47,7 @@ struct GitHubView: View {
                 }
                 statRow
                 if !gh.contributions.isEmpty { contributionCard }
-                HStack(alignment: .top, spacing: 22) {
+                AdaptiveStack(spacing: 22) {
                     reposCard
                     VStack(spacing: 22) {
                         listCard("Your open pull requests", items: gh.pullRequests, symbol: "arrow.triangle.pull",
@@ -56,10 +56,10 @@ struct GitHubView: View {
                                  empty: "Nothing assigned.")
                         activityCard
                     }
-                    .frame(width: 380)
+                    .frame(width: Platform.isPhone ? nil : 380)
                 }
             }
-            .padding(.horizontal, 32)
+            .padding(.horizontal, Theme.pagePadding)
             .padding(.top, 10)
             .padding(.bottom, 32)
         }
@@ -212,7 +212,7 @@ struct GitHubView: View {
     }
 }
 
-private struct GHStat: View {
+struct GHStat: View {
     let value: String
     let label: String
     let color: Color
@@ -229,7 +229,7 @@ private struct GHStat: View {
     }
 }
 
-private struct RepoRow: View {
+struct RepoRow: View {
     let repo: GitHubStore.Repo
     @State private var hovering = false
 

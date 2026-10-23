@@ -111,7 +111,7 @@ final class VoiceCapture: ObservableObject {
             NSApp.windows.first { $0.canBecomeMain }?.makeKeyAndOrderFront(nil)
             AppState.current?.openAssistant(with: text)
             show(.done("Asked \(AssistantName.current)"))
-        } else if let container = CapturePanel.shared.container {
+        } else if let container = OrbitStore.container {
             let summary = await CaptureEngine.capture(text, context: container.mainContext)
             show(summary.isEmpty ? .failed("Nothing to save in “\(text)”.") : .done(summary))
         }

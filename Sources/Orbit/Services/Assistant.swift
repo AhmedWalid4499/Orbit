@@ -165,7 +165,7 @@ final class AssistantStore: ObservableObject {
     // MARK: Prompt
 
     static func systemPrompt(context: ModelContext, apple: AppleSync) -> String {
-        let name = (UserDefaults.standard.string(forKey: "userName") ?? NSFullUserName()).split(separator: " ").first.map(String.init) ?? "the user"
+        let name = (Platform.userName).split(separator: " ").first.map(String.init) ?? "the user"
         return """
         You are \(AssistantName.current), \(name)'s personal assistant inside Orbit (you're built on Claude, by Anthropic), their life-organizer app on the Mac. You can talk things through and you can act in the app with tools: create tasks, events, habits, notes and transactions, add books to their reading list, set the monthly budget, and look up their data.
 

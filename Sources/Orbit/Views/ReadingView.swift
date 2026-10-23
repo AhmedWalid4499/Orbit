@@ -391,7 +391,7 @@ struct ReadingView: View {
 
 // MARK: - Pieces
 
-private struct ReadingStat: View {
+struct ReadingStat: View {
     let value: String
     let label: String
     let color: Color
@@ -408,7 +408,7 @@ private struct ReadingStat: View {
     }
 }
 
-private struct ReadingFilterRow: View {
+struct ReadingFilterRow: View {
     let title: String
     let symbol: String
     let count: Int
@@ -469,7 +469,7 @@ struct BookCover: View {
     }
 }
 
-private struct BookTile: View {
+struct BookTile: View {
     let book: Book
     @State private var hovering = false
 
@@ -517,7 +517,7 @@ struct Stars: View {
 
 // MARK: - Sheets
 
-private struct AddBookSheet: View {
+struct AddBookSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Query(sort: \BookCategory.createdAt) private var categories: [BookCategory]
@@ -598,7 +598,7 @@ private struct AddBookSheet: View {
             }
         }
         .padding(28)
-        .frame(width: 600)
+        .sheetFrame(width: 600)
         .onAppear { if let defaultCategory { picked = [defaultCategory] } }
     }
 
@@ -633,7 +633,7 @@ private struct AddBookSheet: View {
     }
 }
 
-private struct BookDetailSheet: View {
+struct BookDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Query(sort: \BookCategory.createdAt) private var categories: [BookCategory]
@@ -739,7 +739,7 @@ private struct BookDetailSheet: View {
             }
         }
         .padding(28)
-        .frame(width: 640)
+        .sheetFrame(width: 640)
     }
 
     private var sourceLabel: String {
@@ -753,7 +753,7 @@ private struct BookDetailSheet: View {
     }
 }
 
-private struct CategoryEditor: View {
+struct CategoryEditor: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Query private var books: [Book]
@@ -798,7 +798,7 @@ private struct CategoryEditor: View {
             }
         }
         .padding(28)
-        .frame(width: 420)
+        .sheetFrame(width: 420)
         .onAppear {
             if let category { name = category.name; color = category.colorIndex; symbol = category.symbol }
             else { color = all.count % BookPalette.colors.count }
@@ -889,8 +889,7 @@ struct ReadingSourcesSheet: View {
                         Spacer()
                         if UserDefaults.standard.string(forKey: "kindleDiagnostics") != nil && !sync.kindleLinked {
                             Button("Copy details") {
-                                NSPasteboard.general.clearContents()
-                                NSPasteboard.general.setString(UserDefaults.standard.string(forKey: "kindleDiagnostics") ?? "", forType: .string)
+                                Platform.copy(UserDefaults.standard.string(forKey: "kindleDiagnostics") ?? "")
                             }
                         }
                         Button(sync.kindleLinked ? "Import again" : "Import from Kindle") {
@@ -907,7 +906,7 @@ struct ReadingSourcesSheet: View {
             }
             .padding(28)
         }
-        .frame(width: 600, height: 720)
+        .sheetFrame(width: 600, height: 720)
         .fileImporter(isPresented: $importingCSV, allowedContentTypes: [.commaSeparatedText, .plainText]) { result in
             guard case .success(let url) = result else { return }
             let scoped = url.startAccessingSecurityScopedResource()
@@ -937,6 +936,7 @@ struct ReadingSourcesSheet: View {
                 step(3, "Make sure the switch next to Orbit is **on**.")
                 step(4, "Click **Relaunch Orbit**. Your Apple Books and Kindle books are imported right after.")
             }
+            #if os(macOS)
             HStack(spacing: 8) {
                 Button("Open Full Disk Access") {
                     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
@@ -946,6 +946,7 @@ struct ReadingSourcesSheet: View {
                 Spacer()
                 Button("Relaunch Orbit") { Updater.relaunch() }
             }
+            #endif
         }
         .padding(16)
         .background(RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.orange, lineWidth: 1.5))
@@ -1012,8 +1013,7 @@ struct HighlightRow: View {
         .background(RoundedRectangle(cornerRadius: 12).fill(Theme.canvas))
         .contextMenu {
             Button("Copy") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString("“\(highlight.text)” — \(highlight.bookTitle)", forType: .string)
+                Platform.copy("“\(highlight.text)” — \(highlight.bookTitle)")
             }
             Button("Delete", role: .destructive) { context.delete(highlight) }
         }

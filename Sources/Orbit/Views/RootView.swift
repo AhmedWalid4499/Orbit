@@ -91,7 +91,7 @@ struct RootView: View {
     }
 }
 
-private struct TopBar: View {
+struct TopBar: View {
     @EnvironmentObject private var state: AppState
     @AppStorage("assistantName") private var assistantName = "Ask"
     let userName: String
@@ -145,7 +145,7 @@ private struct TopBar: View {
 }
 
 /// Compact navigation: icons in one capsule, the current tab expands to show its name.
-private struct NavDock: View {
+struct NavDock: View {
     @EnvironmentObject private var state: AppState
     /// 0 roomy, 1 tighter, 2 tightest.
     let density: Int
@@ -169,7 +169,7 @@ private struct NavDock: View {
     }
 }
 
-private struct DockItem: View {
+struct DockItem: View {
     let tab: Tab
     let selected: Bool
     let density: Int
@@ -204,7 +204,7 @@ private struct DockItem: View {
 }
 
 /// Avatar in the top bar; click it to change your photo.
-private struct ProfileMenu: View {
+struct ProfileMenu: View {
     let name: String
     @ObservedObject private var profile = ProfileStore.shared
 
@@ -224,31 +224,5 @@ private struct ProfileMenu: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Profile")
-    }
-}
-
-struct Avatar: View {
-    let name: String
-    var size: CGFloat = 44
-    @ObservedObject private var profile = ProfileStore.shared
-
-    var initials: String {
-        name.split(separator: " ").prefix(2).compactMap(\.first).map(String.init).joined().uppercased()
-    }
-
-    var body: some View {
-        Group {
-            if let photo = profile.photo {
-                Image(nsImage: photo).resizable().scaledToFill()
-            } else {
-                Text(initials.isEmpty ? "Me" : initials)
-                    .font(Theme.ui(size * 0.36, weight: .bold))
-                    .foregroundStyle(Theme.stickerInk)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(LinearGradient(colors: [Theme.pink, Theme.purple], startPoint: .topLeading, endPoint: .bottomTrailing))
-            }
-        }
-        .frame(width: size, height: size)
-        .clipShape(Circle())
     }
 }

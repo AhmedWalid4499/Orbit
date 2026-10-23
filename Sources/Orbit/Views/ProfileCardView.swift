@@ -1,12 +1,14 @@
 import SwiftUI
+#if os(macOS)
 import AppKit
+#endif
 import UniformTypeIdentifiers
 
 /// The card itself: what people see when you share it.
 struct CardFace: View {
     let card: ProfileCard
-    let photo: NSImage?
-    let qr: NSImage?
+    let photo: PlatformImage?
+    let qr: PlatformImage?
 
     private var ink: Color { card.isDark ? Color(hex: 0xF4F4F5) : Theme.stickerInk }
 
@@ -14,7 +16,7 @@ struct CardFace: View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .center, spacing: 16) {
                 if card.showPhoto, let photo {
-                    Image(nsImage: photo).resizable().scaledToFill()
+                    photo.swiftUI.resizable().scaledToFill()
                         .frame(width: 86, height: 86).clipShape(Circle())
                         .overlay(Circle().strokeBorder(ink.opacity(0.15), lineWidth: 3))
                 }
@@ -48,7 +50,7 @@ struct CardFace: View {
                 }
                 Spacer()
                 if let qr {
-                    Image(nsImage: qr).interpolation(.none).resizable()
+                    qr.swiftUI.interpolation(.none).resizable()
                         .frame(width: 150, height: 150)
                         .padding(8)
                         .background(RoundedRectangle(cornerRadius: 14).fill(.white))
@@ -83,6 +85,29 @@ struct ProfileCardSheet: View {
     @State private var publishTask: Task<Void, Never>?
 
     var body: some View {
+        #if os(iOS)
+        ScrollView {
+            VStack(spacing: 18) {
+                CardFace(card: card, photo: profile.photo, qr: qrImage)
+                    .shadow(color: .black.opacity(0.15), radius: 18, y: 10)
+                    .scaleEffect(0.86).frame(height: 500)
+                actions
+                editor
+            }
+            .padding(.vertical, 20)
+        }
+        .onChange(of: card) { old, new in
+            card.save()
+            refreshFiles()
+            schedulePublish(turnedOff: old.publishPublic && !new.publishPublic)
+        }
+        .onAppear { refreshFiles() }
+        #else
+        macBody
+        #endif
+    }
+
+    private var macBody: some View {
         HStack(spacing: 0) {
             editor.frame(width: 420)
             Rectangle().fill(Theme.line).frame(width: 1)
@@ -97,7 +122,7 @@ struct ProfileCardSheet: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Theme.card.opacity(0.5))
         }
-        .frame(width: 900, height: 720)
+        .sheetFrame(width: 900, height: 720)
         .onChange(of: card) { old, new in
             card.save()
             refreshFiles()
@@ -109,7 +134,7 @@ struct ProfileCardSheet: View {
     // MARK: Editor
 
     private var editor: some View {
-        ScrollView {
+        VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     Text("My card").font(Theme.display(28))
@@ -128,7 +153,9 @@ struct ProfileCardSheet: View {
                     TextField("A line about you (optional)", text: $card.bio, axis: .vertical).lineLimit(2...3).textFieldStyle(.roundedBorder)
                     Toggle("Show my profile photo", isOn: $card.showPhoto)
                     if profile.photo == nil {
-                        Button("Add a profile photo…") { profile.choosePhoto() }.buttonStyle(.link).font(Theme.ui(12))
+                        #if os(macOS)
+                        Button("Add a profile photo…") { profile.choosePhoto() }.buttonStyle(.orbitLink).font(Theme.ui(12))
+                        #endif
                     }
                 }
 
@@ -175,8 +202,7 @@ struct ProfileCardSheet: View {
                                     Link(url.replacingOccurrences(of: "https://", with: ""), destination: URL(string: url)!).font(Theme.ui(11)).lineLimit(1)
                                     Spacer()
                                     Button("Copy link") {
-                                        NSPasteboard.general.clearContents()
-                                        NSPasteboard.general.setString(url, forType: .string)
+                                        Platform.copy(url)
                                         copied = "Link copied."
                                     }
                                 }
@@ -206,7 +232,7 @@ struct ProfileCardSheet: View {
             .font(Theme.ui(13))
             .padding(24)
         }
-        .scrollIndicators(.never)
+        .macScrollable()
     }
 
     private func group<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
@@ -247,20 +273,30 @@ struct ProfileCardSheet: View {
 
     // MARK: Sharing
 
-    private var qrImage: NSImage? { Self.qr(card.qrPayload) }
+    private var qrImage: PlatformImage? { Self.qr(card.qrPayload) }
 
     /// Crisp QR code as a bitmap (CoreImage output drawn without smoothing).
-    static func qr(_ text: String) -> NSImage? {
+    static func qr(_ text: String) -> PlatformImage? {
         let filter = CIFilter(name: "CIQRCodeGenerator")
         filter?.setValue(Data(text.utf8), forKey: "inputMessage")
         filter?.setValue("M", forKey: "inputCorrectionLevel")
         guard let out = filter?.outputImage?.transformed(by: CGAffineTransform(scaleX: 12, y: 12)),
               let cg = CIContext().createCGImage(out, from: out.extent) else { return nil }
-        return NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+        return PlatformImage.from(cg)
     }
 
     private var actions: some View {
         VStack(spacing: 10) {
+            #if os(iOS)
+            if let files {
+                ShareLink(items: [files.png, files.vcf]) { Label("Share card…", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity) }
+                    .buttonStyle(PrimaryButtonStyle()).padding(.horizontal, 24)
+            }
+            HStack(spacing: 10) {
+                Button { copyImage() } label: { Label("Copy image", systemImage: "doc.on.doc") }.buttonStyle(SoftButtonStyle())
+                Button { copyText() } label: { Label("Copy links", systemImage: "link") }.buttonStyle(SoftButtonStyle())
+            }
+            #else
             HStack(spacing: 10) {
                 if let files {
                     ShareLink(items: [files.png, files.vcf]) { Label("Share card…", systemImage: "square.and.arrow.up") }
@@ -269,12 +305,15 @@ struct ProfileCardSheet: View {
                 Button { copyImage() } label: { Label("Copy image", systemImage: "doc.on.doc") }.buttonStyle(SoftButtonStyle())
                 Button { copyText() } label: { Label("Copy links", systemImage: "link") }.buttonStyle(SoftButtonStyle())
             }
+            #endif
+            #if os(macOS)
             HStack(spacing: 10) {
                 Button { save(files?.png, as: "\(fileStem).png", type: .png) } label: { Label("Save image…", systemImage: "photo") }
                     .buttonStyle(SoftButtonStyle())
                 Button { save(files?.vcf, as: "\(fileStem).vcf", type: .vCard) } label: { Label("Save contact…", systemImage: "person.crop.square") }
                     .buttonStyle(SoftButtonStyle())
             }
+            #endif
             if let copied { Text(copied).font(Theme.ui(11, weight: .medium)).foregroundStyle(Theme.good) }
         }
     }
@@ -297,22 +336,21 @@ struct ProfileCardSheet: View {
         let renderer = ImageRenderer(content: CardFace(card: card, photo: profile.photo, qr: qrImage).padding(20))
         renderer.scale = 3
         guard let cg = renderer.cgImage else { return nil }
-        return NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])
+        return ImageData.encode(cg, size: CGSize(width: cg.width, height: cg.height), type: .png, quality: 1, crop: nil)
     }
 
     private func copyImage() {
-        guard let data = renderPNG(), let image = NSImage(data: data) else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.writeObjects([image])
+        guard let data = renderPNG(), let image = PlatformImage(data: data) else { return }
+        Platform.copy(image: image)
         copied = "Card image copied. Paste it into a chat or email."
     }
 
     private func copyText() {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(card.shareText, forType: .string)
+        Platform.copy(card.shareText)
         copied = "Links copied."
     }
 
+    #if os(macOS)
     private func save(_ source: URL?, as name: String, type: UTType) {
         guard let source else { return }
         let panel = NSSavePanel()
@@ -322,4 +360,5 @@ struct ProfileCardSheet: View {
         try? FileManager.default.removeItem(at: dest)
         try? FileManager.default.copyItem(at: source, to: dest)
     }
+    #endif
 }

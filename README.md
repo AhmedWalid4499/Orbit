@@ -125,6 +125,18 @@ Add your username on the GitHub tab to see public repos, open pull requests, ass
 
 Today's journal entry has a chat with Claude next to it. Claude asks about your mood and your day, and **Write my entry** turns the conversation into a first-person journal entry.
 
+## iPhone
+
+Orbit for iPhone has the same features and data as the Mac: sign in with the same account (Google or email) and enter your sync passphrase to bring your API key and Google sign-ins across. Today, Calendar, Tasks and Money have their own tabs; Habits, Journal & Notes, Reading, Bucket list and trips, Documents and GitHub are under More. The ✦ button opens your assistant (files, voice and spoken replies included), + is quick add, and your avatar opens My Card, Week in review, Search and Settings. Home-screen widgets and Siri ("Add to Orbit", "What's on today in Orbit") work like on the Mac.
+
+To install it, connect your iPhone and run:
+
+```
+scripts/install-iphone.sh
+```
+
+With a free Apple account the app stops opening after 7 days; run the script again to renew it. `scripts/run-ios-sim.sh -demo` runs it in the simulator with sample data.
+
 ## Project layout
 
 - `Sources/Orbit/Models`: SwiftData models (tasks, events, habits, transactions, notes, books, subscriptions, documents, focus sessions, day plans, trips and bookings)

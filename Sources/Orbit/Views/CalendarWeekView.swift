@@ -305,7 +305,7 @@ struct CalendarWeekView: View {
     }
 }
 
-private struct SlotCell: View {
+struct SlotCell: View {
     let isPast: Bool
     let isSelected: Bool
     let onTap: () -> Void
@@ -329,7 +329,7 @@ private struct SlotCell: View {
     }
 }
 
-private struct EventCard: View {
+struct EventCard: View {
     let entry: CalEntry
     let height: CGFloat
     @State private var hovering = false
@@ -413,7 +413,7 @@ struct NewEventPopover: View {
                 .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
         }
         .padding(20)
-        .frame(width: 320)
+        .sheetFrame(width: 320)
         .onChange(of: from) { old, new in to = new.addingTimeInterval(to.timeIntervalSince(old)) }
     }
 
@@ -427,7 +427,7 @@ struct NewEventPopover: View {
     }
 }
 
-private struct EventDetailPopover: View {
+struct EventDetailPopover: View {
     @Environment(\.modelContext) private var context
     let entry: CalEntry
     let onDone: () -> Void
@@ -455,7 +455,7 @@ private struct EventDetailPopover: View {
         }
         .font(Theme.ui(13))
         .padding(20)
-        .frame(width: 300, alignment: .leading)
+        .sheetFrame(width: 300)
     }
 }
 
@@ -504,7 +504,7 @@ struct FlowLayout: Layout {
 
 // MARK: - Month view
 
-private struct MonthGrid: View {
+struct MonthGrid: View {
     let days: [Date]
     let month: Date
     let entries: [CalEntry]
@@ -537,7 +537,7 @@ private struct MonthGrid: View {
     }
 }
 
-private struct MonthCell: View {
+struct MonthCell: View {
     let day: Date
     let inMonth: Bool
     let entries: [CalEntry]

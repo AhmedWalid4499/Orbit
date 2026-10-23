@@ -108,7 +108,7 @@ struct NotesView: View {
     }
 }
 
-private struct NoteRow: View {
+struct NoteRow: View {
     let note: Note
     let selected: Bool
 
@@ -135,7 +135,7 @@ private struct NoteRow: View {
     }
 }
 
-private struct NoteEditor: View {
+struct NoteEditor: View {
     @Bindable var note: Note
     let onDelete: () -> Void
 
@@ -180,7 +180,7 @@ struct PillToggleStyle: ToggleStyle {
 
 // MARK: - Journal with Claude check-in
 
-private struct JournalEditor: View {
+struct JournalEditor: View {
     @Environment(\.modelContext) private var context
     @EnvironmentObject private var apple: AppleSync
     @ObservedObject private var ai = AIAssistant.shared
@@ -207,12 +207,24 @@ private struct JournalEditor: View {
     }
     private var isToday: Bool { note.createdAt.isToday }
 
+    #if os(iOS)
+    @State private var talking = true
+    #endif
+
     var body: some View {
+        #if os(iOS)
+        VStack(spacing: 0) {
+            Picker("", selection: $talking) { Text("Talk").tag(true); Text("Write").tag(false) }
+                .pickerStyle(.segmented).padding(.horizontal, 16).padding(.vertical, 8)
+            if talking { chat } else { writing }
+        }
+        #else
         HStack(spacing: 0) {
             writing
             Rectangle().fill(Theme.line).frame(width: 1)
             chat.frame(width: 400)
         }
+        #endif
     }
 
     // Left: the entry itself
@@ -286,7 +298,7 @@ private struct JournalEditor: View {
                     Spacer()
                     Text("Add your Anthropic API key to chat about your day.").font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
                         .multilineTextAlignment(.center)
-                    SettingsLink { Text("Open Settings") }.buttonStyle(SoftButtonStyle())
+                    OpenSettingsLink { Text("Open Settings") }.buttonStyle(SoftButtonStyle())
                     Spacer()
                 }
                 .padding(24)
@@ -429,7 +441,7 @@ private struct JournalEditor: View {
     }
 }
 
-private struct Bubble: View {
+struct Bubble: View {
     let turn: JournalTurn
     var mine: Bool { turn.role == "user" }
 
@@ -460,7 +472,7 @@ private struct Bubble: View {
     }
 }
 
-private struct TypingDots: View {
+struct TypingDots: View {
     @State private var on = false
     var body: some View {
         HStack(spacing: 5) {

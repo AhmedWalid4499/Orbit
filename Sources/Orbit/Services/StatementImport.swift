@@ -322,7 +322,7 @@ struct StatementImportSheet: View {
             }
         }
         .padding(26)
-        .frame(width: 860, height: 700)
+        .sheetFrame(width: 860, height: 700)
         .onAppear { if !isPDF { loadCSV() } }
         .task { if isPDF { await loadPDF() } }
         .onChange(of: mapping) {
@@ -338,7 +338,7 @@ struct StatementImportSheet: View {
             column("Amount", $mapping.amount)
             column("Money out", $mapping.debit)
             column("Money in", $mapping.credit)
-            Toggle("Flip signs", isOn: $mapping.flip).toggleStyle(.checkbox).font(Theme.ui(12))
+            Toggle("Flip signs", isOn: $mapping.flip).toggleStyle(.orbitCheckbox).font(Theme.ui(12))
                 .help("Turn this on if spending shows up as income")
         }
     }
@@ -382,7 +382,7 @@ struct StatementImportSheet: View {
                 }
                 ForEach($rows) { $r in
                     HStack(spacing: 12) {
-                        Toggle("", isOn: $r.include).toggleStyle(.checkbox).labelsHidden()
+                        Toggle("", isOn: $r.include).toggleStyle(.orbitCheckbox).labelsHidden()
                         Text(r.date.formatted(.dateTime.day().month(.abbreviated).year(.twoDigits))).font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
                             .frame(width: 80, alignment: .leading)
                         Text(r.text).font(Theme.ui(13)).lineLimit(1)

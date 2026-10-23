@@ -2,7 +2,11 @@ import Foundation
 import SwiftUI
 import SwiftData
 import UserNotifications
+#if os(macOS)
 import AppKit
+#else
+import AudioToolbox
+#endif
 
 /// Pomodoro-style focus blocks. One runs at a time; it survives restarts (an open block has no end).
 @MainActor
@@ -69,7 +73,11 @@ final class FocusTimer: ObservableObject {
         guard let s = active, s.plannedEnd <= now else { return }
         s.end = s.plannedEnd
         try? context?.save()
+        #if os(macOS)
         NSSound(named: "Glass")?.play()
+        #else
+        AudioServicesPlaySystemSound(1016)
+        #endif
         finishUp()
         justFinished = s
     }
@@ -177,7 +185,7 @@ struct FocusDoneSheet: View {
                 Button("Close") { dismiss() }.buttonStyle(SoftButtonStyle()).keyboardShortcut(.defaultAction)
             }
         }
-        .padding(26).frame(width: 440)
+        .padding(26).sheetFrame(width: 440)
     }
 }
 

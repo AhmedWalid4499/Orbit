@@ -2,7 +2,6 @@ import Foundation
 import SwiftUI
 import SwiftData
 import CryptoKit
-import AppKit
 
 // MARK: - Supabase project
 
@@ -86,7 +85,11 @@ enum CloudAuth {
                             .init(name: "code_challenge", value: challenge), .init(name: "code_challenge_method", value: "s256")]
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
             pending = (verifier, cont)
-            NSWorkspace.shared.open(comps.url!)
+            Task { @MainActor in
+                // On iPhone the sign-in sheet hands back the redirect itself; on the Mac it arrives through the URL scheme.
+                if let back = await Platform.webAuth(comps.url!, callbackScheme: "com.personal.orbit") { handleCallback(back) }
+                else if Platform.isPhone, let p = pending { pending = nil; p.continuation.resume(throwing: CloudError("Google sign-in was cancelled.")) }
+            }
         }
     }
 
@@ -103,7 +106,7 @@ enum CloudAuth {
                     let json = try await auth("token?grant_type=pkce", body: ["auth_code": code, "code_verifier": p.verifier])
                     guard let s = parseSession(json) else { throw CloudError("Google sign-in didn't finish.") }
                     session = s
-                    NSApp.activate(ignoringOtherApps: true)
+                    Platform.bringToFront()
                     p.continuation.resume()
                 } catch {
                     p.continuation.resume(throwing: error)

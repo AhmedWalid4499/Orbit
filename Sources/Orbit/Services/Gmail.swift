@@ -3,7 +3,6 @@ import SwiftUI
 import SwiftData
 import Network
 import CryptoKit
-import AppKit
 
 // MARK: - Google OAuth (desktop loopback + PKCE)
 
@@ -74,7 +73,8 @@ enum GoogleAuth {
             .init(name: "prompt", value: "consent"),
             .init(name: "include_granted_scopes", value: "true"),
         ] + (hint.map { [URLQueryItem(name: "login_hint", value: $0)] } ?? [])
-        NSWorkspace.shared.open(comps.url!)
+        let browser = Task { _ = await Platform.webAuth(comps.url!, callbackScheme: nil) }
+        defer { browser.cancel(); Platform.endWebAuth() }
 
         let code = try await server.waitForCode()
         let tokens = try await tokenRequest([
@@ -352,7 +352,7 @@ final class InboxStore: ObservableObject {
         let listing = mails.enumerated().map { i, m in
             "[\(i)] account: \(m.account) | from: \(m.from) | subject: \(m.subject) | date: \(m.date) | \(m.unread ? "unread" : "read")\n    \(m.snippet)"
         }.joined(separator: "\n")
-        let name = (UserDefaults.standard.string(forKey: "userName") ?? NSFullUserName()).split(separator: " ").first.map(String.init) ?? "the user"
+        let name = (Platform.userName).split(separator: " ").first.map(String.init) ?? "the user"
         let system = """
         You triage email for \(name) across their Gmail accounts. You get the last two days of inbox mail (promotions and social already filtered out), each with a reference number, sender, subject and a short snippet.
         - overview: 1-2 calm sentences on what's going on across their inboxes. Mention the account when it matters.

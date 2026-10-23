@@ -17,7 +17,7 @@ struct WelcomeView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 14) {
-                Image(nsImage: AppIcon.make()).resizable().frame(width: 56, height: 56)
+                OrbitMark(size: 56)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Welcome to Orbit").font(Theme.display(30))
                     Text("Your day, plans, money, reading and dreams in one place.").font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
@@ -88,7 +88,7 @@ struct WelcomeView: View {
             }
         }
         .padding(30)
-        .frame(width: 560)
+        .sheetFrame(width: 560)
         .interactiveDismissDisabled()
     }
 

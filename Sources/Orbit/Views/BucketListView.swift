@@ -52,7 +52,7 @@ struct BucketListView: View {
                     }
                 }
             }
-            .padding(.horizontal, 32).padding(.top, 10).padding(.bottom, 32)
+            .padding(.horizontal, Theme.pagePadding).padding(.top, 10).padding(.bottom, 32)
         }
         .scrollIndicators(.never)
         .sheet(isPresented: $adding) { BucketEditor(item: nil) }
@@ -62,13 +62,10 @@ struct BucketListView: View {
 
     private var header: some View {
         let done = items.filter(\.isDone).count
-        return HStack(alignment: .center, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Bucket list").font(Theme.display(38))
-                Text(items.isEmpty ? "The things you want to do, see, learn and feel." : "\(done) of \(items.count) done. Keep dreaming.")
-                    .font(Theme.ui(14)).foregroundStyle(Theme.inkSecondary)
-            }
-            Spacer()
+        return PageHeader(title: "Bucket list", size: 38, isPage: true) {
+            Text(items.isEmpty ? "The things you want to do, see, learn and feel." : "\(done) of \(items.count) done. Keep dreaming.")
+                .font(Theme.ui(14)).foregroundStyle(Theme.inkSecondary)
+        } actions: {
             if !items.isEmpty {
                 ZStack {
                     Circle().stroke(Theme.card, lineWidth: 8)
@@ -118,6 +115,10 @@ struct BucketListView: View {
     }
 
     private var filters: some View {
+        ScrollView(.horizontal) { filterRow }.scrollIndicators(.never)
+    }
+
+    private var filterRow: some View {
         HStack(spacing: 8) {
             ForEach(["Dreams", "Done"], id: \.self) { s in
                 Button(s == "Done" ? "Done (\(items.filter(\.isDone).count))" : "Dreams (\(items.filter { !$0.isDone }.count))") { show = s }
@@ -152,7 +153,7 @@ struct BucketListView: View {
     }
 }
 
-private struct BucketCard: View {
+struct BucketCard: View {
     @Bindable var item: BucketItem
     var onTrip: () -> Void = {}
     @Query private var trips: [Trip]
@@ -220,7 +221,7 @@ private struct BucketCard: View {
     }
 }
 
-private struct BucketEditor: View {
+struct BucketEditor: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     let item: BucketItem?
@@ -276,7 +277,7 @@ private struct BucketEditor: View {
             }
         }
         .padding(28)
-        .frame(width: 500)
+        .sheetFrame(width: 500)
         .onAppear {
             guard let item else { return }
             title = item.title; notes = item.notes; kind = item.kind; excitement = item.excitement

@@ -1,6 +1,5 @@
 import Foundation
 import SwiftUI
-import AppKit
 
 /// Your shareable contact card: name, headline, contact details and social links.
 /// Stored as JSON in the "profileCard" setting, so it syncs with your Orbit account.
@@ -141,7 +140,7 @@ struct ProfileCard: Codable, Equatable {
         if let s = UserDefaults.standard.string(forKey: "profileCard"), let data = s.data(using: .utf8),
            let card = try? JSONDecoder().decode(ProfileCard.self, from: data) { return card }
         var card = ProfileCard()
-        card.name = UserDefaults.standard.string(forKey: "userName") ?? NSFullUserName()
+        card.name = Platform.userName
         card.links = [Link(kind: .linkedin, value: ""), Link(kind: .website, value: "")]
         return card
     }
@@ -196,23 +195,13 @@ struct ProfileCard: Codable, Equatable {
     }
 
     /// What the public page shows (email and phone only if you chose to).
-    func publicData(photo: NSImage?) -> [String: Any] {
+    func publicData(photo: PlatformImage?) -> [String: Any] {
         var d: [String: Any] = ["name": name, "headline": headline, "company": company, "location": location, "bio": bio,
                                 "colorIndex": colorIndex,
                                 "links": filledLinks.map { ["kind": $0.kind.rawValue, "url": $0.url, "display": $0.display] },
                                 "email": publicShowContact ? email : "", "phone": publicShowContact ? phone : "", "photo": ""]
-        if showPhoto, let photo, let tiff = photo.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
-            let side = 200
-            if let small = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: side, pixelsHigh: side, bitsPerSample: 8, samplesPerPixel: 4,
-                                            hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) {
-                NSGraphicsContext.saveGraphicsState()
-                NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: small)
-                rep.draw(in: NSRect(x: 0, y: 0, width: side, height: side))
-                NSGraphicsContext.restoreGraphicsState()
-                if let jpeg = small.representation(using: .jpeg, properties: [.compressionFactor: 0.7]) {
-                    d["photo"] = "data:image/jpeg;base64," + jpeg.base64EncodedString()
-                }
-            }
+        if showPhoto, let photo, let jpeg = photo.square(side: 200, type: .jpeg, quality: 0.7) {
+            d["photo"] = "data:image/jpeg;base64," + jpeg.base64EncodedString()
         }
         return d
     }

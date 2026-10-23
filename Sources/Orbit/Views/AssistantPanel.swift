@@ -38,7 +38,7 @@ struct AssistantPanel: View {
                     Spacer()
                     Image(systemName: "sparkles").font(.system(size: 30))
                     Text("Add your Anthropic API key to chat with \(assistantName).").font(Theme.ui(13)).multilineTextAlignment(.center)
-                    SettingsLink { Text("Open Settings") }.buttonStyle(SoftButtonStyle())
+                    OpenSettingsLink { Text("Open Settings") }.buttonStyle(SoftButtonStyle())
                     Spacer()
                 }
                 .foregroundStyle(Theme.inkSecondary)
@@ -48,7 +48,7 @@ struct AssistantPanel: View {
                 composer
             }
         }
-        .frame(width: 440)
+        .sheetFrame(width: 440)
         .frame(maxHeight: .infinity)
         .background(Theme.canvas)
         .overlay(alignment: .leading) { Rectangle().fill(Theme.line).frame(width: 1) }
@@ -280,7 +280,7 @@ struct AssistantPanel: View {
 }
 
 /// Assistant text with light markdown (bold, italics, links) and calm line spacing.
-private struct AssistantText: View {
+struct AssistantText: View {
     let text: String
 
     var body: some View {
@@ -295,7 +295,7 @@ private struct AssistantText: View {
     }
 }
 
-private struct Thinking: View {
+struct Thinking: View {
     @State private var on = false
     var body: some View {
         HStack(spacing: 5) {

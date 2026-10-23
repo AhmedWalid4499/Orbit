@@ -89,12 +89,12 @@ struct MoneyView: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            Text(month.formatted(.dateTime.month(.wide).year())).font(Theme.display(38))
+            Text(month.formatted(.dateTime.month(.wide).year())).font(Theme.display(38)).lineLimit(1).minimumScaleFactor(0.7)
             HStack(spacing: 2) {
                 ForEach([("Overview", "overview"), ("Calendar", "calendar"), ("Subscriptions", "subscriptions")], id: \.1) { label, key in
                     Button(label) { withAnimation(.snappy) { mode = key } }
                         .buttonStyle(.plain)
-                        .font(Theme.ui(13, weight: .semibold))
+                        .font(Theme.ui(13, weight: .semibold)).lineLimit(1).fixedSize()
                         .foregroundStyle(mode == key ? Theme.onInverse : Theme.ink)
                         .padding(.horizontal, 14).padding(.vertical, 8)
                         .background(Capsule().fill(mode == key ? Theme.inverse : .clear))
@@ -105,7 +105,7 @@ struct MoneyView: View {
             .padding(.leading, 8)
             Spacer()
             EmailExpensesChip()
-            Button { pickingStatement = true } label: { Label("Import statement", systemImage: "doc.text.magnifyingglass") }
+            Button { pickingStatement = true } label: { Label("Import", systemImage: "doc.text.magnifyingglass") }
                 .buttonStyle(SoftButtonStyle()).help("Add transactions from your bank's CSV or PDF statement")
             Button { adding = true } label: { Label("Add transaction", systemImage: "plus") }.buttonStyle(SoftButtonStyle())
             CircleIconButton(symbol: "arrow.left", filled: true, size: 46) {
@@ -222,7 +222,7 @@ struct MoneyView: View {
     }
 }
 
-private struct BalanceCard: View {
+struct BalanceCard: View {
     let title: String
     let value: Double
     let caption: String
@@ -249,7 +249,7 @@ private struct BalanceCard: View {
     }
 }
 
-private struct TxnRow: View {
+struct TxnRow: View {
     @Environment(\.modelContext) private var context
     @Bindable var txn: Transaction
 
@@ -308,7 +308,7 @@ private struct TxnRow: View {
     }
 }
 
-private struct NewTransactionSheet: View {
+struct NewTransactionSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @State private var title = ""
@@ -346,7 +346,7 @@ private struct NewTransactionSheet: View {
         }
         .font(Theme.ui(13))
         .padding(28)
-        .frame(width: 420)
+        .sheetFrame(width: 420)
         .onChange(of: title) { _, t in if !isIncome { category = ["General", "Income"].contains(QuickParser.guessCategory(t)) ? category : QuickParser.guessCategory(t) } }
     }
 
@@ -360,7 +360,7 @@ private struct NewTransactionSheet: View {
 }
 
 /// Status of receipts imported from Gmail, with a manual sync.
-private struct EmailExpensesChip: View {
+struct EmailExpensesChip: View {
     @Environment(\.modelContext) private var context
     @ObservedObject private var importer = EmailExpenses.shared
     @ObservedObject private var inbox = InboxStore.shared

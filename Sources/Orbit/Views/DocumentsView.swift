@@ -17,13 +17,10 @@ struct DocumentsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                HStack(alignment: .firstTextBaseline) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Documents").font(Theme.display(38))
-                        Text("Orbit reminds you before anything expires. Keep numbers short (e.g. the last 4 digits).")
-                            .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
-                    }
-                    Spacer()
+                PageHeader(title: "Documents", size: 38, isPage: true) {
+                    Text("Orbit reminds you before anything expires. Keep numbers short (e.g. the last 4 digits).")
+                        .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
+                } actions: {
                     Button { adding = true } label: { Label("Add document", systemImage: "plus") }.buttonStyle(SoftButtonStyle())
                 }
                 summary
@@ -44,7 +41,7 @@ struct DocumentsView: View {
                     }
                 }
             }
-            .padding(.horizontal, 32).padding(.top, 10).padding(.bottom, 32)
+            .padding(.horizontal, Theme.pagePadding).padding(.top, 10).padding(.bottom, 32)
         }
         .scrollIndicators(.never)
         .sheet(item: $editing) { DocEditor(doc: $0) }
@@ -54,7 +51,7 @@ struct DocumentsView: View {
     private var summary: some View {
         let soon = docs.filter { ($0.daysLeft ?? 999) <= 90 && ($0.daysLeft ?? -1) >= 0 }.count
         let expired = docs.filter { ($0.daysLeft ?? 1) < 0 }.count
-        return HStack(spacing: 12) {
+        return AdaptiveStack(grid: true) {
             tile("\(docs.count)", "Documents", Theme.cyan)
             tile("\(soon)", "Expire within 3 months", Theme.orange)
             tile("\(expired)", "Expired", expired > 0 ? Theme.pink : Theme.mint)
@@ -63,11 +60,14 @@ struct DocumentsView: View {
     }
 
     private var filters: some View {
-        HStack(spacing: 6) {
-            chip("All", nil)
-            ForEach(DocKind.allCases.filter { k in docs.contains { $0.kind == k } }) { chip($0.title, $0) }
-            Spacer()
+        ScrollView(.horizontal) {
+            HStack(spacing: 6) {
+                chip("All", nil)
+                ForEach(DocKind.allCases.filter { k in docs.contains { $0.kind == k } }) { chip($0.title, $0) }
+                Spacer()
+            }
         }
+        .scrollIndicators(.never)
     }
 
     private func chip(_ title: String, _ k: DocKind?) -> some View {
@@ -89,7 +89,7 @@ struct DocumentsView: View {
     }
 }
 
-private struct DocCard: View {
+struct DocCard: View {
     let doc: DocItem
     @State private var hovering = false
 
@@ -132,7 +132,7 @@ private struct DocCard: View {
     }
 }
 
-private struct DocEditor: View {
+struct DocEditor: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     let doc: DocItem?
@@ -190,7 +190,7 @@ private struct DocEditor: View {
                     .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
-        .padding(26).frame(width: 520)
+        .padding(26).sheetFrame(width: 520)
         .onAppear {
             guard let d = doc else { title = DocKind.passport.title; remindDays = 180; return }
             title = d.title; kind = d.kind; number = d.number; issuer = d.issuer; remindDays = d.remindDays; notes = d.notes

@@ -361,6 +361,7 @@ final class EmailExpenses: ObservableObject {
             }
         }
         try? context.save()
+        if expenses > 0 { SpendingAlerts.check(context: context) }
         return (expenses, bills)
     }
 }

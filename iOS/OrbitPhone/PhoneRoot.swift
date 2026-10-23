@@ -52,6 +52,7 @@ struct PhoneRoot: View {
         .task {
             focus.restore(context: context); reading.restore(context: context)
             BankTest.runIfRequested()
+            SmartsTest.runIfRequested()
             // For testing: `-open habits` (or any tab), `-sheet plan|review|card|assistant|settings|capture|search`.
             let args = ProcessInfo.processInfo.arguments
             if let i = args.firstIndex(of: "-open"), i + 1 < args.count, let t = Tab(rawValue: args[i + 1]) { show(t) }

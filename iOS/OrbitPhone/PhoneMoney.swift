@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import Charts
+import PhotosUI
 
 /// Money on iPhone: the month at a glance, then Overview, Calendar or Subscriptions, like the Mac.
 struct PhoneMoney: View {
@@ -14,6 +15,12 @@ struct PhoneMoney: View {
     @State private var pickingStatement = false
     @State private var statement: StatementFile?
     @State private var bankSetup = false
+    @State private var camera = false
+    @State private var libraryItem: PhotosPickerItem?
+    @State private var choosingPhoto = false
+    @State private var receiptMenu = false
+    @State private var receipt: ReceiptPhoto?
+    @State private var rulesOpen = false
 
     private var monthEnd: Date { Calendar.current.date(byAdding: .month, value: 1, to: month)! }
     private var txns: [Transaction] { all.filter { $0.date >= month && $0.date < monthEnd } }
@@ -49,11 +56,16 @@ struct PhoneMoney: View {
                 } else if mode == "subscriptions" {
                     SubscriptionsView()
                 } else {
-                    HStack(spacing: 10) {
-                        Button { adding = true } label: { Label("Add", systemImage: "plus") }.buttonStyle(SoftButtonStyle())
-                        Button { pickingStatement = true } label: { Label("Import statement", systemImage: "doc.text.magnifyingglass") }
-                            .buttonStyle(SoftButtonStyle())
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 10) {
+                            Button { adding = true } label: { Label("Add", systemImage: "plus") }.buttonStyle(SoftButtonStyle())
+                            Button { receiptMenu = true } label: { Label("Receipt", systemImage: "doc.viewfinder") }.buttonStyle(SoftButtonStyle())
+                            Button { rulesOpen = true } label: { Label("Budgets", systemImage: "slider.horizontal.3") }.buttonStyle(SoftButtonStyle())
+                            Button { pickingStatement = true } label: { Label("Statement", systemImage: "doc.text.magnifyingglass") }
+                                .buttonStyle(SoftButtonStyle())
+                        }
                     }
+                    .scrollIndicators(.never)
                     autoLogCard
                     MoneyCoachCard()
                     chart
@@ -70,6 +82,20 @@ struct PhoneMoney: View {
         }
         .sheet(item: $statement) { StatementImportSheet(url: $0.url) }
         .sheet(isPresented: $bankSetup) { PhoneBankSetup() }
+        .sheet(isPresented: $rulesOpen) { MoneyRulesSheet() }
+        .sheet(item: $receipt) { ReceiptScanSheet(photo: $0) }
+        .confirmationDialog("Add a receipt", isPresented: $receiptMenu) {
+            Button("Take photo") { camera = true }
+            Button("Choose from Photos") { choosingPhoto = true }
+        }
+        .fullScreenCover(isPresented: $camera) { CameraPicker { receipt = ReceiptPhoto(image: $0) }.ignoresSafeArea() }
+        .photosPicker(isPresented: $choosingPhoto, selection: $libraryItem, matching: .images)
+        .onChange(of: libraryItem) { _, item in
+            Task {
+                if let data = try? await item?.loadTransferable(type: Data.self), let img = UIImage(data: data) { receipt = ReceiptPhoto(image: img) }
+                libraryItem = nil
+            }
+        }
         .phoneChrome("Money")
     }
 

@@ -13,6 +13,9 @@ struct MoneyView: View {
     /// overview, calendar or subscriptions
     @AppStorage("moneyTab") private var mode = "overview"
     @State private var pickingStatement = false
+    @State private var pickingReceipt = false
+    @State private var receipt: ReceiptPhoto?
+    @State private var rulesOpen = false
     @State private var statement: StatementFile?
 
     private var monthEnd: Date { Calendar.current.date(byAdding: .month, value: 1, to: month)! }
@@ -85,6 +88,8 @@ struct MoneyView: View {
             if case .success(let url) = result { statement = StatementFile(url: url) }
         }
         .sheet(item: $statement) { StatementImportSheet(url: $0.url) }
+        .sheet(item: $receipt) { ReceiptScanSheet(photo: $0) }
+        .sheet(isPresented: $rulesOpen) { MoneyRulesSheet() }
     }
 
     private var header: some View {
@@ -105,6 +110,16 @@ struct MoneyView: View {
             .padding(.leading, 8)
             Spacer()
             EmailExpensesChip()
+            Button { pickingReceipt = true } label: { Label("Receipt", systemImage: "doc.viewfinder") }
+                .buttonStyle(SoftButtonStyle()).help("Add an expense from a photo of a receipt")
+                .fileImporter(isPresented: $pickingReceipt, allowedContentTypes: [.image]) { result in
+                    guard case .success(let url) = result else { return }
+                    let scoped = url.startAccessingSecurityScopedResource()
+                    defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                    if let img = PlatformImage.load(url) { receipt = ReceiptPhoto(image: img) }
+                }
+            Button { rulesOpen = true } label: { Label("Budgets", systemImage: "slider.horizontal.3") }
+                .buttonStyle(SoftButtonStyle()).help("Budgets per category, spending alerts and learned merchant categories")
             Button { pickingStatement = true } label: { Label("Import", systemImage: "doc.text.magnifyingglass") }
                 .buttonStyle(SoftButtonStyle()).help("Add transactions from your bank's CSV or PDF statement")
             Button { adding = true } label: { Label("Add transaction", systemImage: "plus") }.buttonStyle(SoftButtonStyle())
@@ -265,6 +280,7 @@ struct TxnRow: View {
                 HStack(spacing: 6) {
                     if txn.fromEmail { Image(systemName: "envelope.fill").help("Added from \(txn.source.dropFirst(6))") }
                     if txn.fromBank { Image(systemName: txn.source == "sms" ? "message.fill" : "wave.3.right").help(txn.source == "sms" ? "Added from a bank message" : "Added from Apple Pay") }
+                    if txn.source == "receipt" { Image(systemName: "doc.viewfinder").help("Added from a receipt photo") }
                     Text(txn.category)
                     if !txn.originalCurrency.isEmpty {
                         Text("· \(txn.originalAmount.formatted(.number.precision(.fractionLength(0...2)))) \(txn.originalCurrency)")
@@ -282,7 +298,9 @@ struct TxnRow: View {
         .background(RoundedRectangle(cornerRadius: 12).fill(Theme.canvas))
         .contextMenu {
             Toggle("Recurring", isOn: $txn.isRecurring)
-            Menu("Category") { ForEach(MoneyCategory.all, id: \.self) { c in Button(c) { txn.category = c } } }
+            Menu("Category") {
+                ForEach(MoneyCategory.all, id: \.self) { c in Button(c) { MerchantRules.learn(txn, category: c, context: context) } }
+            }
             Divider()
             if txn.fromEmail {
                 Button("Not an expense") { EmailExpenses.shared.reject(txn, context: context) }
@@ -318,6 +336,7 @@ struct NewTransactionSheet: View {
     @State private var category = "Food"
     @State private var date = Date.now
     @State private var recurring = false
+    @State private var pickedCategory = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -325,9 +344,14 @@ struct NewTransactionSheet: View {
             Picker("", selection: $isIncome) { Text("Expense").tag(false); Text("Income").tag(true) }
                 .pickerStyle(.segmented).labelsHidden()
             field("What", text: $title, prompt: "Groceries")
+                .onChange(of: title) { _, t in
+                    if !pickedCategory { let g = QuickParser.guessCategory(t); category = g == "Income" || g == "General" && t.isEmpty ? "Food" : g }
+                }
             field("Amount", text: $amount, prompt: "0.00")
             HStack {
-                Picker("Category", selection: $category) { ForEach(MoneyCategory.all, id: \.self) { Text($0) } }
+                Picker("Category", selection: Binding(get: { category }, set: { category = $0; pickedCategory = true })) {
+                    ForEach(MoneyCategory.all, id: \.self) { Text($0) }
+                }
                 DatePicker("", selection: $date, displayedComponents: .date).labelsHidden()
             }
             Toggle("Repeats monthly", isOn: $recurring)
@@ -336,8 +360,13 @@ struct NewTransactionSheet: View {
                 Spacer()
                 Button("Add") {
                     let v = Double(amount.replacingOccurrences(of: ",", with: ".")) ?? 0
-                    context.insert(Transaction(title: title, amount: isIncome ? v : -v,
-                                               category: isIncome ? "Income" : category, date: date, isRecurring: recurring))
+                    let t = Transaction(title: title, amount: isIncome ? v : -v,
+                                        category: isIncome ? "Income" : category, date: date, isRecurring: recurring)
+                    context.insert(t)
+                    // Picking a different category than Orbit suggested teaches it this merchant.
+                    if !isIncome, pickedCategory, category != QuickParser.guessCategory(title) { MerchantRules.learn(t, category: category, context: context) }
+                    t.category = isIncome ? "Income" : category
+                    SpendingAlerts.check(context: context)
                     dismiss()
                 }
                 .buttonStyle(PrimaryButtonStyle()).frame(width: 120)

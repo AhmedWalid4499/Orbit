@@ -36,7 +36,7 @@ def action(intent, params):
     p.update(params)
     return {"WFWorkflowActionIdentifier": f"{BUNDLE}.{intent}", "WFWorkflowActionParameters": p}
 
-def shortcut(actions, glyph, color, input_class):
+def shortcut(actions, glyph, color, input_class, share_sheet=False):
     return {
         "WFWorkflowActions": actions,
         "WFWorkflowClientVersion": "3600.0.0",
@@ -46,13 +46,16 @@ def shortcut(actions, glyph, color, input_class):
         "WFWorkflowIcon": {"WFWorkflowIconGlyphNumber": glyph, "WFWorkflowIconStartColor": color},
         "WFWorkflowImportQuestions": [],
         # The trigger's own type first, so Shortcuts keeps its properties (Sender, Merchant…) instead of turning it into text.
-        "WFWorkflowInputContentItemClasses": [input_class, "WFStringContentItem"],
+        "WFWorkflowInputContentItemClasses": input_class if isinstance(input_class, list) else [input_class, "WFStringContentItem"],
         "WFWorkflowOutputContentItemClasses": [],
-        "WFWorkflowTypes": [],
+        # In the Share Sheet (e.g. from Google or Apple Maps) when share_sheet is set.
+        "WFWorkflowTypes": ["ActionExtension"] if share_sheet else [],
         "WFQuickActionSurfaces": [],
     }
 
 SHORTCUTS = {
+    "Orbit Go To": shortcut([action("AddPlaceIntent", {"place": whole_input()})], 59825, 4251333119,
+                            ["WFURLContentItem", "WFMKMapItemContentItem", "WFStringContentItem", "WFRichTextContentItem"], share_sheet=True),
     "Orbit Bank Message": shortcut([action("LogBankMessageIntent", {
         "message": input_property("Content"), "sender": input_property("Sender"), "fullInput": whole_input()})], 59511, 4282601983, "WFMessageContentItem"),
     "Orbit Card Payment": shortcut([action("LogCardPaymentIntent", {

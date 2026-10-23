@@ -284,6 +284,10 @@ struct NotificationSettingsView: View {
                 Toggle("Documents and warranties about to expire", isOn: $r.documents)
                 Toggle("Evening nudge to plan tomorrow", isOn: $r.evening)
                 Toggle("Trips: packing and flights", isOn: $r.trips)
+                Toggle("Spending reaching a budget (80% and 100%)", isOn: Binding(
+                    get: { SpendingAlerts.budgetAlerts }, set: { UserDefaults.standard.set($0, forKey: "notify.budgets"); r.objectWillChange.send() }))
+                Toggle("Unusually large charges", isOn: Binding(
+                    get: { SpendingAlerts.bigChargeAlerts }, set: { UserDefaults.standard.set($0, forKey: "notify.bigCharges"); r.objectWillChange.send() }))
             }
             Section("Times") {
                 Picker("Morning summary", selection: $r.morningHour) { ForEach(5..<13) { Text("\($0):00").tag($0) } }

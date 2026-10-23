@@ -269,8 +269,14 @@ private let syncKinds: [SyncKind] = [
              fetch: { (try? $0.fetch(FetchDescriptor<BucketItem>())) ?? [] }, uuid: { ($0 as! BucketItem).uuid },
              encode: { m in let b = m as! BucketItem
                  return ["title": b.title, "notes": b.notes, "kind": b.kindRaw, "targetDate": J.date(b.targetDate), "excitement": b.excitement,
-                         "isDone": b.isDone, "doneAt": J.date(b.doneAt), "createdAt": J.date(b.createdAt)] },
+                         "isDone": b.isDone, "doneAt": J.date(b.doneAt), "createdAt": J.date(b.createdAt),
+                         "place": ["category": b.placeCategoryRaw, "address": b.address, "lat": b.latitude, "lon": b.longitude, "url": b.mapURL]] },
              apply: { d, m in let b = m as! BucketItem
+                 // Only rows written by an Orbit that knows places carry them (the Windows app doesn't yet).
+                 if let p = d["place"] as? [String: Any] {
+                     b.placeCategoryRaw = J.str(p["category"]); b.address = J.str(p["address"]); b.latitude = J.num(p["lat"])
+                     b.longitude = J.num(p["lon"]); b.mapURL = J.str(p["url"])
+                 }
                  b.title = J.str(d["title"]); b.notes = J.str(d["notes"]); b.kindRaw = J.str(d["kind"]); b.targetDate = J.date(d["targetDate"])
                  b.excitement = J.int(d["excitement"]); b.isDone = J.bool(d["isDone"]); b.doneAt = J.date(d["doneAt"]); b.createdAt = J.date(d["createdAt"]) ?? b.createdAt },
              make: { let b = BucketItem(title: ""); $0.insert(b); return b }),
@@ -368,7 +374,8 @@ private let syncedSettings = ["monthlyBudget", "readingGoal", "currencyCode", "a
                               "emailExpensesEnabled", "aiMorningBrief", "aiSmartCapture", "assistantSpeaks", "focusMinutes", "launchSound",
                               "notify.tasks", "notify.events", "notify.bills", "notify.habits", "notify.journal", "notify.review",
                               "notify.subscriptions", "notify.documents", "notify.evening", "notify.trips", "notify.morningHour",
-                              "notify.habitHour", "notify.journalHour", "notify.eventLead"]
+                              "notify.habitHour", "notify.journalHour", "notify.eventLead",
+                              "merchantRules", "categoryBudgets", "notify.budgets", "notify.bigCharges", "spendAlerts.sent"]
 
 // MARK: - Sync engine
 
@@ -462,6 +469,7 @@ final class CloudSync: ObservableObject {
             do { try await syncVault(userID: session.userID) } catch { vaultState = .error(error.localizedDescription) }
             try? context.save()
             saveState()
+            SpendingAlerts.check(context: context)
             lastSync = .now
             status = pulled + pushed == 0 ? "Up to date" : "Synced \(pulled) down, \(pushed) up"
         } catch {

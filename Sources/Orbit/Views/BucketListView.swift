@@ -11,6 +11,7 @@ extension BucketKind {
         case .create: Theme.purple
         case .people: Theme.mint
         case .other: Theme.peach
+        case .place: Theme.mint
         }
     }
 }
@@ -19,7 +20,10 @@ extension BucketKind {
 struct BucketListView: View {
     @Environment(\.modelContext) private var context
     @EnvironmentObject private var state: AppState
-    @Query(sort: \BucketItem.createdAt, order: .reverse) private var items: [BucketItem]
+    @Query(sort: \BucketItem.createdAt, order: .reverse) private var everything: [BucketItem]
+    /// Dreams only: Go to places have their own section.
+    private var items: [BucketItem] { everything.filter { $0.kind != .place } }
+    @AppStorage("bucketSection") private var section = "dreams"
 
     @State private var show = "Dreams"
     @State private var kind: BucketKind?
@@ -41,14 +45,32 @@ struct BucketListView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 header
-                TripsSection(open: $openTrip)
-                if !upcoming.isEmpty { lookingForward }
-                filters
-                if visible.isEmpty { empty }
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 250, maximum: 360), spacing: 16, alignment: .top)], spacing: 16) {
-                    ForEach(visible) { item in
-                        BucketCard(item: item) { openTrip = TripStore.plan(from: item, context: context) }
-                            .onTapGesture { editing = item }
+                HStack(spacing: 0) {
+                    ForEach([("dreams", "Dreams", "sparkles"), ("goto", "Go to", "mappin.and.ellipse")], id: \.0) { key, label, symbol in
+                        Button { withAnimation(.snappy) { section = key } } label: {
+                            Label(label, systemImage: symbol).font(Theme.ui(14, weight: .semibold)).lineLimit(1).fixedSize()
+                                .foregroundStyle(section == key ? Theme.onInverse : Theme.ink)
+                                .padding(.horizontal, 18).padding(.vertical, 9)
+                                .background(Capsule().fill(section == key ? Theme.inverse : .clear))
+                                .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(3)
+                .background(Capsule().fill(Theme.card))
+                if section == "goto" {
+                    GoToSection()
+                } else {
+                    TripsSection(open: $openTrip)
+                    if !upcoming.isEmpty { lookingForward }
+                    filters
+                    if visible.isEmpty { empty }
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 250, maximum: 360), spacing: 16, alignment: .top)], spacing: 16) {
+                        ForEach(visible) { item in
+                            BucketCard(item: item) { openTrip = TripStore.plan(from: item, context: context) }
+                                .onTapGesture { editing = item }
+                        }
                     }
                 }
             }
@@ -128,7 +150,7 @@ struct BucketListView: View {
                     .background(Capsule().fill(show == s ? Theme.inverse : Theme.card))
             }
             Rectangle().fill(Theme.line).frame(width: 1, height: 22).padding(.horizontal, 4)
-            ForEach(BucketKind.allCases) { k in
+            ForEach(BucketKind.dreams) { k in
                 Button { kind = kind == k ? nil : k } label: {
                     Label(k.title, systemImage: k.symbol).font(Theme.ui(12, weight: .medium))
                         .foregroundStyle(Theme.stickerInk)
@@ -240,7 +262,7 @@ struct BucketEditor: View {
                 .textFieldStyle(.plain).font(Theme.ui(16))
                 .padding(12).background(RoundedRectangle(cornerRadius: 12).fill(Theme.card))
             FlowLayout(spacing: 6) {
-                ForEach(BucketKind.allCases) { k in
+                ForEach(BucketKind.dreams) { k in
                     Label(k.title, systemImage: k.symbol).font(Theme.ui(12, weight: .medium)).foregroundStyle(Theme.stickerInk)
                         .padding(.horizontal, 10).padding(.vertical, 6)
                         .background(Capsule().fill(k.color.opacity(kind == k ? 1 : 0.3)))

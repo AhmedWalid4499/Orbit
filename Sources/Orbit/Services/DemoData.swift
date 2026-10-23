@@ -46,6 +46,17 @@ enum Snapshot {
         ctx.insert(TaskItem(title: "Pay Electricity — 450 EGP", area: .money, due: Date.now.startOfDay.adding(days: 4), priority: 2))
         ctx.insert(BucketItem(title: "See the northern lights in Norway", kind: .travel, notes: "Tromsø in February", targetDate: Date.now.startOfDay.adding(days: 23), excitement: 3))
         ctx.insert(BucketItem(title: "Learn to surf", kind: .adventure, excitement: 2))
+        for (name, cat, addr, lat, lon, note, been) in [
+            ("Zooba", PlaceCategory.food, "26 Taha Hussein, Zamalek", 30.0611, 31.2194, "Get the koshary and the taameya sandwich", false),
+            ("Grand Egyptian Museum", .museum, "Kafr Nassar, Giza", 29.9947, 31.1186, "Book the Tutankhamun galleries", false),
+            ("Café Riche", .cafe, "Talaat Harb, Downtown", 30.0476, 31.2393, "", true),
+            ("Cairo Festival City Mall", .shop, "New Cairo", 30.0288, 31.4082, "", false),
+        ] {
+            let p = BucketItem(title: name, kind: .place, notes: note)
+            p.placeCategory = cat; p.address = addr; p.latitude = lat; p.longitude = lon
+            if been { p.isDone = true; p.doneAt = .now.adding(days: -12) }
+            ctx.insert(p)
+        }
         ctx.insert(BucketItem(title: "Read 50 books in a year", kind: .learn, excitement: 2))
         ctx.insert(BucketItem(title: "Concert with friends", kind: .people, targetDate: Date.now.startOfDay.adding(days: 6), excitement: 3))
         let done = BucketItem(title: "Climb Mount Sinai at sunrise", kind: .adventure, excitement: 3)

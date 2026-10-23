@@ -93,6 +93,7 @@ enum BankMessages {
         if currency != Fmt.currencyCode { t.originalAmount = p.amount; t.originalCurrency = currency }
         context.insert(t)
         try? context.save()
+        SpendingAlerts.check(context: context)
         await pushSoon(context: context)
         return p.kind == .expense ? "Logged \(Fmt.money(value)) at \(title)." : "Logged \(Fmt.money(value)) in from \(title)."
     }

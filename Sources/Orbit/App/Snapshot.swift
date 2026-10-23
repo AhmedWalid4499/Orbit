@@ -85,6 +85,8 @@ extension Snapshot {
             renderAlone("review-insights", width: 920, height: 740, ReviewView(startOnInsights: true))
             for (i, a) in [0.6, 2.2, 4.0].enumerated() { renderAlone("splash-\(i)", width: size.width, height: size.height, SplashView(angle: a)) }
             renderAlone("plan-tomorrow", width: 1040, height: 720, PlanTomorrowSheet())
+            renderAlone("goto", width: 1100, height: 820, wait: 3, ScrollView { GoToSection().padding(28) })
+            renderAlone("money-rules", width: 560, height: 720, MoneyRulesSheet())
             if let trip = try? container.mainContext.fetch(FetchDescriptor<Trip>()).first {
                 renderAlone("trip", width: 820, height: 720, TripSheet(trip: trip))
             }

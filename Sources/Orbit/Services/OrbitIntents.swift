@@ -150,6 +150,26 @@ struct LogCardPaymentIntent: AppIntent {
     }
 }
 
+/// Saves a place to Bucket list › Go to. Shared from Google or Apple Maps through the "Orbit Go To" shortcut, or said to Siri.
+struct AddPlaceIntent: AppIntent {
+    static let title: LocalizedStringResource = "Add Place to Go To"
+    static let description = IntentDescription("Saves a restaurant, café, shop, museum or any place to your Go to list, from its name or a Google or Apple Maps link. Orbit finds it on the map and works out what kind of place it is.")
+
+    @Parameter(title: "Place", requestValueDialog: "Which place?") var place: String
+    @Parameter(title: "Notes", default: "") var notes: String
+
+    static var parameterSummary: some ParameterSummary { Summary("Add \(\.$place) to Go to") }
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
+        guard let p = await PlaceLookup.add(place, notes: notes, context: try orbitContext()) else {
+            throw IntentError.message("I couldn't find that place. Try its name and area, like “Zooba Zamalek”.")
+        }
+        let text = "Saved \(p.title) to Go to (\(p.placeCategory.title))."
+        return .result(value: text, dialog: IntentDialog(stringLiteral: text))
+    }
+}
+
 struct OrbitShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(intent: AddToOrbitIntent(), phrases: [
@@ -170,5 +190,8 @@ struct OrbitShortcuts: AppShortcutsProvider {
         AppShortcut(intent: LogCardPaymentIntent(), phrases: [
             "Log a card payment in \(.applicationName)",
         ], shortTitle: "Log card payment", systemImageName: "wave.3.right.circle")
+        AppShortcut(intent: AddPlaceIntent(), phrases: [
+            "Add a place to \(.applicationName)", "Save a place in \(.applicationName)",
+        ], shortTitle: "Add place", systemImageName: "mappin.and.ellipse")
     }
 }

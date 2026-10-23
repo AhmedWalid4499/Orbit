@@ -199,7 +199,8 @@ final class Transaction {
     init(title: String, amount: Double, category: String = "General", date: Date = .now, isRecurring: Bool = false) {
         self.title = title
         self.amount = amount
-        self.category = category
+        // A category you taught Orbit for this merchant wins over any guess (see MerchantRules).
+        self.category = amount < 0 ? MerchantRules.category(for: title) ?? category : category
         self.date = date
         self.isRecurring = isRecurring
     }
@@ -650,8 +651,12 @@ final class Booking {
 
 enum BucketKind: String, CaseIterable, Identifiable {
     case travel, experience, adventure, learn, create, people, other
+    /// A real place you want to go back to or try: lives in Bucket list › Go to, with a map pin.
+    case place
     var id: String { rawValue }
-    var title: String { self == .people ? "People" : rawValue.capitalized }
+    var title: String { self == .people ? "People" : self == .place ? "Go to" : rawValue.capitalized }
+    /// The dream kinds (everything except Go to places).
+    static var dreams: [BucketKind] { allCases.filter { $0 != .place } }
     var symbol: String {
         switch self {
         case .travel: "airplane"
@@ -661,6 +666,39 @@ enum BucketKind: String, CaseIterable, Identifiable {
         case .create: "paintbrush.fill"
         case .people: "person.2.fill"
         case .other: "star.fill"
+        case .place: "mappin.and.ellipse"
+        }
+    }
+}
+
+/// What kind of place a Go to pin is.
+enum PlaceCategory: String, CaseIterable, Identifiable {
+    case food, cafe, bar, shop, museum, park, attraction, hotel, other
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .food: "Food"
+        case .cafe: "Café"
+        case .bar: "Bar"
+        case .shop: "Shop"
+        case .museum: "Museum"
+        case .park: "Park"
+        case .attraction: "Sight"
+        case .hotel: "Stay"
+        case .other: "Other"
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .food: "fork.knife"
+        case .cafe: "cup.and.saucer.fill"
+        case .bar: "wineglass.fill"
+        case .shop: "bag.fill"
+        case .museum: "building.columns.fill"
+        case .park: "leaf.fill"
+        case .attraction: "star.fill"
+        case .hotel: "bed.double.fill"
+        case .other: "mappin"
         }
     }
 }
@@ -679,6 +717,19 @@ final class BucketItem {
     var isDone: Bool = false
     var doneAt: Date? = nil
     var createdAt: Date = Date.now
+    // Go to places only (kind == .place). isDone means "been there".
+    var placeCategoryRaw: String = ""
+    var address: String = ""
+    var latitude: Double = 0
+    var longitude: Double = 0
+    /// Link the place came from (Google or Apple Maps), or an Apple Maps link Orbit made.
+    var mapURL: String = ""
+
+    var placeCategory: PlaceCategory {
+        get { PlaceCategory(rawValue: placeCategoryRaw) ?? .other }
+        set { placeCategoryRaw = newValue.rawValue }
+    }
+    var hasLocation: Bool { latitude != 0 || longitude != 0 }
 
     init(title: String, kind: BucketKind = .experience, notes: String = "", targetDate: Date? = nil, excitement: Int = 2) {
         self.title = title

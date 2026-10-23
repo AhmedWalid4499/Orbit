@@ -102,6 +102,7 @@ struct QuickParser {
     }
 
     static func guessCategory(_ title: String) -> String {
+        if let learned = MerchantRules.category(for: title) { return learned }
         let t = title.lowercased()
         let map: [(String, [String])] = [
             ("Income", ["salary", "payroll"]),

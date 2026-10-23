@@ -382,9 +382,9 @@ enum AssistantTools {
                 if let p = await SmartReminders.resolve(placeText) {
                     t.placeName = p.name; t.placeLat = p.lat; t.placeLon = p.lon; t.placeOnLeave = str("remind_on") == "leave"
                     SmartReminders.ensureLocationAccess()
-                    when += " · " + t.placeReminderText.lowercased().replacingOccurrences(of: "when you", with: "when you")
+                    when += " · " + t.placeReminderText.lowercased()
                 } else if ["home", "work"].contains(placeText.lowercased()) {
-                    note += " Couldn't set the place reminder: \(placeText) isn't saved yet. Tell the user to add it in Settings › General › Places."
+                    note += " Couldn't set the place reminder: add your \(placeText.lowercased()) in Settings › General › Places first."
                 } else {
                     note += " Couldn't find \(placeText) on the map for the place reminder."
                 }

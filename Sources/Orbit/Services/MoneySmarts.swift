@@ -182,6 +182,8 @@ enum SmartsTest {
             let req = SmartReminders.requests(tasks: [rt], prefix: "orbit.")
             let near = await SmartReminders.resolve("pharmacy")
             print("REMIND  timed=\(req.timed.count) places=\(req.places.count) home=\(await SmartReminders.resolve("home")?.name ?? "nil") pharmacy=\(near.map { "\($0.name) \($0.lat),\($0.lon)" } ?? "nil")")
+            print("QUICK   " + (await CaptureEngine.capture("remind me to call mom when I get home", context: ctx)))
+            print("QUICK   " + (await CaptureEngine.capture("remind me to take the gym bag when I leave work", context: ctx)))
             SavedPlaces.set("home", nil)
             print("WEATHER " + (await WeatherStore.shared.forecastText(latitude: 30.06, longitude: 31.22, place: "Cairo") ?? "nil").split(separator: "\n").prefix(7).joined(separator: "\n"))
             print("SENT    \(Speaker.sentences("Hey! Your day looks calm. Two things left: • Gym at 7 • Call mom. Want me to move one?"))")

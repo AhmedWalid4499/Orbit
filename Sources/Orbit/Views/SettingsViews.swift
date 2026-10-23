@@ -33,6 +33,9 @@ struct GeneralSettings: View {
 
     @EnvironmentObject private var state: AppState
 
+    @State private var placeEditing: SavedPlaceKey?
+    @State private var placesVersion = 0
+
     var body: some View {
     Form {
         TextField("Your name", text: $userName)
@@ -48,7 +51,7 @@ struct GeneralSettings: View {
         LabeledContent("Quick capture", value: "⌥Space (anywhere)")
         LabeledContent("Search", value: "⌘K")
         #endif
-        SavedPlacesSection()
+        SavedPlacesSection(editing: $placeEditing, refresh: placesVersion)
         Section {
             Button("Take the tour") {
                 // On iPhone, Settings is a sheet: close it first so the tour can cover the screen.
@@ -60,6 +63,7 @@ struct GeneralSettings: View {
             Button("Delete all data…", role: .destructive) { confirmClear = true }
         }
     }
+        .savedPlaceSearch($placeEditing) { placesVersion += 1 }
         .confirmationDialog("Delete everything in Orbit?", isPresented: $confirmClear) {
             Button("Delete all data", role: .destructive) { DataReset.clearAll(context) }
         } message: {

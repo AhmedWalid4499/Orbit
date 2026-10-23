@@ -64,7 +64,11 @@ final class TaskItem {
     var placeOnLeave: Bool = false
 
     var hasPlaceReminder: Bool { !placeName.isEmpty && (placeLat != 0 || placeLon != 0) }
-    var placeReminderText: String { placeOnLeave ? "When you leave \(placeName)" : "When you get to \(placeName)" }
+    var placeReminderText: String {
+        let home = placeName == "Home"
+        if placeOnLeave { return home ? "When you leave home" : "When you leave \(placeName)" }
+        return home ? "When you get home" : placeName == "Work" ? "When you get to work" : "When you get to \(placeName)"
+    }
 
     init(title: String, area: Area = .personal, due: Date? = nil, priority: Int = 0,
          notes: String = "", recurrence: Recurrence = .none) {

@@ -169,7 +169,7 @@ struct PhoneCapture: View {
             .buttonStyle(PrimaryButtonStyle()).disabled(busy || text.trimmingCharacters(in: .whitespaces).isEmpty)
             if let result { Label(result, systemImage: "checkmark.circle.fill").font(Theme.ui(14, weight: .medium)).foregroundStyle(Theme.good) }
             if let e = dictation.error { Text(e).font(Theme.ui(12)).foregroundStyle(Theme.orange) }
-            Text("One line can hold several things: “gym tomorrow 7am and pay rent friday”.").font(Theme.ui(12)).foregroundStyle(Theme.inkMuted)
+            Text("One line can hold several things: “gym tomorrow 7am and pay rent friday”. Reminders work too: “remind me to call mom when I get home”.").font(Theme.ui(12)).foregroundStyle(Theme.inkMuted)
             Spacer()
         }
         .padding(20)

@@ -133,41 +133,54 @@ struct ReminderSection: View {
 }
 
 /// Settings › General › Places: Home and Work for "remind me when I get home".
+/// The search sheet is attached by the settings page (`.savedPlaceSearch`), not the row: a sheet on a list row
+/// is dropped as soon as the row redraws.
 struct SavedPlacesSection: View {
-    @State private var home = SavedPlaces.home
-    @State private var work = SavedPlaces.work
-    @State private var editing: String?
+    @Binding var editing: SavedPlaceKey?
+    var refresh: Int = 0
+    @State private var cleared = 0
 
     var body: some View {
         Section {
-            row("Home", "house.fill", home) { editing = "home" } clear: { SavedPlaces.set("home", nil); home = nil }
-            row("Work", "briefcase.fill", work) { editing = "work" } clear: { SavedPlaces.set("work", nil); work = nil }
+            row("home", "Home", "house.fill")
+            row("work", "Work", "briefcase.fill")
         } header: {
             Text("Places")
         } footer: {
             Text("Used for reminders like “remind me to call mom when I get home”.")
         }
-        .sheet(item: Binding(get: { editing.map { EditingKey(id: $0) } }, set: { editing = $0?.id })) { key in
-            PlaceSearchSheet(title: key.id == "home" ? "Your home" : "Your work") { f in
-                guard let c = f.coordinate else { return }
-                let p = SavedPlaces.Place(name: key.id == "home" ? "Home" : "Work", address: f.address.isEmpty ? f.name : f.address,
-                                          lat: c.latitude, lon: c.longitude)
-                SavedPlaces.set(key.id, p)
-                if key.id == "home" { home = p } else { work = p }
-                SmartReminders.ensureLocationAccess()
-            }
-        }
+        .id("\(refresh)-\(cleared)")
     }
 
-    private struct EditingKey: Identifiable { let id: String }
-
-    private func row(_ title: String, _ symbol: String, _ place: SavedPlaces.Place?, edit: @escaping () -> Void, clear: @escaping () -> Void) -> some View {
-        HStack {
+    private func row(_ key: String, _ title: String, _ symbol: String) -> some View {
+        let place = SavedPlaces.load(key)
+        return HStack {
             Label(title, systemImage: symbol)
             Spacer()
             Text(place?.address ?? "Not set").foregroundStyle(.secondary).lineLimit(1)
-            Button(place == nil ? "Set" : "Change", action: edit)
-            if place != nil { Button(role: .destructive, action: clear) { Image(systemName: "xmark.circle.fill") }.buttonStyle(.plain).foregroundStyle(.secondary) }
+            Button(place == nil ? "Set" : "Change") { editing = SavedPlaceKey(id: key) }
+                .buttonStyle(.borderless)
+            if place != nil {
+                Button(role: .destructive) { SavedPlaces.set(key, nil); cleared += 1 } label: { Image(systemName: "xmark.circle.fill") }
+                    .buttonStyle(.borderless).foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+struct SavedPlaceKey: Identifiable, Equatable { let id: String }
+
+extension View {
+    /// The Home / Work search sheet for `SavedPlacesSection`.
+    func savedPlaceSearch(_ editing: Binding<SavedPlaceKey?>, onSaved: @escaping () -> Void) -> some View {
+        sheet(item: editing) { key in
+            PlaceSearchSheet(title: key.id == "home" ? "Your home" : "Your work") { f in
+                guard let c = f.coordinate else { return }
+                SavedPlaces.set(key.id, .init(name: key.id == "home" ? "Home" : "Work", address: f.address.isEmpty ? f.name : f.address,
+                                              lat: c.latitude, lon: c.longitude))
+                SmartReminders.ensureLocationAccess()
+                onSaved()
+            }
         }
     }
 }

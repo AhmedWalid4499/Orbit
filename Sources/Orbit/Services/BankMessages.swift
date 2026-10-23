@@ -204,6 +204,37 @@ enum BankMessages {
 
 /// Banks and wallets you can pick, with the names their texts usually arrive from. Bank text messages are only
 /// logged when they come from one you picked (or from a sender you added); with none picked, every one is read.
+/// Every time a Shortcuts automation reaches Orbit, newest first (last 20), so the setup screen can show
+/// whether the automations are firing and what they passed in.
+enum AutoLogActivity {
+    enum Kind: String { case sms, wallet }
+    struct Entry: Identifiable {
+        let id: Double
+        let kind: Kind
+        let sender: String
+        let text: String
+        let result: String
+        var date: Date { Date(timeIntervalSince1970: id) }
+    }
+
+    private static let key = "bankSMS.activity"
+
+    static func record(_ kind: Kind, sender: String, text: String, result: String) {
+        var list = UserDefaults.standard.array(forKey: key) as? [[String: Any]] ?? []
+        list.insert(["t": Date.now.timeIntervalSince1970, "k": kind.rawValue, "s": String(sender.prefix(60)),
+                     "x": String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(120)), "r": result], at: 0)
+        UserDefaults.standard.set(Array(list.prefix(20)), forKey: key)
+    }
+
+    static var entries: [Entry] {
+        (UserDefaults.standard.array(forKey: key) as? [[String: Any]] ?? []).compactMap { d in
+            guard let t = d["t"] as? Double else { return nil }
+            return Entry(id: t, kind: Kind(rawValue: d["k"] as? String ?? "") ?? .sms, sender: d["s"] as? String ?? "",
+                         text: d["x"] as? String ?? "", result: d["r"] as? String ?? "")
+        }
+    }
+}
+
 enum EgyptBanks {
     struct Bank: Identifiable, Hashable {
         let id: String

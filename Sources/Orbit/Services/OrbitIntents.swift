@@ -117,7 +117,10 @@ struct LogBankMessageIntent: AppIntent {
     func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
         // If Shortcuts couldn't read the sender it hands over the whole message instead: treat it as unknown.
         let from = sender.count > 40 || sender == message ? "" : sender
-        let result = await BankMessages.log(message: message, sender: from, context: try orbitContext())
+        let result: String
+        do { result = await BankMessages.log(message: message, sender: from, context: try orbitContext()) }
+        catch { AutoLogActivity.record(.sms, sender: from, text: message, result: "Orbit wasn't ready: \(error.localizedDescription)"); throw error }
+        AutoLogActivity.record(.sms, sender: from, text: message, result: result)
         return .result(value: result, dialog: IntentDialog(stringLiteral: result))
     }
 }
@@ -135,7 +138,11 @@ struct LogCardPaymentIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
-        let result = await BankMessages.logCardTap(amount: amount, merchant: merchant, card: card, context: try orbitContext())
+        let what = "\(amount) · \(merchant)"
+        let result: String
+        do { result = await BankMessages.logCardTap(amount: amount, merchant: merchant, card: card, context: try orbitContext()) }
+        catch { AutoLogActivity.record(.wallet, sender: card, text: what, result: "Orbit wasn't ready: \(error.localizedDescription)"); throw error }
+        AutoLogActivity.record(.wallet, sender: card, text: what, result: result)
         return .result(value: result, dialog: IntentDialog(stringLiteral: result))
     }
 }

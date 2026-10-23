@@ -15,6 +15,7 @@ struct PhoneBankSetup: View {
     @State private var extra = EgyptBanks.extraSenders
     @State private var ignored = EgyptBanks.lastIgnored
     @State private var picking = false
+    @State private var entries: [AutoLogActivity.Entry] = []
 
     private var logged: [Transaction] { all.filter(\.fromBank) }
 
@@ -52,6 +53,8 @@ struct PhoneBankSetup: View {
                         Label("Open Shortcuts", systemImage: "square.2.layers.3d").frame(maxWidth: .infinity)
                     }
                     .buttonStyle(PrimaryButtonStyle())
+
+                    activity
 
                     tryIt
 
@@ -134,6 +137,41 @@ struct PhoneBankSetup: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 18).fill(Theme.card))
+    }
+
+    /// What the automations have sent to Orbit, so it's clear whether they fire at all.
+    private var activity: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Recent activity").font(Theme.display(20))
+                Spacer()
+                Button { entries = AutoLogActivity.entries } label: { Image(systemName: "arrow.clockwise") }
+                    .buttonStyle(.plain).foregroundStyle(Theme.inkSecondary)
+            }
+            if entries.isEmpty {
+                Text("Nothing has reached Orbit from Shortcuts yet. Each time an automation runs, it appears here with what Orbit did with it.")
+                    .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
+                Text("Testing? iPhone may not run Message automations for texts you send yourself. Ask someone to text you “Your card was charged EGP 25.00 at Cafe”, or wait for your next bank text.")
+                    .font(Theme.ui(12)).foregroundStyle(Theme.inkMuted).fixedSize(horizontal: false, vertical: true)
+            }
+            ForEach(entries.prefix(8)) { e in
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: e.kind == .sms ? "message.fill" : "wave.3.right").font(.system(size: 12, weight: .semibold))
+                        .frame(width: 26, height: 26).background(Circle().fill(e.kind == .sms ? Theme.cyan : Theme.lime)).foregroundStyle(Theme.stickerInk)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(e.result).font(Theme.ui(13, weight: .medium)).fixedSize(horizontal: false, vertical: true)
+                        Text("\(e.date.formatted(.relative(presentation: .named)))\(e.sender.isEmpty ? "" : " · from \(e.sender)")")
+                            .font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
+                        if !e.text.isEmpty {
+                            Text("“\(e.text)”").font(Theme.ui(11)).foregroundStyle(Theme.inkSecondary).lineLimit(2)
+                        } else {
+                            Text("No text was passed in. Check the shortcut's Message is set to Shortcut Input › Content.").font(Theme.ui(11)).foregroundStyle(Theme.orange)
+                        }
+                    }
+                }
+            }
+        }
+        .onAppear { entries = AutoLogActivity.entries }
     }
 
     private var tryIt: some View {

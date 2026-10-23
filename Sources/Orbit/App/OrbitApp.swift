@@ -98,6 +98,7 @@ struct OrbitApp: App {
                     Snapshot.runIfRequested(container: container, apple: apple)
                     SyncTest.runIfRequested()
                     AITest.runIfRequested(apple: apple)
+                    BankTest.runIfRequested()
                 }
         }
         .modelContainer(container)

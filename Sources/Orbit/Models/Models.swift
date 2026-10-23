@@ -206,6 +206,8 @@ final class Transaction {
 
     var isExpense: Bool { amount < 0 }
     var fromEmail: Bool { source.hasPrefix("gmail:") }
+    /// Logged by a Shortcuts automation from a bank SMS ("sms") or an Apple Pay tap ("wallet").
+    var fromBank: Bool { source == "sms" || source == "wallet" }
 }
 
 enum MoneyCategory {

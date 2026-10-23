@@ -264,6 +264,7 @@ struct TxnRow: View {
                 Text(txn.title).font(Theme.ui(14, weight: .medium))
                 HStack(spacing: 6) {
                     if txn.fromEmail { Image(systemName: "envelope.fill").help("Added from \(txn.source.dropFirst(6))") }
+                    if txn.fromBank { Image(systemName: txn.source == "sms" ? "message.fill" : "wave.3.right").help(txn.source == "sms" ? "Added from a bank message" : "Added from Apple Pay") }
                     Text(txn.category)
                     if !txn.originalCurrency.isEmpty {
                         Text("· \(txn.originalAmount.formatted(.number.precision(.fractionLength(0...2)))) \(txn.originalCurrency)")

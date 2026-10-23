@@ -103,6 +103,40 @@ struct LogExpenseIntent: AppIntent {
     }
 }
 
+/// For a Shortcuts automation: "When I get a message from <bank>" → Log Bank Message with the message's text.
+struct LogBankMessageIntent: AppIntent {
+    static let title: LocalizedStringResource = "Log Bank Message"
+    static let description = IntentDescription("Reads a bank or card SMS and, if money was spent or received, adds it to Money. OTP codes, declined payments and balance updates are ignored, and the same message is never logged twice.")
+
+    @Parameter(title: "Message", requestValueDialog: "Paste the bank message") var message: String
+
+    static var parameterSummary: some ParameterSummary { Summary("Log \(\.$message) in Orbit") }
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
+        let result = await BankMessages.log(message: message, context: try orbitContext())
+        return .result(value: result, dialog: IntentDialog(stringLiteral: result))
+    }
+}
+
+/// For a Shortcuts automation: "When I tap any Wallet card" → Log Card Payment with Amount, Merchant and Card.
+struct LogCardPaymentIntent: AppIntent {
+    static let title: LocalizedStringResource = "Log Card Payment"
+    static let description = IntentDescription("Adds an Apple Pay payment to Money. Use it in a Wallet “Transaction” automation and pass the Amount, Merchant and Card it provides.")
+
+    @Parameter(title: "Amount") var amount: String
+    @Parameter(title: "Merchant", default: "") var merchant: String
+    @Parameter(title: "Card", default: "") var card: String
+
+    static var parameterSummary: some ParameterSummary { Summary("Log \(\.$amount) at \(\.$merchant) paid with \(\.$card)") }
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
+        let result = await BankMessages.logCardTap(amount: amount, merchant: merchant, card: card, context: try orbitContext())
+        return .result(value: result, dialog: IntentDialog(stringLiteral: result))
+    }
+}
+
 struct OrbitShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(intent: AddToOrbitIntent(), phrases: [
@@ -117,5 +151,11 @@ struct OrbitShortcuts: AppShortcutsProvider {
         AppShortcut(intent: LogExpenseIntent(), phrases: [
             "Log an expense in \(.applicationName)", "Add an expense to \(.applicationName)",
         ], shortTitle: "Log expense", systemImageName: "creditcard")
+        AppShortcut(intent: LogBankMessageIntent(), phrases: [
+            "Log a bank message in \(.applicationName)",
+        ], shortTitle: "Log bank message", systemImageName: "message.badge")
+        AppShortcut(intent: LogCardPaymentIntent(), phrases: [
+            "Log a card payment in \(.applicationName)",
+        ], shortTitle: "Log card payment", systemImageName: "wave.3.right.circle")
     }
 }

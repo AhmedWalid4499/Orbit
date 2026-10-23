@@ -13,6 +13,7 @@ struct PhoneMoney: View {
     @State private var adding = false
     @State private var pickingStatement = false
     @State private var statement: StatementFile?
+    @State private var bankSetup = false
 
     private var monthEnd: Date { Calendar.current.date(byAdding: .month, value: 1, to: month)! }
     private var txns: [Transaction] { all.filter { $0.date >= month && $0.date < monthEnd } }
@@ -53,6 +54,7 @@ struct PhoneMoney: View {
                         Button { pickingStatement = true } label: { Label("Import statement", systemImage: "doc.text.magnifyingglass") }
                             .buttonStyle(SoftButtonStyle())
                     }
+                    autoLogCard
                     MoneyCoachCard()
                     chart
                     categories
@@ -67,7 +69,29 @@ struct PhoneMoney: View {
             if case .success(let url) = result { statement = StatementFile(url: url) }
         }
         .sheet(item: $statement) { StatementImportSheet(url: $0.url) }
+        .sheet(isPresented: $bankSetup) { PhoneBankSetup() }
         .phoneChrome("Money")
+    }
+
+    /// Card and Apple Pay spending, via Shortcuts automations.
+    private var autoLogCard: some View {
+        let count = all.filter(\.fromBank).count
+        return Button { bankSetup = true } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "wave.3.right").font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.stickerInk)
+                    .frame(width: 38, height: 38).background(Circle().fill(Theme.lime))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Auto-log card payments").font(Theme.ui(15, weight: .semibold))
+                    Text(count == 0 ? "Apple Pay and bank texts, straight into Money" : "\(count) logged from Apple Pay and bank texts")
+                        .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.inkMuted)
+            }
+            .padding(14)
+            .background(RoundedRectangle(cornerRadius: 18).fill(Theme.card))
+        }
+        .buttonStyle(.plain)
     }
 
     private func shift(_ n: Int) {

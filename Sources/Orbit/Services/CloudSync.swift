@@ -362,7 +362,13 @@ private let syncKinds: [SyncKind] = [
 ]
 
 /// Preferences that follow you between Macs (API keys and sign-ins never leave the Keychain).
-private let syncedSettings = ["monthlyBudget", "readingGoal", "currencyCode", "assistantName", "userName", "weatherCity", "profileCard"]
+/// Preferences that follow you to every device. Connection secrets travel separately, in the key vault.
+private let syncedSettings = ["monthlyBudget", "readingGoal", "currencyCode", "assistantName", "userName", "weatherCity", "profileCard",
+                              "goodreadsUser", "readingAutoSync", "appleCalendarEnabled", "appleRemindersEnabled", "googleCalendarEnabled",
+                              "emailExpensesEnabled", "aiMorningBrief", "aiSmartCapture", "assistantSpeaks", "focusMinutes", "launchSound",
+                              "notify.tasks", "notify.events", "notify.bills", "notify.habits", "notify.journal", "notify.review",
+                              "notify.subscriptions", "notify.documents", "notify.evening", "notify.trips", "notify.morningHour",
+                              "notify.habitHour", "notify.journalHour", "notify.eventLead"]
 
 // MARK: - Sync engine
 
@@ -378,10 +384,12 @@ final class CloudSync: ObservableObject {
     @Published private(set) var lastSync: Date?
     @Published private(set) var status: String?
 
-    enum VaultState: Equatable { case off, needsNewPassphrase, needsPassphrase, on, error(String) }
-    @AppStorage("syncSecrets") var syncSecrets = false
+    /// `waiting`: the keys were stored by an older Orbit with a passphrase; opening Orbit on that Mac converts them.
+    enum VaultState: Equatable { case off, waiting, on, error(String) }
+    @AppStorage("syncSecrets") var syncSecrets = true
     @Published private(set) var vaultState: VaultState = .off
     private var keyCache: (salt: Data, pass: String, key: SymmetricKey)?
+    private var accountKeyCache: (user: String, key: SymmetricKey)?
 
     private struct State: Codable {
         var cursor = ""                              // last updated_at pulled from the server
@@ -432,6 +440,8 @@ final class CloudSync: ObservableObject {
         state = State()
         status = nil
         lastSync = nil
+        accountKeyCache = nil
+        vaultState = .off
     }
 
     // MARK: Sync
@@ -524,7 +534,7 @@ final class CloudSync: ObservableObject {
                 let data = row["data"] as? [String: Any] ?? [:]
                 if let ts = row["updated_at"] as? String { state.cursor = ts }
 
-                if kindName == "vault" { continue } // handled by syncVault
+                if kindName == "vault" || kindName == "vaultkey" { continue } // handled by syncVault
                 if kindName == "setting" {
                     guard let key = data["key"] as? String, syncedSettings.contains(key) else { continue }
                     if state.known[id]?.hash == fingerprint(data) { continue } // our own upload coming back
@@ -652,39 +662,49 @@ final class CloudSync: ObservableObject {
         _ = try await rest(URL(string: "\(SupabaseConfig.url)/rest/v1/public_cards?user_id=eq.\(session.userID)")!, method: "DELETE")
     }
 
-    // MARK: API keys & connections (end-to-end encrypted)
+    // MARK: API keys & connections
+
+    // Your Anthropic key, GitHub token and Google sign-ins follow your Orbit account to every device you sign in on,
+    // with nothing to type. They're encrypted with a random key that lives in your account (its own row, readable only
+    // when signed in as you), so the stored vault is never plain text. Older versions used a sync passphrase instead;
+    // a device that still has that passphrase converts the vault the first time it syncs.
 
     private var vaultID: String { settingID("vault") }
-
-    /// Sets this device's sync passphrase and syncs keys right away. Returns an error message, if any.
-    func setPassphrase(_ passphrase: String, context: ModelContext) async -> String? {
-        Keychain.write(passphrase, account: "sync-passphrase")
-        syncSecrets = true
-        guard let session = CloudAuth.session else { return nil }
-        do { try await syncVault(userID: session.userID) } catch { vaultState = .error(error.localizedDescription) }
-        saveState()
-        if case .error(let message) = vaultState {
-            Keychain.delete("sync-passphrase")
-            return message
-        }
-        return nil
-    }
-
-    func forgetPassphrase() {
-        Keychain.delete("sync-passphrase")
-        keyCache = nil
-        vaultState = syncSecrets ? .needsPassphrase : .off
-    }
+    private var vaultKeyID: String { settingID("vaultkey") }
 
     func turnOffKeySync() {
         syncSecrets = false
         vaultState = .off
     }
 
-    private func key(_ pass: String, salt: Data) -> SymmetricKey {
+    private func passphraseKey(_ pass: String, salt: Data) -> SymmetricKey {
         if let c = keyCache, c.salt == salt, c.pass == pass { return c.key }
         let k = VaultCrypto.deriveKey(passphrase: pass, salt: salt)
         keyCache = (salt, pass, k)
+        return k
+    }
+
+    /// The account's vault key; made once by the first device that has something to store.
+    private func accountKey(userID: String, create: Bool) async throws -> SymmetricKey? {
+        if let c = accountKeyCache, c.user == userID { return c.key }
+        var comps = URLComponents(string: "\(SupabaseConfig.url)/rest/v1/orbit_records")!
+        comps.queryItems = [.init(name: "id", value: "eq.\(vaultKeyID)"), .init(name: "select", value: "data,deleted")]
+        let rows = try await rest(comps.url!, method: "GET") as? [[String: Any]] ?? []
+        if let row = rows.first, !J.bool(row["deleted"]), let text = (row["data"] as? [String: Any])?["key"] as? String,
+           let raw = Data(base64Encoded: text), raw.count == 32 {
+            let k = SymmetricKey(data: raw)
+            accountKeyCache = (userID, k)
+            return k
+        }
+        guard create else { return nil }
+        let k = SymmetricKey(size: .bits256)
+        let raw = k.withUnsafeBytes { Data($0) }
+        var up = URLComponents(string: "\(SupabaseConfig.url)/rest/v1/orbit_records")!
+        up.queryItems = [.init(name: "on_conflict", value: "user_id,id")]
+        _ = try await rest(up.url!, method: "POST", body: [["id": vaultKeyID, "user_id": userID, "kind": "vaultkey",
+                                                             "data": ["key": raw.base64EncodedString()], "deleted": false]],
+                           prefer: "resolution=merge-duplicates,return=minimal")
+        accountKeyCache = (userID, k)
         return k
     }
 
@@ -693,6 +713,10 @@ final class CloudSync: ObservableObject {
         for k in ["googleClientID", "githubUser"] { if let v = UserDefaults.standard.string(forKey: k), !v.isEmpty { config[k] = v } }
         if let a = UserDefaults.standard.stringArray(forKey: "gmailAccounts"), !a.isEmpty { config["gmailAccounts"] = a }
         return ["secrets": Keychain.syncable(), "config": config]
+    }
+
+    private func isEmpty(_ p: [String: Any]) -> Bool {
+        (p["secrets"] as? [String: String] ?? [:]).isEmpty && (p["config"] as? [String: Any] ?? [:]).isEmpty
     }
 
     private func applyPayload(_ p: [String: Any]) {
@@ -725,39 +749,72 @@ final class CloudSync: ObservableObject {
         comps.queryItems = [.init(name: "id", value: "eq.\(vaultID)"), .init(name: "select", value: "data,deleted")]
         let rows = try await rest(comps.url!, method: "GET") as? [[String: Any]] ?? []
         let remote = rows.first.flatMap { J.bool($0["deleted"]) ? nil : $0["data"] as? [String: Any] }
+        let local = vaultPayload()
 
-        guard let pass = Keychain.read("sync-passphrase"), !pass.isEmpty else {
-            vaultState = remote == nil ? .needsNewPassphrase : .needsPassphrase
+        var remotePayload: [String: Any]?
+        var remotePlain: Data?
+        var converting = false
+        if let remote, let box = remote["box"] as? String {
+            if (remote["v"] as? Int ?? 1) >= 2 {
+                guard let k = try await accountKey(userID: userID, create: false), let opened = VaultCrypto.open(box, key: k) else {
+                    throw CloudError("Couldn't read your synced keys. Sign out and in again, or add them in Settings.")
+                }
+                remotePlain = opened
+            } else {
+                // The old passphrase vault: only a device that still has the passphrase can open (and convert) it.
+                if let pass = Keychain.read("sync-passphrase"), !pass.isEmpty,
+                   let salt = (remote["salt"] as? String).flatMap({ Data(base64Encoded: $0) }),
+                   let opened = VaultCrypto.open(box, key: passphraseKey(pass, salt: salt)) {
+                    remotePlain = opened
+                    converting = true
+                } else if isEmpty(local) {
+                    vaultState = .waiting // a device that has the keys will replace the old vault
+                    return
+                }
+                // Otherwise this device has the keys itself but not the old passphrase: it starts a fresh vault below.
+            }
+            remotePayload = remotePlain.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        }
+
+        guard let remotePayload else {
+            // Nothing stored yet: this device starts the vault if it has anything to share.
+            if !isEmpty(local), let k = try await accountKey(userID: userID, create: true) {
+                let data = plain(local)
+                try await uploadVault(data, key: k, userID: userID)
+                state.vaultMac = VaultCrypto.mac(data, key: k)
+            }
+            vaultState = .on
             return
         }
-        let local = vaultPayload()
-        if let remote, let saltText = remote["salt"] as? String, let salt = Data(base64Encoded: saltText), let box = remote["box"] as? String {
-            let k = key(pass, salt: salt)
-            guard let remotePlain = VaultCrypto.open(box, key: k),
-                  let remotePayload = try JSONSerialization.jsonObject(with: remotePlain) as? [String: Any] else {
-                throw CloudError("That passphrase doesn't match the one you set on your other device.")
-            }
-            let localMac = VaultCrypto.mac(plain(local), key: k)
-            if localMac == remote["mac"] as? String { state.vaultMac = localMac; vaultState = .on; return }
-            let localChanged = state.vaultMac != nil && state.vaultMac != localMac
-            let merged = mergePayloads(remote: remotePayload, local: local, preferLocal: localChanged)
-            applyPayload(merged)
-            let mergedPlain = plain(merged)
-            if mergedPlain != remotePlain { try await uploadVault(mergedPlain, salt: salt, key: k, userID: userID) }
-            state.vaultMac = VaultCrypto.mac(mergedPlain, key: k)
-        } else {
-            let salt = VaultCrypto.newSalt()
-            let k = key(pass, salt: salt)
-            let data = plain(local)
-            try await uploadVault(data, salt: salt, key: k, userID: userID)
-            state.vaultMac = VaultCrypto.mac(data, key: k)
-        }
+
+        guard let k = try await accountKey(userID: userID, create: true) else { return }
+        let localMac = VaultCrypto.mac(plain(local), key: k)
+        if !converting, localMac == remote?["mac"] as? String { state.vaultMac = localMac; vaultState = .on; return }
+        let localChanged = converting || (state.vaultMac != nil && state.vaultMac != localMac)
+        let merged = mergePayloads(remote: remotePayload, local: local, preferLocal: localChanged)
+        applyPayload(merged)
+        let mergedPlain = plain(merged)
+        if converting || mergedPlain != remotePlain { try await uploadVault(mergedPlain, key: k, userID: userID) }
+        if converting { Keychain.delete("sync-passphrase") }
+        state.vaultMac = VaultCrypto.mac(mergedPlain, key: k)
         vaultState = .on
     }
 
-    private func uploadVault(_ plaintext: Data, salt: Data, key: SymmetricKey, userID: String) async throws {
-        let data: [String: Any] = ["v": 1, "salt": salt.base64EncodedString(), "box": try VaultCrypto.seal(plaintext, key: key),
-                                   "mac": VaultCrypto.mac(plaintext, key: key)]
+    /// Test hook: stores a vault the way Orbit did before 1.14 (encrypted with a sync passphrase).
+    func storeLegacyVaultForTest(_ payload: [String: Any], passphrase: String) async throws {
+        guard let session = CloudAuth.session else { return }
+        let salt = VaultCrypto.newSalt()
+        let k = VaultCrypto.deriveKey(passphrase: passphrase, salt: salt)
+        let p = plain(payload)
+        let data: [String: Any] = ["v": 1, "salt": salt.base64EncodedString(), "box": try VaultCrypto.seal(p, key: k), "mac": VaultCrypto.mac(p, key: k)]
+        var comps = URLComponents(string: "\(SupabaseConfig.url)/rest/v1/orbit_records")!
+        comps.queryItems = [.init(name: "on_conflict", value: "user_id,id")]
+        _ = try await rest(comps.url!, method: "POST", body: [["id": vaultID, "user_id": session.userID, "kind": "vault", "data": data, "deleted": false]],
+                           prefer: "resolution=merge-duplicates,return=minimal")
+    }
+
+    private func uploadVault(_ plaintext: Data, key: SymmetricKey, userID: String) async throws {
+        let data: [String: Any] = ["v": 2, "box": try VaultCrypto.seal(plaintext, key: key), "mac": VaultCrypto.mac(plaintext, key: key)]
         var comps = URLComponents(string: "\(SupabaseConfig.url)/rest/v1/orbit_records")!
         comps.queryItems = [.init(name: "on_conflict", value: "user_id,id")]
         _ = try await rest(comps.url!, method: "POST", body: [["id": vaultID, "user_id": userID, "kind": "vault", "data": data, "deleted": false]],

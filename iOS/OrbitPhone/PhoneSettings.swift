@@ -72,7 +72,6 @@ struct PhoneWelcome: View {
     @ObservedObject private var cloud = CloudSync.shared
     @State private var email = ""
     @State private var password = ""
-    @State private var passphrase = ""
     @State private var busy = false
     @State private var error: String?
 
@@ -99,26 +98,14 @@ struct PhoneWelcome: View {
                     .textFieldStyle(.roundedBorder)
                     Button("Sign in with email") { run { try await cloud.signIn(email: email, password: password, context: context) } }
                         .buttonStyle(SoftButtonStyle()).disabled(email.isEmpty || password.isEmpty)
-                } else if cloud.vaultState == .needsPassphrase {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Label("Signed in as \(cloud.email ?? "")", systemImage: "checkmark.circle.fill").foregroundStyle(Theme.good)
-                        Text("Enter your sync passphrase to bring your API key and Google sign-ins from the Mac.").font(Theme.ui(14))
-                        SecureField("Sync passphrase", text: $passphrase).textFieldStyle(.roundedBorder)
-                        Button("Unlock") {
-                            Task {
-                                busy = true
-                                error = await cloud.setPassphrase(passphrase, context: context)
-                                busy = false
-                                if error == nil { onDone() }
-                            }
-                        }
-                        .buttonStyle(PrimaryButtonStyle()).disabled(passphrase.isEmpty)
-                        Button("Skip for now", action: onDone).buttonStyle(.borderless)
-                    }
                 } else {
                     VStack(alignment: .leading, spacing: 10) {
                         Label("Signed in as \(cloud.email ?? "")", systemImage: "checkmark.circle.fill").foregroundStyle(Theme.good)
-                        if let s = cloud.status { Text(s).font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary) }
+                        if cloud.syncing { Label("Bringing everything over from your Mac…", systemImage: "arrow.triangle.2.circlepath").font(Theme.ui(13)) }
+                        else if let s = cloud.status { Text(s).font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary) }
+                        if cloud.vaultState == .waiting {
+                            Text("Open Orbit on your Mac once so your API key and Google and GitHub sign-ins come across.").font(Theme.ui(13))
+                        }
                         Button("Start", action: onDone).buttonStyle(PrimaryButtonStyle())
                     }
                 }

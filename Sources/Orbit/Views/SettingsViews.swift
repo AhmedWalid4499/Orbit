@@ -461,59 +461,26 @@ struct AccountSettings: View {
 struct KeySyncSection: View {
     @Environment(\.modelContext) private var context
     @ObservedObject private var cloud = CloudSync.shared
-    @State private var pass = ""
-    @State private var confirm = ""
-    @State private var working = false
-    @State private var message: String?
 
     var body: some View {
         Section("API keys and connections") {
-            Toggle("Sync them to my other devices", isOn: Binding(
+            Toggle("Bring them to my other devices", isOn: Binding(
                 get: { cloud.syncSecrets },
                 set: { on in if on { cloud.syncSecrets = true; Task { await cloud.sync(context: context) } } else { cloud.turnOffKeySync() } }))
             if cloud.syncSecrets {
                 switch cloud.vaultState {
                 case .on:
-                    Label("Synced and end-to-end encrypted", systemImage: "lock.shield.fill").foregroundStyle(Theme.good)
-                    Text("Includes your Anthropic key, GitHub token, Google sign-ins for Gmail and Calendar, and their settings. On a new device, sign in and enter your passphrase once.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    Button("Forget passphrase on this Mac") { cloud.forgetPassphrase() }.buttonStyle(.orbitLink).font(.caption)
-                case .needsPassphrase:
-                    Text("Your keys are already synced from another device. Enter your sync passphrase to unlock them here.").font(.caption)
-                    SecureField("Sync passphrase", text: $pass)
-                    actionRow("Unlock") { pass }
-                case .needsNewPassphrase, .off:
-                    Text("Choose a sync passphrase. Your keys are encrypted with it on this Mac before they're uploaded, so nobody else, not even someone with database access, can read them. You'll type it once on each new device. It can't be recovered, so keep it somewhere safe.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    SecureField("New passphrase (at least 8 characters)", text: $pass)
-                    SecureField("Repeat passphrase", text: $confirm)
-                    actionRow("Turn on") { pass.count >= 8 && pass == confirm ? pass : nil }
+                    Label("Synced with your Orbit account", systemImage: "lock.shield.fill").foregroundStyle(Theme.good)
+                case .waiting:
+                    Label("Open Orbit on your Mac once to bring your keys here.", systemImage: "hourglass").font(.caption)
                 case .error(let e):
                     Label(e, systemImage: "exclamationmark.triangle.fill").foregroundStyle(Theme.orange).font(.caption)
-                    SecureField("Sync passphrase", text: $pass)
-                    actionRow("Try again") { pass }
+                case .off:
+                    Text("Sign in to sync them.").font(.caption).foregroundStyle(.secondary)
                 }
-                if let message { Text(message).font(.caption).foregroundStyle(Theme.critical) }
+                Text("Your Anthropic key, GitHub token, Google sign-ins for Gmail and Calendar, and their settings arrive on every device you sign in to, with nothing to type. They're stored encrypted in your account.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
-        }
-    }
-
-    private func actionRow(_ title: String, value: @escaping () -> String?) -> some View {
-        HStack {
-            Spacer()
-            if working { ProgressView().controlSize(.small) }
-            Button(title) {
-                guard let p = value(), !p.isEmpty else { message = "The passphrases need to match and be at least 8 characters."; return }
-                working = true
-                message = nil
-                Task {
-                    message = await cloud.setPassphrase(p, context: context)
-                    if message == nil { pass = ""; confirm = "" }
-                    working = false
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(working || pass.isEmpty)
         }
     }
 }

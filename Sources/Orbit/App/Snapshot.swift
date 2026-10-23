@@ -194,29 +194,45 @@ enum SyncTest {
                 check("Edit reaches Mac A", tasksA.contains { $0.title == "Edited on Mac B" })
                 check("Deletion reaches Mac A", !(try a.fetch(FetchDescriptor<Book>())).contains { $0.title == deletedTitle })
 
-                // Key sync: A turns it on, B must give the same passphrase; the server never sees a key in the clear.
-                let errA = await cloud.setPassphrase("test-pass-123", context: a)
-                check("Keys upload, encrypted (\(errA ?? "ok"))", errA == nil && cloud.vaultState == .on)
+                // Key sync. An older Orbit left a passphrase vault; the Mac that still has the passphrase converts it,
+                // then a second device gets the keys with nothing to type, and the server never holds a key in the clear.
+                let testSecret = "test-secret-value-123"
+                cloud.syncSecrets = true
+                cloud.deviceTag = "-testA"
+                try await cloud.storeLegacyVaultForTest(["secrets": ["orbit-test-secret": testSecret], "config": [String: Any]()], passphrase: "test-pass-123")
+                Keychain.write("test-pass-123", account: "sync-passphrase")
+                await cloud.sync(context: a)
+                check("Old passphrase vault is converted (\(cloud.vaultState))", cloud.vaultState == .on && Keychain.read("sync-passphrase") == nil)
                 var req = URLRequest(url: URL(string: "\(SupabaseConfig.url)/rest/v1/orbit_records?select=data,kind")!)
                 req.setValue("Bearer tok", forHTTPHeaderField: "Authorization")
                 let (raw, _) = try await URLSession.shared.data(for: req)
-                let stored = String(decoding: raw, as: UTF8.self)
+                let rows = (try JSONSerialization.jsonObject(with: raw) as? [[String: Any]]) ?? []
+                let vaultRow = rows.first { $0["kind"] as? String == "vault" }?["data"] as? [String: Any]
+                let stored = String(decoding: try JSONSerialization.data(withJSONObject: vaultRow ?? [:]), as: UTF8.self)
                 let secrets = Keychain.syncable().values.filter { $0.count >= 8 }
-                check("Server holds no readable key (\(secrets.count) checked)", stored.contains("\"vault\"") && !secrets.contains { stored.contains($0) })
+                check("Vault is in the new format", vaultRow?["v"] as? Int == 2)
+                check("Server holds no readable key (\(secrets.count) checked)", vaultRow != nil && !secrets.contains { stored.contains($0) })
+
+                // A Mac that has the keys but forgot the passphrase replaces an old vault instead of getting stuck.
+                try await cloud.storeLegacyVaultForTest(["secrets": [String: String](), "config": [String: Any]()], passphrase: "lost-pass")
+                cloud.deviceTag = "-testC"
+                await cloud.sync(context: a)
+                check("Old vault without its passphrase is replaced (\(cloud.vaultState))", cloud.vaultState == .on)
+
                 cloud.deviceTag = "-testB"
-                Keychain.delete("sync-passphrase")
-                let wrong = await cloud.setPassphrase("not-the-pass", context: b)
-                check("Wrong passphrase is refused", wrong != nil)
-                let right = await cloud.setPassphrase("test-pass-123", context: b)
-                check("Right passphrase unlocks on Mac B (\(right ?? "ok"))", right == nil && cloud.vaultState == .on)
+                Keychain.delete("orbit-test-secret")
+                await cloud.sync(context: b)
+                check("New device gets the keys with nothing to type (\(cloud.vaultState))",
+                      cloud.vaultState == .on && Keychain.read("orbit-test-secret") == testSecret)
             } catch {
                 results.append("FAIL  \(error.localizedDescription)")
             }
             // Leave no trace: sign out and remove the test sync state.
-            for tag in ["-testA", "-testB"] { cloud.deviceTag = tag; if let s = CloudAuth.session {
+            for tag in ["-testA", "-testB", "-testC"] { cloud.deviceTag = tag; if let s = CloudAuth.session {
                 try? FileManager.default.removeItem(at: URL.applicationSupportDirectory.appending(path: "Orbit/sync-\(s.userID)\(tag).json")) } }
             cloud.signOut()
             cloud.deviceTag = ""
+            Keychain.delete("orbit-test-secret")
             if let realPassphrase { Keychain.write(realPassphrase, account: "sync-passphrase") } else { Keychain.delete("sync-passphrase") }
             if let realSession { Keychain.write(realSession, account: "supabase-session") }
             cloud.syncSecrets = realKeySync

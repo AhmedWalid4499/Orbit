@@ -68,6 +68,21 @@ final class AppleSync: ObservableObject {
         revision += 1
     }
 
+    /// When Calendar or Reminders were switched on on another device: ask for this device's permission once.
+    /// A "Don't Allow" here leaves the synced switch alone, so the other device keeps working.
+    func requestAccessIfEnabled() async {
+        if calendarEnabled && calendarAccess == .unknown {
+            _ = try? await store.requestFullAccessToEvents()
+            refreshStatus()
+            revision += 1
+        }
+        if remindersEnabled && remindersAccess == .unknown {
+            _ = try? await store.requestFullAccessToReminders()
+            refreshStatus()
+            await loadReminders()
+        }
+    }
+
     func connectReminders() async {
         let ok = (try? await store.requestFullAccessToReminders()) ?? false
         refreshStatus()

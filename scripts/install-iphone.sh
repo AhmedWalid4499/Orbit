@@ -9,6 +9,7 @@
 # After the first install: Settings › General › VPN & Device Management › your Apple ID › Trust.
 set -e
 cd "$(dirname "$0")/.."
+python3 scripts/gen-ios-project.py >/dev/null  # picks up the current VERSION
 
 JSON="$(mktemp)"
 xcrun devicectl list devices --json-output "$JSON" >/dev/null 2>&1 || true
@@ -20,7 +21,7 @@ except Exception:
     devices = []
 for d in devices:
     hw, props = d.get("hardwareProperties", {}), d.get("deviceProperties", {})
-    if hw.get("platform") == "iOS" and hw.get("reality") == "physical" and hw.get("deviceType") == "iPhone":
+    if hw.get("platform") == "iOS" and hw.get("reality") != "simulated" and hw.get("deviceType") == "iPhone":
         print(hw.get("udid", "")); break
 EOF
 )"
@@ -31,9 +32,12 @@ if [[ -z "$UDID" ]]; then
 fi
 echo "Installing on iPhone $UDID…"
 
+# Build outside the iCloud-synced Desktop: iCloud adds file attributes that code signing rejects.
+DD="$HOME/Library/Developer/Orbit-iOS"
+
 build() {
   xcodebuild -project iOS/Orbit.xcodeproj -scheme OrbitPhone -configuration Release \
-    -destination "id=$UDID" -derivedDataPath build/ios \
+    -destination "id=$UDID" -derivedDataPath "$DD" \
     -allowProvisioningUpdates -allowProvisioningDeviceRegistration build 2>&1 | tee build/ios-build.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
   grep -q "BUILD SUCCEEDED" build/ios-build.log
 }
@@ -52,7 +56,7 @@ if ! build; then
   fi
 fi
 
-APP="build/ios/Build/Products/Release-iphoneos/Orbit.app"
+APP="$DD/Build/Products/Release-iphoneos/Orbit.app"
 xcrun devicectl device install app --device "$UDID" "$APP"
 xcrun devicectl device process launch --device "$UDID" com.ahmedwalid.orbit >/dev/null 2>&1 || \
   echo "Installed. If it doesn't open: Settings › General › VPN & Device Management › trust your Apple ID, then tap Orbit."

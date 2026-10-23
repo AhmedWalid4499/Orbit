@@ -73,6 +73,7 @@ struct PhoneRoot: View {
             var rounds = 0
             while !Task.isCancelled {
                 await cloud.syncIfSignedIn(context: context)
+                await apple.requestAccessIfEnabled()
                 await Reminders.shared.reschedule(context: context, apple: apple)
                 WidgetBridge.update(context: context, apple: apple)
                 if rounds % 30 == 0 {

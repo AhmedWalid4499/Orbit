@@ -3,6 +3,7 @@
 # Pass -demo to use sample data instead of your account.
 set -e
 cd "$(dirname "$0")/.."
+python3 scripts/gen-ios-project.py >/dev/null  # picks up the current VERSION
 DD="${TMPDIR:-/tmp}/orbit-ios-sim"
 xcodebuild -project iOS/Orbit.xcodeproj -scheme OrbitPhone -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
   -derivedDataPath "$DD" CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= -quiet build

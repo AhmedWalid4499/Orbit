@@ -148,6 +148,18 @@ struct PhoneBankSetup: View {
                 Button { entries = AutoLogActivity.entries } label: { Image(systemName: "arrow.clockwise") }
                     .buttonStyle(.plain).foregroundStyle(Theme.inkSecondary)
             }
+            Button {
+                let text = "\(BankMessages.testPrefix) Your card was charged EGP 25.00 at Cafe"
+                var c = URLComponents(string: "shortcuts://run-shortcut")!
+                c.queryItems = [.init(name: "name", value: "Orbit Bank Message"), .init(name: "input", value: "text"), .init(name: "text", value: text)]
+                UserDefaults.standard.set(Date.now.timeIntervalSince1970, forKey: "bankSMS.testStarted")
+                if let url = c.url { Platform.open(url) }
+            } label: {
+                Label("Test the bank shortcut", systemImage: "play.fill").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(SoftButtonStyle())
+            Text("Runs Orbit Bank Message with a sample text, then come back here: a “Test worked” line means Shortcuts can reach Orbit. Nothing is saved.")
+                .font(Theme.ui(11)).foregroundStyle(Theme.inkMuted).fixedSize(horizontal: false, vertical: true)
             if entries.isEmpty {
                 Text("Nothing has reached Orbit from Shortcuts yet. Each time an automation runs, it appears here with what Orbit did with it.")
                     .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
@@ -164,7 +176,7 @@ struct PhoneBankSetup: View {
                             .font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
                         if !e.text.isEmpty {
                             Text("“\(e.text)”").font(Theme.ui(11)).foregroundStyle(Theme.inkSecondary).lineLimit(2)
-                        } else {
+                        } else if !e.result.hasPrefix("Test worked") {
                             Text("No text was passed in. Check the shortcut's Message is set to Shortcut Input › Content.").font(Theme.ui(11)).foregroundStyle(Theme.orange)
                         }
                     }
@@ -172,6 +184,7 @@ struct PhoneBankSetup: View {
             }
         }
         .onAppear { entries = AutoLogActivity.entries }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in entries = AutoLogActivity.entries }
     }
 
     private var tryIt: some View {

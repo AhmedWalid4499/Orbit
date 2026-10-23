@@ -23,6 +23,13 @@ def input_property(name):
         "WFSerializationType": "WFTextTokenString",
     }
 
+def whole_input():
+    """The whole Shortcut Input, as a text field value."""
+    return {
+        "Value": {"string": "\ufffc", "attachmentsByRange": {"{0, 1}": {"Type": "ExtensionInput"}}},
+        "WFSerializationType": "WFTextTokenString",
+    }
+
 def action(intent, params):
     p = {"AppIntentDescriptor": {"AppIntentIdentifier": intent, "BundleIdentifier": BUNDLE, "Name": "Orbit", "TeamIdentifier": TEAM},
          "UUID": str(uuid.uuid4()).upper()}
@@ -47,7 +54,7 @@ def shortcut(actions, glyph, color, input_class):
 
 SHORTCUTS = {
     "Orbit Bank Message": shortcut([action("LogBankMessageIntent", {
-        "message": input_property("Content"), "sender": input_property("Sender")})], 59511, 4282601983, "WFMessageContentItem"),
+        "message": input_property("Content"), "sender": input_property("Sender"), "fullInput": whole_input()})], 59511, 4282601983, "WFMessageContentItem"),
     "Orbit Card Payment": shortcut([action("LogCardPaymentIntent", {
         "amount": input_property("Amount"), "merchant": input_property("Merchant"), "card": input_property("Card or Pass")})], 59446, 431817727, "WFWalletTransactionContentItem"),
 }

@@ -17,14 +17,29 @@ enum BankMessages {
         var category: String
     }
 
+    static let testPrefix = "[Orbit test]"
+
     /// Logs a bank SMS. Returns what happened, in one short sentence.
     static func log(message raw: String, sender: String = "", context: ModelContext) async -> String {
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return "The message was empty." }
+        guard !text.isEmpty else {
+            // The test button on a shortcut added before it passed the whole input: getting here is the proof.
+            if Date.now.timeIntervalSince1970 - UserDefaults.standard.double(forKey: "bankSMS.testStarted") < 120 {
+                UserDefaults.standard.removeObject(forKey: "bankSMS.testStarted")
+                return "Test worked: Shortcuts can reach Orbit. Nothing was saved."
+            }
+            return "The message was empty."
+        }
         if !EgyptBanks.accepts(sender: sender) {
             // Not one of your banks. Remember it, so Orbit can offer to add it if it looks like a payment.
             if let p = offline(text), p.kind != .notPayment, p.amount > 0 { EgyptBanks.noteIgnored(sender: sender, text: text) }
             return "Not from one of your banks, nothing logged."
+        }
+        // Orbit's own "Test the automation" button: show what would happen, save nothing.
+        if text.hasPrefix(testPrefix) {
+            let sample = String(text.dropFirst(testPrefix.count)).trimmingCharacters(in: .whitespaces)
+            guard let p = await read(sample), p.kind != .notPayment, p.amount > 0 else { return "Test reached Orbit, but it couldn't read the sample." }
+            return "Test worked: Orbit would log \(p.amount.formatted(.number.precision(.fractionLength(0...2)))) \(p.currency.isEmpty ? Fmt.currencyCode : p.currency)\(p.merchant.isEmpty ? "" : " at \(p.merchant)"). Nothing was saved."
         }
         let id = "sms:" + digest(text)
         let existing = (try? context.fetch(FetchDescriptor<Transaction>())) ?? []

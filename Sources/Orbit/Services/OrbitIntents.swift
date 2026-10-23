@@ -110,11 +110,14 @@ struct LogBankMessageIntent: AppIntent {
 
     @Parameter(title: "Message", requestValueDialog: "Paste the bank message") var message: String
     @Parameter(title: "Sender", default: "") var sender: String
+    /// The whole Shortcut Input, used when the message's Content comes through empty (plain text, a shared note, a test).
+    @Parameter(title: "Whole input", default: "") var fullInput: String
 
     static var parameterSummary: some ParameterSummary { Summary("Log \(\.$message) from \(\.$sender) in Orbit") }
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
+        let message = self.message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? fullInput : self.message
         // If Shortcuts couldn't read the sender it hands over the whole message instead: treat it as unknown.
         let from = sender.count > 40 || sender == message ? "" : sender
         let result: String

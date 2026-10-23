@@ -109,12 +109,13 @@ struct LogBankMessageIntent: AppIntent {
     static let description = IntentDescription("Reads a bank or card SMS and, if money was spent or received, adds it to Money. OTP codes, declined payments and balance updates are ignored, and the same message is never logged twice.")
 
     @Parameter(title: "Message", requestValueDialog: "Paste the bank message") var message: String
+    @Parameter(title: "Sender", default: "") var sender: String
 
-    static var parameterSummary: some ParameterSummary { Summary("Log \(\.$message) in Orbit") }
+    static var parameterSummary: some ParameterSummary { Summary("Log \(\.$message) from \(\.$sender) in Orbit") }
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
-        let result = await BankMessages.log(message: message, context: try orbitContext())
+        let result = await BankMessages.log(message: message, sender: sender, context: try orbitContext())
         return .result(value: result, dialog: IntentDialog(stringLiteral: result))
     }
 }

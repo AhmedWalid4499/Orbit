@@ -11,6 +11,10 @@ struct PhoneBankSetup: View {
     @State private var checked = false
     @State private var busy = false
     @State private var result: String?
+    @State private var chosen = EgyptBanks.chosen
+    @State private var extra = EgyptBanks.extraSenders
+    @State private var ignored = EgyptBanks.lastIgnored
+    @State private var picking = false
 
     private var logged: [Transaction] { all.filter(\.fromBank) }
 
@@ -34,14 +38,17 @@ struct PhoneBankSetup: View {
                         "Tap **Done**. Every Apple Pay tap now lands in Money.",
                     ])
 
+                    banksCard
+
                     guide("Bank text messages", symbol: "message.fill", color: Theme.cyan, steps: [
                         "Open **Shortcuts** › **Automation** › **+** › **Message**.",
-                        "Under **Sender**, choose your bank (save its SMS sender as a contact first), or use **Message Contains** with a word your bank always uses, like **EGP** or **debited**.",
-                        "Choose **Run Immediately**, then **Next** › **New Blank Automation**.",
-                        "**Add Action**, search **Orbit**, pick **Log Bank Message**.",
-                        "Tap **Message** › **Shortcut Input**, then tap it and choose **Content**. Tap **Done**.",
-                        "Repeat for each bank. Purchases, transfers, ATM withdrawals and money in are logged; codes, declined payments and balance updates are ignored.",
+                        "Tap **Message Contains**, type **EGP**, and leave **Sender** empty. Choose **Run Immediately**, then **Next**.",
+                        "Tap **New Blank Automation** › **Add Action**, search **Orbit** and pick **Log Bank Message**.",
+                        "Tap **Message** › **Shortcut Input**, then tap it and choose **Content**. Tap **Sender** › **Shortcut Input**, then choose **Sender**.",
+                        "Tap **Done**. Orbit keeps texts from the banks you picked above and ignores the rest. Codes, declined payments and balance updates are always ignored.",
                     ])
+                    Text("Bank texts you in Arabic? Make the same automation once more with **جنيه** instead of EGP.")
+                        .font(Theme.ui(12)).foregroundStyle(Theme.inkMuted)
 
                     Button { Platform.open(URL(string: "shortcuts://")!) } label: {
                         Label("Open Shortcuts", systemImage: "square.2.layers.3d").frame(maxWidth: .infinity)
@@ -59,6 +66,50 @@ struct PhoneBankSetup: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
+    }
+
+    /// Step one for bank texts: which banks are yours.
+    private var banksCard: some View {
+        let names = EgyptBanks.all.filter { chosen.contains($0.id) }.map(\.name) + extra
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "building.columns.fill").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.stickerInk)
+                    .frame(width: 32, height: 32).background(RoundedRectangle(cornerRadius: 9).fill(Theme.peach))
+                Text("Your banks").font(Theme.display(20))
+                Spacer()
+                Button(names.isEmpty ? "Choose" : "Edit") { picking = true }.buttonStyle(SoftButtonStyle())
+            }
+            if names.isEmpty {
+                Text("Pick the banks and wallets that text you, so Orbit only reads their messages.")
+                    .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
+            } else {
+                FlowLayout(spacing: 6) {
+                    ForEach(names, id: \.self) { n in
+                        Text(n).font(Theme.ui(12, weight: .medium)).padding(.horizontal, 10).padding(.vertical, 5)
+                            .background(Capsule().fill(Theme.canvas))
+                    }
+                }
+            }
+            if let ignored {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Skipped a payment text from **\(ignored.sender)**: “\(ignored.text)”").font(Theme.ui(12))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button("That's my bank, log its texts") {
+                        EgyptBanks.addSender(ignored.sender)
+                        extra = EgyptBanks.extraSenders
+                        self.ignored = nil
+                    }
+                    .buttonStyle(SoftButtonStyle())
+                }
+                .padding(12).background(RoundedRectangle(cornerRadius: 12).fill(Theme.blush))
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 18).fill(Theme.card))
+        .sheet(isPresented: $picking) { BankPicker(chosen: $chosen, extra: $extra) }
+        .onChange(of: chosen) { _, v in EgyptBanks.chosen = v }
+        .onChange(of: extra) { _, v in EgyptBanks.extraSenders = v }
     }
 
     private func guide(_ title: String, symbol: String, color: Color, steps: [String]) -> some View {
@@ -115,6 +166,55 @@ struct PhoneBankSetup: View {
                 }
             }
             if let result { Text(result).font(Theme.ui(13, weight: .medium)) }
+        }
+    }
+}
+
+/// Pick your banks and wallets; their usual text senders come with them.
+private struct BankPicker: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var chosen: Set<String>
+    @Binding var extra: [String]
+    @State private var query = ""
+    @State private var newSender = ""
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(EgyptBanks.all.filter { query.isEmpty || $0.name.localizedCaseInsensitiveContains(query) }) { bank in
+                        Button {
+                            if chosen.contains(bank.id) { chosen.remove(bank.id) } else { chosen.insert(bank.id) }
+                        } label: {
+                            HStack {
+                                Text(bank.name).foregroundStyle(Theme.ink)
+                                Spacer()
+                                if chosen.contains(bank.id) { Image(systemName: "checkmark").foregroundStyle(Theme.good).fontWeight(.semibold) }
+                            }
+                        }
+                    }
+                }
+                Section {
+                    ForEach(extra, id: \.self) { Text($0) }.onDelete { extra.remove(atOffsets: $0) }
+                    HStack {
+                        TextField("Sender name, e.g. CIB", text: $newSender).textInputAutocapitalization(.never).autocorrectionDisabled()
+                        Button("Add") {
+                            let s = newSender.trimmingCharacters(in: .whitespaces)
+                            if !s.isEmpty, !extra.contains(s) { extra.append(s) }
+                            newSender = ""
+                        }
+                        .disabled(newSender.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                } header: {
+                    Text("Other senders")
+                } footer: {
+                    Text("If your bank's texts arrive under a different name, add it exactly as it appears in Messages.")
+                }
+            }
+            .searchable(text: $query, prompt: "Search banks")
+            .navigationTitle("Your banks")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
     }
 }

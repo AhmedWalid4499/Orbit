@@ -18,9 +18,14 @@ enum BankMessages {
     }
 
     /// Logs a bank SMS. Returns what happened, in one short sentence.
-    static func log(message raw: String, context: ModelContext) async -> String {
+    static func log(message raw: String, sender: String = "", context: ModelContext) async -> String {
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return "The message was empty." }
+        if !EgyptBanks.accepts(sender: sender) {
+            // Not one of your banks. Remember it, so Orbit can offer to add it if it looks like a payment.
+            if let p = offline(text), p.kind != .notPayment, p.amount > 0 { EgyptBanks.noteIgnored(sender: sender, text: text) }
+            return "Not from one of your banks, nothing logged."
+        }
         let id = "sms:" + digest(text)
         let existing = (try? context.fetch(FetchDescriptor<Transaction>())) ?? []
         if existing.contains(where: { $0.sourceID == id }) { return "Already logged." }
@@ -195,6 +200,92 @@ enum BankMessages {
     }
 }
 
+/// Banks and wallets you can pick, with the names their texts usually arrive from. Bank text messages are only
+/// logged when they come from one you picked (or from a sender you added); with none picked, every one is read.
+enum EgyptBanks {
+    struct Bank: Identifiable, Hashable {
+        let id: String
+        let name: String
+        let senders: [String]
+    }
+
+    static let all: [Bank] = [
+        Bank(id: "nbe", name: "National Bank of Egypt (NBE)", senders: ["NBE", "AlAhly", "NBEgypt", "Ahly", "البنك الأهلي", "الاهلي"]),
+        Bank(id: "misr", name: "Banque Misr", senders: ["BanqueMisr", "BM", "Banque Misr", "MisrBank", "بنك مصر"]),
+        Bank(id: "cib", name: "CIB", senders: ["CIB", "CIBEgypt", "CIB Egypt"]),
+        Bank(id: "qnb", name: "QNB Egypt", senders: ["QNB", "QNBAlahli", "QNB Egypt"]),
+        Bank(id: "bdc", name: "Banque du Caire", senders: ["BDC", "BanqueDuCaire", "بنك القاهرة"]),
+        Bank(id: "alex", name: "Alexbank", senders: ["ALEXBANK", "Alex Bank", "بنك الإسكندرية"]),
+        Bank(id: "aaib", name: "Arab African International Bank (AAIB)", senders: ["AAIB"]),
+        Bank(id: "hsbc", name: "HSBC Egypt", senders: ["HSBC", "HSBCEgypt"]),
+        Bank(id: "ca", name: "Crédit Agricole Egypt", senders: ["CAE", "CA-Egypt", "CreditAgricole", "CA Egypt"]),
+        Bank(id: "enbd", name: "Emirates NBD Egypt", senders: ["ENBD", "EmiratesNBD", "Emirates NBD"]),
+        Bank(id: "fab", name: "FABMISR", senders: ["FABMISR", "FAB Misr", "FAB"]),
+        Bank(id: "adcb", name: "ADCB Egypt", senders: ["ADCB"]),
+        Bank(id: "adib", name: "ADIB Egypt", senders: ["ADIB", "ADIBEgypt"]),
+        Bank(id: "nbk", name: "NBK Egypt", senders: ["NBK", "NBKEgypt"]),
+        Bank(id: "abk", name: "ABK Egypt", senders: ["ABK", "ABKEgypt"]),
+        Bank(id: "hdb", name: "Housing and Development Bank (HDB)", senders: ["HDB", "HDBank"]),
+        Bank(id: "ub", name: "The United Bank", senders: ["UB", "UnitedBank", "TheUnitedBank"]),
+        Bank(id: "agri", name: "Agricultural Bank of Egypt", senders: ["ABE", "AgriBank", "البنك الزراعي"]),
+        Bank(id: "idb", name: "Industrial Development Bank (IDB)", senders: ["IDB"]),
+        Bank(id: "ealb", name: "Egyptian Arab Land Bank", senders: ["EALB", "LandBank"]),
+        Bank(id: "edbe", name: "Export Development Bank (EBank)", senders: ["EBank", "EDBE"]),
+        Bank(id: "saib", name: "SAIB", senders: ["SAIB"]),
+        Bank(id: "eg", name: "EG BANK", senders: ["EGBANK", "EG BANK", "EGB"]),
+        Bank(id: "mid", name: "MIDBank", senders: ["MIDBANK", "MID Bank"]),
+        Bank(id: "scb", name: "Suez Canal Bank", senders: ["SCBank", "SuezCanal", "Suez Canal Bank"]),
+        Bank(id: "mashreq", name: "Mashreq", senders: ["Mashreq", "MashreqBank"]),
+        Bank(id: "abc", name: "Bank ABC", senders: ["BankABC", "ABC Bank", "ABC"]),
+        Bank(id: "arab", name: "Arab Bank", senders: ["ArabBank", "Arab Bank"]),
+        Bank(id: "attijari", name: "Attijariwafa Bank", senders: ["Attijari", "AttijariEG"]),
+        Bank(id: "citi", name: "Citibank Egypt", senders: ["Citi", "Citibank"]),
+        Bank(id: "faisal", name: "Faisal Islamic Bank", senders: ["FaisalBank", "Faisal", "FIBE"]),
+        Bank(id: "baraka", name: "Al Baraka Bank", senders: ["AlBaraka", "Baraka"]),
+        Bank(id: "kfh", name: "Kuwait Finance House (KFH)", senders: ["KFH"]),
+        Bank(id: "instapay", name: "InstaPay", senders: ["InstaPay", "IPN"]),
+        Bank(id: "vfcash", name: "Vodafone Cash", senders: ["VF-Cash", "VFCash", "Vodafone Cash", "VodafoneCash"]),
+        Bank(id: "fawry", name: "Fawry", senders: ["Fawry"]),
+        Bank(id: "telda", name: "Telda", senders: ["Telda"]),
+    ]
+
+    static var chosen: Set<String> {
+        get { Set(UserDefaults.standard.stringArray(forKey: "bankSMS.banks") ?? []) }
+        set { UserDefaults.standard.set(Array(newValue).sorted(), forKey: "bankSMS.banks") }
+    }
+    /// Senders you added yourself ("this is my bank").
+    static var extraSenders: [String] {
+        get { UserDefaults.standard.stringArray(forKey: "bankSMS.senders") ?? [] }
+        set { UserDefaults.standard.set(newValue, forKey: "bankSMS.senders") }
+    }
+    /// The last payment-looking text that was skipped because of its sender.
+    static var lastIgnored: (sender: String, text: String)? {
+        guard let s = UserDefaults.standard.string(forKey: "bankSMS.ignoredSender"), !s.isEmpty else { return nil }
+        return (s, UserDefaults.standard.string(forKey: "bankSMS.ignoredText") ?? "")
+    }
+    static func noteIgnored(sender: String, text: String) {
+        UserDefaults.standard.set(sender, forKey: "bankSMS.ignoredSender")
+        UserDefaults.standard.set(String(text.prefix(160)), forKey: "bankSMS.ignoredText")
+    }
+    static func addSender(_ sender: String) {
+        let s = sender.trimmingCharacters(in: .whitespaces)
+        if !s.isEmpty, !extraSenders.contains(s) { extraSenders.append(s) }
+        if lastIgnored?.sender == sender { UserDefaults.standard.removeObject(forKey: "bankSMS.ignoredSender") }
+    }
+
+    private static func normal(_ s: String) -> String { s.lowercased().filter { $0.isLetter || $0.isNumber } }
+
+    /// Whether a text from `sender` should be read. Empty sender (not passed by the automation) or no banks picked: yes.
+    static func accepts(sender: String) -> Bool {
+        let from = normal(sender)
+        let picked = all.filter { chosen.contains($0.id) }.flatMap(\.senders) + extraSenders
+        guard !from.isEmpty, !picked.isEmpty else { return true }
+        return picked.map(normal).contains { alias in
+            !alias.isEmpty && (from == alias || (alias.count >= 4 && from.contains(alias)))
+        }
+    }
+}
+
 /// Test hook: `ORBIT_BANK_TEST=1` reads sample bank messages (offline and with Claude), logs them into demo data
 /// to check duplicates are skipped, prints the results and quits. Nothing touches your real data.
 @MainActor
@@ -230,6 +321,12 @@ enum BankTest {
             print("LOG     " + (await BankMessages.logCardTap(amount: "EGP 350.00", merchant: "Carrefour", card: "CIB", context: context)))
             print("LOG     " + (await BankMessages.logCardTap(amount: "$12.40", merchant: "Starbucks", card: "CIB", context: context)))
             print("LOG     " + (await BankMessages.log(message: samples[3], context: context)))
+            let saved = EgyptBanks.chosen
+            EgyptBanks.chosen = ["cib", "nbe"]
+            print("FILTER  CIB:\(EgyptBanks.accepts(sender: "CIB")) AlAhly:\(EgyptBanks.accepts(sender: "AlAhly")) Mom:\(EgyptBanks.accepts(sender: "+201001234567")) QNB:\(EgyptBanks.accepts(sender: "QNB")) empty:\(EgyptBanks.accepts(sender: ""))")
+            print("LOG     " + (await BankMessages.log(message: samples[1], sender: "+201001234567", context: context)))
+            print("IGNORED \(EgyptBanks.lastIgnored?.sender ?? "-")")
+            EgyptBanks.chosen = saved
             fflush(stdout)
             withExtendedLifetime(container) { exit(0) }
         }

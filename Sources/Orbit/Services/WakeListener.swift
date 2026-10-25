@@ -25,7 +25,7 @@ final class WakeListener: ObservableObject {
 
     @Published private(set) var listening = false
     /// A voice conversation is going on: the orb is in the middle of the screen.
-    @Published private(set) var inConversation = false
+    @Published private(set) var inConversation = false { didSet { meter?.on = inConversation } }
     /// What you're saying right now.
     @Published private(set) var heard = ""
     /// Your last question, shown under the orb while it thinks and answers.
@@ -122,7 +122,9 @@ final class WakeListener: ObservableObject {
         guard let recognizer, recognizer.isAvailable else { error = "Speech recognition isn't available right now."; return }
         let req = SFSpeechAudioBufferRecognitionRequest()
         req.shouldReportPartialResults = true
-        req.addsPunctuation = true
+        // Punctuation only matters for a question you're asking; listening for the wake word stays light.
+        req.addsPunctuation = inConversation
+        req.taskHint = inConversation ? .dictation : .search
         req.contextualStrings = ["Hey \(AssistantName.current)", AssistantName.current]
         if recognizer.supportsOnDeviceRecognition { req.requiresOnDeviceRecognition = true }
         request = req
@@ -135,14 +137,13 @@ final class WakeListener: ObservableObject {
         input.removeTap(onBus: 0)
         let format = input.outputFormat(forBus: 0)
         guard format.sampleRate > 0 else { error = "No microphone found."; return }
-        input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
+        // Bigger pieces of audio (~0.1 s) mean far less work; the loudness for the orb is only measured while it shows.
+        let meter = Meter(on: inConversation)
+        self.meter = meter
+        input.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, _ in
             req.append(buffer)
-            let data = buffer.floatChannelData?[0]
-            let n = Int(buffer.frameLength)
-            var sum: Float = 0
-            if let data { for i in 0..<n { sum += data[i] * data[i] } }
-            let rms = n > 0 ? sqrt(sum / Float(n)) : 0
-            Task { @MainActor in self?.setLevel(min(1, rms * 14)) }
+            guard meter.on, let v = meter.level(buffer) else { return }
+            Task { @MainActor in self?.setLevel(v) }
         }
         do {
             engine.prepare()
@@ -170,6 +171,7 @@ final class WakeListener: ObservableObject {
         }
     }
 
+    private var meter: Meter?
     private var levelAt = Date.distantPast
     /// The orb's pulse: only while it's showing, at most 15 times a second, and only when it really changes.
     private func setLevel(_ v: Float) {
@@ -308,5 +310,23 @@ final class WakeListener: ObservableObject {
             }
         }
         return row[y.count] <= allowed
+    }
+}
+
+/// Measures how loud the microphone is, on the audio thread, at most 15 times a second, only when switched on.
+final class Meter: @unchecked Sendable {
+    var on: Bool
+    private var last = Date.distantPast
+    init(on: Bool) { self.on = on }
+
+    func level(_ buffer: AVAudioPCMBuffer) -> Float? {
+        guard Date.now.timeIntervalSince(last) > 0.066, let data = buffer.floatChannelData?[0] else { return nil }
+        last = .now
+        let n = Int(buffer.frameLength)
+        guard n >= 4 else { return nil }
+        var sum: Float = 0
+        // Every fourth sample is plenty for a loudness reading.
+        for i in stride(from: 0, to: n, by: 4) { sum += data[i] * data[i] }
+        return min(1, sqrt(sum / Float(n / 4)) * 14)
     }
 }

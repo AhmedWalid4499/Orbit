@@ -154,128 +154,7 @@ struct AssistantPanel: View {
     }
 
     private var messages: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    if store.items.isEmpty && !store.busy {
-                        VStack(alignment: .leading, spacing: 14) {
-                            AssistantAvatar(size: 56)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(greeting).font(Theme.display(28))
-                                Text("What's on your mind? Ask me anything, or tell me what to set up: tasks, plans, places, money, books.")
-                                    .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
-                            }
-                            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                                ForEach(suggestions, id: \.0) { text, symbol, tint in
-                                    Button { send(text) } label: {
-                                        VStack(alignment: .leading, spacing: 8) {
-                                            Image(systemName: symbol).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.stickerInk)
-                                                .frame(width: 28, height: 28).background(Circle().fill(tint))
-                                            Text(text).font(Theme.ui(12, weight: .medium)).multilineTextAlignment(.leading)
-                                                .foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
-                                            Spacer(minLength: 0)
-                                        }
-                                        .padding(12)
-                                        .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
-                                        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(tint.opacity(0.18)))
-                                        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(tint.opacity(0.5)))
-                                        .contentShape(Rectangle())
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                        }
-                        .padding(.top, 8)
-                    }
-                    ForEach(store.items) { item in
-                        row(item).id(item.id)
-                    }
-                    if store.busy {
-                        HStack(alignment: .top, spacing: 8) {
-                            AssistantAvatar(size: 22, busy: true)
-                            Group {
-                                if store.revealed.isEmpty { Thinking() } else { AssistantText(text: store.revealed) }
-                            }
-                            .padding(.horizontal, 14).padding(.vertical, 10)
-                            .background(UnevenRoundedRectangle(topLeadingRadius: 6, bottomLeadingRadius: 18, bottomTrailingRadius: 18, topTrailingRadius: 18, style: .continuous)
-                                .fill(Theme.card))
-                            Spacer(minLength: 24)
-                        }
-                        .id("live")
-                    }
-                    if let e = store.error {
-                        Label(e, systemImage: "exclamationmark.triangle.fill").font(Theme.ui(12)).foregroundStyle(Theme.orange)
-                    }
-                }
-                .padding(16)
-            }
-            .scrollIndicators(.never)
-            // Scrolling or tapping the conversation puts the keyboard away.
-            .scrollDismissesKeyboard(.interactively)
-            .simultaneousGesture(TapGesture().onEnded { focused = false })
-            .onChange(of: store.items.count) { withAnimation { proxy.scrollTo(store.items.last?.id, anchor: .bottom) } }
-            .onChange(of: store.revealed) { proxy.scrollTo("live", anchor: .bottom) }
-        }
-    }
-
-    @ViewBuilder
-    private func row(_ item: ChatItem) -> some View {
-        switch item.role {
-        case .user:
-            VStack(alignment: .trailing, spacing: 6) {
-                if let files = item.files, !files.isEmpty {
-                    HStack(spacing: 6) {
-                        Spacer(minLength: 50)
-                        ForEach(files, id: \.self) { f in
-                            Label(f, systemImage: "paperclip").font(Theme.ui(11, weight: .medium)).lineLimit(1)
-                                .padding(.horizontal, 10).padding(.vertical, 5)
-                                .background(Capsule().fill(Theme.card))
-                        }
-                    }
-                }
-                HStack {
-                    Spacer(minLength: 50)
-                    Text(item.text).font(Theme.ui(14)).textSelection(.enabled)
-                        .foregroundStyle(Theme.stickerInk)
-                        .padding(.horizontal, 14).padding(.vertical, 10)
-                        .background(UnevenRoundedRectangle(topLeadingRadius: 18, bottomLeadingRadius: 18, bottomTrailingRadius: 6, topTrailingRadius: 18, style: .continuous)
-                            .fill(LinearGradient(colors: [Theme.lime, Theme.mint], startPoint: .topLeading, endPoint: .bottomTrailing)))
-                }
-            }
-        case .assistant:
-            HStack(alignment: .top, spacing: 8) {
-                AssistantAvatar(size: 22)
-                AssistantText(text: item.text)
-                    .padding(.horizontal, 14).padding(.vertical, 10)
-                    .background(UnevenRoundedRectangle(topLeadingRadius: 6, bottomLeadingRadius: 18, bottomTrailingRadius: 18, topTrailingRadius: 18, style: .continuous)
-                        .fill(Theme.card))
-                Spacer(minLength: 24)
-            }
-        case .action:
-            if let place = item.place, !item.undone {
-                PlaceChatCard(place: place, note: item.text) { store.undo(item, context: context) }
-                    .padding(.leading, 30)
-            } else {
-                let tint = ActionTint.color(for: item.symbol)
-                HStack(spacing: 10) {
-                    Image(systemName: item.undone ? "arrow.uturn.backward" : item.symbol)
-                        .font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.stickerInk)
-                        .frame(width: 30, height: 30).background(Circle().fill(item.undone ? Theme.line : tint))
-                    Text(item.text).font(Theme.ui(13, weight: .medium)).strikethrough(item.undone).lineLimit(3)
-                        .foregroundStyle(item.undone ? Theme.inkMuted : Theme.ink)
-                    Spacer(minLength: 4)
-                    if item.undo != nil && !item.undone {
-                        Button("Undo") { store.undo(item, context: context) }
-                            .buttonStyle(.plain).font(Theme.ui(11, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
-                            .padding(.horizontal, 10).padding(.vertical, 5).background(Capsule().fill(Theme.canvas))
-                    }
-                }
-                .padding(10)
-                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(item.undone ? Theme.card : tint.opacity(0.16)))
-                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(item.undone ? Theme.line : tint.opacity(0.55)))
-                .padding(.leading, 30)
-            }
-        }
+        ChatTranscript(greeting: greeting, suggestions: suggestions, onSend: { send($0) }, onTap: { focused = false })
     }
 
     private var composer: some View {
@@ -351,6 +230,142 @@ struct AssistantPanel: View {
         state.assistantSeed = nil
         send(seed)
     }
+}
+
+/// The conversation itself. Its own view so typing or talking (which change the box below) doesn't redraw every message.
+private struct ChatTranscript: View {
+    @Environment(\.modelContext) private var context
+    @ObservedObject private var store = AssistantStore.shared
+    let greeting: String
+    let suggestions: [(String, String, Color)]
+    let onSend: (String) -> Void
+    let onTap: () -> Void
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    if store.items.isEmpty && !store.busy {
+                        VStack(alignment: .leading, spacing: 14) {
+                            AssistantAvatar(size: 56)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(greeting).font(Theme.display(28))
+                                Text("What's on your mind? Ask me anything, or tell me what to set up: tasks, plans, places, money, books.")
+                                    .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
+                            }
+                            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                                ForEach(suggestions, id: \.0) { text, symbol, tint in
+                                    Button { onSend(text) } label: {
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            Image(systemName: symbol).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.stickerInk)
+                                                .frame(width: 28, height: 28).background(Circle().fill(tint))
+                                            Text(text).font(Theme.ui(12, weight: .medium)).multilineTextAlignment(.leading)
+                                                .foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                                            Spacer(minLength: 0)
+                                        }
+                                        .padding(12)
+                                        .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
+                                        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(tint.opacity(0.18)))
+                                        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(tint.opacity(0.5)))
+                                        .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                        .padding(.top, 8)
+                    }
+                    ForEach(store.items) { item in
+                        row(item).id(item.id)
+                    }
+                    if store.busy {
+                        HStack(alignment: .top, spacing: 8) {
+                            AssistantAvatar(size: 22, busy: true)
+                            Group {
+                                if store.revealed.isEmpty { Thinking() } else { AssistantText(text: store.revealed) }
+                            }
+                            .padding(.horizontal, 14).padding(.vertical, 10)
+                            .background(UnevenRoundedRectangle(topLeadingRadius: 6, bottomLeadingRadius: 18, bottomTrailingRadius: 18, topTrailingRadius: 18, style: .continuous)
+                                .fill(Theme.card))
+                            Spacer(minLength: 24)
+                        }
+                        .id("live")
+                    }
+                    if let e = store.error {
+                        Label(e, systemImage: "exclamationmark.triangle.fill").font(Theme.ui(12)).foregroundStyle(Theme.orange)
+                    }
+                }
+                .padding(16)
+            }
+            .scrollIndicators(.never)
+            // Scrolling or tapping the conversation puts the keyboard away.
+            .scrollDismissesKeyboard(.interactively)
+            .simultaneousGesture(TapGesture().onEnded { onTap() })
+            .onChange(of: store.items.count) { withAnimation { proxy.scrollTo(store.items.last?.id, anchor: .bottom) } }
+            .onChange(of: store.revealed) { proxy.scrollTo("live", anchor: .bottom) }
+        }
+    }
+
+    @ViewBuilder
+    private func row(_ item: ChatItem) -> some View {
+        switch item.role {
+        case .user:
+            VStack(alignment: .trailing, spacing: 6) {
+                if let files = item.files, !files.isEmpty {
+                    HStack(spacing: 6) {
+                        Spacer(minLength: 50)
+                        ForEach(files, id: \.self) { f in
+                            Label(f, systemImage: "paperclip").font(Theme.ui(11, weight: .medium)).lineLimit(1)
+                                .padding(.horizontal, 10).padding(.vertical, 5)
+                                .background(Capsule().fill(Theme.card))
+                        }
+                    }
+                }
+                HStack {
+                    Spacer(minLength: 50)
+                    Text(item.text).font(Theme.ui(14)).textSelection(.enabled)
+                        .foregroundStyle(Theme.stickerInk)
+                        .padding(.horizontal, 14).padding(.vertical, 10)
+                        .background(UnevenRoundedRectangle(topLeadingRadius: 18, bottomLeadingRadius: 18, bottomTrailingRadius: 6, topTrailingRadius: 18, style: .continuous)
+                            .fill(LinearGradient(colors: [Theme.lime, Theme.mint], startPoint: .topLeading, endPoint: .bottomTrailing)))
+                }
+            }
+        case .assistant:
+            HStack(alignment: .top, spacing: 8) {
+                AssistantAvatar(size: 22)
+                AssistantText(text: item.text)
+                    .padding(.horizontal, 14).padding(.vertical, 10)
+                    .background(UnevenRoundedRectangle(topLeadingRadius: 6, bottomLeadingRadius: 18, bottomTrailingRadius: 18, topTrailingRadius: 18, style: .continuous)
+                        .fill(Theme.card))
+                Spacer(minLength: 24)
+            }
+        case .action:
+            if let place = item.place, !item.undone {
+                PlaceChatCard(place: place, note: item.text) { store.undo(item, context: context) }
+                    .padding(.leading, 30)
+            } else {
+                let tint = ActionTint.color(for: item.symbol)
+                HStack(spacing: 10) {
+                    Image(systemName: item.undone ? "arrow.uturn.backward" : item.symbol)
+                        .font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.stickerInk)
+                        .frame(width: 30, height: 30).background(Circle().fill(item.undone ? Theme.line : tint))
+                    Text(item.text).font(Theme.ui(13, weight: .medium)).strikethrough(item.undone).lineLimit(3)
+                        .foregroundStyle(item.undone ? Theme.inkMuted : Theme.ink)
+                    Spacer(minLength: 4)
+                    if item.undo != nil && !item.undone {
+                        Button("Undo") { store.undo(item, context: context) }
+                            .buttonStyle(.plain).font(Theme.ui(11, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
+                            .padding(.horizontal, 10).padding(.vertical, 5).background(Capsule().fill(Theme.canvas))
+                    }
+                }
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(item.undone ? Theme.card : tint.opacity(0.16)))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(item.undone ? Theme.line : tint.opacity(0.55)))
+                .padding(.leading, 30)
+            }
+        }
+    }
+
 }
 
 /// Assistant text with light markdown (bold, italics, links) and calm line spacing.

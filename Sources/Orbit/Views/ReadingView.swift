@@ -241,22 +241,17 @@ struct ReadingView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 50)
             }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 190), spacing: 20, alignment: .top)], spacing: 24) {
-                ForEach(visible) { b in
-                    BookTile(book: b).onTapGesture { editing = b }
-                        .contextMenu {
-                            Menu("Status") { ForEach(ReadingStatus.allCases) { s in Button(s.title) { b.status = s } } }
-                            Menu("Category") {
-                                ForEach(categories) { c in
-                                    Toggle(c.name, isOn: Binding(
-                                        get: { b.categories.contains(c.name) },
-                                        set: { on in if on { b.categories.append(c.name) } else { b.categories.removeAll { $0 == c.name } } }))
-                                }
-                            }
-                            Divider()
-                            Button("Delete", role: .destructive) { context.delete(b) }
-                        }
+            BookshelfView(books: visible, onTap: { editing = $0 }) { b in
+                Menu("Status") { ForEach(ReadingStatus.allCases) { s in Button(s.title) { b.status = s } } }
+                Menu("Category") {
+                    ForEach(categories) { c in
+                        Toggle(c.name, isOn: Binding(
+                            get: { b.categories.contains(c.name) },
+                            set: { on in if on { b.categories.append(c.name) } else { b.categories.removeAll { $0 == c.name } } }))
+                    }
                 }
+                Divider()
+                Button("Delete", role: .destructive) { context.delete(b) }
             }
         }
     }

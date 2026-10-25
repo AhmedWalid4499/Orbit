@@ -413,6 +413,13 @@ private let syncKinds: [SyncKind] = [
                  i.body = J.str(d["body"]); i.pinned = d["pinned"] as? Bool ?? false
                  i.createdAt = J.date(d["createdAt"]) ?? i.createdAt; i.updatedAt = J.date(d["updatedAt"]) ?? i.updatedAt },
              make: { let i = Idea(title: "", projectUUID: ""); $0.insert(i); return i }),
+    SyncKind(kind: "chat",
+             fetch: { (try? $0.fetch(FetchDescriptor<ChatThread>())) ?? [] }, uuid: { ($0 as! ChatThread).uuid },
+             encode: { m in let c = m as! ChatThread
+                 return ["title": c.title, "updatedAt": J.date(c.updatedAt), "payload": c.payload] },
+             apply: { d, m in let c = m as! ChatThread
+                 c.title = J.str(d["title"]); c.updatedAt = J.date(d["updatedAt"]) ?? c.updatedAt; c.payload = J.str(d["payload"]) },
+             make: { let c = ChatThread(uuid: ""); $0.insert(c); return c }),
     SyncKind(kind: "goal",
              fetch: { (try? $0.fetch(FetchDescriptor<Goal>())) ?? [] }, uuid: { ($0 as! Goal).uuid },
              encode: { m in let g = m as! Goal
@@ -525,7 +532,9 @@ final class CloudSync: ObservableObject {
         defer { syncing = false }
         do {
             assignMissingIDs(context: context)
+            AssistantStore.shared.shareChats(context: context)
             let pulled = try await pull(context: context)
+            if pulled > 0 { AssistantStore.shared.adoptSharedChats(context: context) }
             let pushed = try await push(context: context, userID: session.userID)
             do { try await syncVault(userID: session.userID) } catch { vaultState = .error(error.localizedDescription) }
             try? context.save()
@@ -568,6 +577,7 @@ final class CloudSync: ObservableObject {
         case let x as BankAccount: x.uuid = id
         case let x as IdeaProject: x.uuid = id
         case let x as Idea: x.uuid = id
+        case let x as ChatThread: x.uuid = id
         case let x as Goal: x.uuid = id
         default: break
         }

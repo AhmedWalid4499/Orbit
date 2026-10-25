@@ -13,6 +13,7 @@ struct OtherConnections: View {
         Section("YouTube") { YouTubeConnectionRow() }
         Section("LinkedIn") { LinkedInConnectionRow() }
         Section("Health") { HealthConnectionRow() }
+        Section("Outlook") { OutlookCalendarRow() }
         Section {
             row("Goodreads", .goodreads, reading.goodreadsUser.isEmpty ? nil : "Shelves sync from your profile") {
                 reading.goodreadsUser = ""

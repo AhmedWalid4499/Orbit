@@ -218,8 +218,8 @@ struct PhoneReading: View {
                     }
                 } else {
                     if shown.isEmpty { EmptyHint(symbol: "books.vertical", text: "No books here yet.") }
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 12, alignment: .top)], spacing: 16) {
-                        ForEach(shown) { b in BookTile(book: b).onTapGesture { detail = b } }
+                    BookshelfView(books: shown, onTap: { detail = $0 }) { b in
+                        ForEach(ReadingStatus.allCases) { s in Button(s.title) { b.status = s } }
                     }
                 }
             }

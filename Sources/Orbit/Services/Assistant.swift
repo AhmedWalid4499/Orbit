@@ -90,6 +90,12 @@ final class AssistantStore: ObservableObject {
     func delete(_ id: UUID) {
         guard !Snapshot.isActive else { return }
         try? FileManager.default.removeItem(at: Self.folder.appending(path: "\(id.uuidString).json"))
+        // Gone from your other devices too.
+        if let context = OrbitStore.container?.mainContext {
+            let key = id.uuidString
+            for t in (try? context.fetch(FetchDescriptor<ChatThread>(predicate: #Predicate { $0.uuid == key }))) ?? [] { context.delete(t) }
+            try? context.save()
+        }
         chats.removeAll { $0.id == id }
         saveIndex()
         if id == currentID { currentID = UUID(); items = []; messages = []; system = ""; error = nil }
@@ -127,8 +133,9 @@ final class AssistantStore: ObservableObject {
             // A dropped or slow connection (switching apps, a weak signal) is retried quietly, twice.
             for attempt in 0..<3 {
                 do {
+                    // Spoken replies think less before answering, so the voice starts sooner.
                     turn = try await client.streamTurn(system: system, messages: messages, tools: AssistantTools.definitions + AssistantTools.serverTools,
-                                                       effort: "medium") { [weak self] t in
+                                                       effort: talk ? "low" : "medium") { [weak self] t in
                         self?.received = t
                         if talk { Speaker.shared.liveFeed(t) }
                     }
@@ -249,6 +256,88 @@ final class AssistantStore: ObservableObject {
         saveIndex()
     }
     private var lastSavedCount = 0
+
+    // MARK: Chats on your other devices
+
+    private var shared: [String: Date] {
+        get { (UserDefaults.standard.dictionary(forKey: "chats.shared") as? [String: Double] ?? [:]).mapValues { Date(timeIntervalSince1970: $0) } }
+        set { UserDefaults.standard.set(newValue.mapValues(\.timeIntervalSince1970), forKey: "chats.shared") }
+    }
+
+    /// Copies chats changed on this device into the synced store (before a sync). File contents stay on this device.
+    func shareChats(context: ModelContext) {
+        guard !Snapshot.isActive else { return }
+        let threads = Dictionary(((try? context.fetch(FetchDescriptor<ChatThread>())) ?? []).map { ($0.uuid, $0) }, uniquingKeysWith: { a, _ in a })
+        var done = shared
+        for c in chats where !busy || c.id != currentID {
+            let key = c.id.uuidString
+            if let sent = done[key], sent >= c.updated { continue }
+            guard let data = try? Data(contentsOf: Self.folder.appending(path: "\(key).json")),
+                  var saved = try? JSONDecoder().decode(Saved.self, from: data) else { continue }
+            saved.messages = Self.withoutFiles(saved.messages)
+            guard let json = try? JSONEncoder().encode(saved), let payload = String(data: json, encoding: .utf8) else { continue }
+            let t = threads[key] ?? { let n = ChatThread(uuid: key); context.insert(n); return n }()
+            if let existing = threads[key], existing.updatedAt > c.updated { continue }   // newer on another device
+            t.title = c.title
+            t.updatedAt = c.updated
+            t.payload = payload
+            done[key] = c.updated
+        }
+        shared = done
+        try? context.save()
+    }
+
+    /// Brings in chats from your other devices (after a sync), and drops ones deleted there.
+    func adoptSharedChats(context: ModelContext) {
+        guard !Snapshot.isActive else { return }
+        let threads = (try? context.fetch(FetchDescriptor<ChatThread>())) ?? []
+        var done = shared
+        var changed = false
+        for t in threads {
+            guard let id = UUID(uuidString: t.uuid) else { continue }
+            let local = chats.first { $0.id == id }
+            if let local, local.updated >= t.updatedAt { continue }
+            if busy && id == currentID { continue }
+            guard let data = t.payload.data(using: .utf8), (try? JSONDecoder().decode(Saved.self, from: data)) != nil else { continue }
+            try? FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
+            try? data.write(to: Self.folder.appending(path: "\(t.uuid).json"))
+            chats.removeAll { $0.id == id }
+            chats.append(ChatInfo(id: id, title: t.title, updated: t.updatedAt))
+            done[t.uuid] = t.updatedAt
+            changed = true
+            if id == currentID { load() }
+        }
+        // Shared before but gone from the store now: it was deleted on another device.
+        let present = Set(threads.map(\.uuid))
+        for (key, _) in done where !present.contains(key) {
+            done[key] = nil
+            guard let id = UUID(uuidString: key), id != currentID || !busy else { continue }
+            try? FileManager.default.removeItem(at: Self.folder.appending(path: "\(key).json"))
+            chats.removeAll { $0.id == id }
+            changed = true
+        }
+        shared = done
+        if changed {
+            chats.sort { $0.updated > $1.updated }
+            saveIndex()
+        }
+    }
+
+    /// The conversation without the contents of attached files (they can be huge), which stay on the device they came from.
+    private static func withoutFiles(_ data: Data) -> Data {
+        guard var messages = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] else { return data }
+        for i in messages.indices {
+            guard let blocks = messages[i]["content"] as? [[String: Any]] else { continue }
+            messages[i]["content"] = blocks.map { b -> [String: Any] in
+                let type = b["type"] as? String
+                guard type == "document" || type == "image" else { return b }
+                return ["type": "text", "text": "[\(b["title"] as? String ?? "A file") was attached here on another device.]"]
+            }
+        }
+        let out = (try? JSONSerialization.data(withJSONObject: messages)) ?? data
+        // Very long chats share what you see; the conversation behind it stays on the device it started on.
+        return out.count > 800_000 ? (try? JSONSerialization.data(withJSONObject: [[String: Any]]())) ?? Data() : out
+    }
 
     private func saveIndex() {
         try? FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)

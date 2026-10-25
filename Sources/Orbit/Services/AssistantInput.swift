@@ -120,14 +120,11 @@ final class Dictation: ObservableObject {
         #endif
         let input = engine.inputNode
         input.removeTap(onBus: 0)
-        input.installTap(onBus: 0, bufferSize: 1024, format: input.outputFormat(forBus: 0)) { [weak self] buffer, _ in
+        let meter = Meter(on: true)
+        input.installTap(onBus: 0, bufferSize: 2048, format: input.outputFormat(forBus: 0)) { [weak self] buffer, _ in
             req.append(buffer)
-            let data = buffer.floatChannelData?[0]
-            let n = Int(buffer.frameLength)
-            var sum: Float = 0
-            if let data { for i in 0..<n { sum += data[i] * data[i] } }
-            let rms = n > 0 ? sqrt(sum / Float(n)) : 0
-            Task { @MainActor in self?.setLevel(min(1, rms * 12)) }
+            guard let v = meter.level(buffer) else { return }
+            Task { @MainActor in self?.setLevel(v) }
         }
         do {
             engine.prepare()
@@ -304,6 +301,7 @@ final class Speaker: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
         liveQueue = []
         appleWaiter?.resume()
         appleWaiter = nil
+        VoiceStream.shared.stop()
         NaturalVoice.shared.stop()
         if synth.isSpeaking { synth.stopSpeaking(at: .immediate) }
         speaking = false
@@ -350,7 +348,16 @@ final class Speaker: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
         var cut = liveQueued
         if final {
             cut = chars.count
-        } else {
+        } else if liveQueue.isEmpty && liveQueued == 0 {
+            // The very first words go as soon as there's a natural pause (a comma, a colon, a dash) after a few words,
+            // so it starts talking almost straight away.
+            var i = chars.count - 2
+            while i >= 24 {
+                if ".!?\n,;:—".contains(chars[i]) && chars[i + 1] == " " { cut = i + 1; break }
+                i -= 1
+            }
+        }
+        if cut == liveQueued && !final {
             // The end of the last finished sentence: . ! ? or a line break, followed by a space.
             var i = chars.count - 2
             while i >= liveQueued {
@@ -373,36 +380,27 @@ final class Speaker: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
     private func readLive(_ token: UUID) async {
         var index = 0
         var useNatural = NaturalVoice.isOn
+        var usedNatural = false
         let key = Keychain.read("openai-key") ?? ""
-        var clips: [Int: Task<Data?, Never>] = [:]
         while liveToken == token {
             if index < liveQueue.count {
                 let sentence = liveQueue[index]
                 if useNatural && !key.isEmpty {
-                    // Ask for the next few sentences' audio ahead, so there are no gaps between them.
-                    for k in index..<min(index + 3, liveQueue.count) where clips[k] == nil {
-                        let s = liveQueue[k]
-                        clips[k] = Task { try? await NaturalVoice.audio(s, key: key) }
-                    }
-                    if let data = await clips[index]?.value {
-                        guard liveToken == token else { break }
-                        await NaturalVoice.shared.playClip(data)
-                    } else {
-                        useNatural = false
-                        await sayApple(sentence)
-                    }
+                    // Streamed: it starts talking a moment after the sentence is sent, and the next sentence downloads
+                    // while this one plays, so there are no gaps.
+                    if await VoiceStream.shared.say(sentence, key: key, still: { self.liveToken == token }) { usedNatural = true }
+                    else { useNatural = false; await sayApple(sentence) }
                 } else {
                     await sayApple(sentence)
                 }
-                clips[index] = nil
                 index += 1
             } else if liveEnded {
                 break
             } else {
-                try? await Task.sleep(for: .milliseconds(60))
+                try? await Task.sleep(for: .milliseconds(40))
             }
         }
-        clips.values.forEach { $0.cancel() }
+        if usedNatural, liveToken == token { await VoiceStream.shared.finish() }
         guard liveToken == token else { return }
         liveEnded = true
         finished()

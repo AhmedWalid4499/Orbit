@@ -549,6 +549,20 @@ final class BankAccount {
     var title: String { last4.isEmpty ? name : "\(name) ••\(last4)" }
 }
 
+// MARK: - Chats
+
+/// An assistant conversation, kept so it follows you to your other devices (Past chats on Mac and iPhone).
+/// `payload` is the saved chat (what you see and what was sent), without the contents of files you attached.
+@Model
+final class ChatThread {
+    var uuid: String = ""
+    var title: String = ""
+    var updatedAt: Date = Date.now
+    var payload: String = ""
+
+    init(uuid: String) { self.uuid = uuid }
+}
+
 // MARK: - Ideas
 
 /// A writing project in Ideas (a novel, a series of posts, a screenplay…) holding the ideas that belong to it.

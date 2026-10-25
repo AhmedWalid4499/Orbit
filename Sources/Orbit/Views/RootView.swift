@@ -34,6 +34,7 @@ struct RootView: View {
                 case .documents: DocumentsView()
                 case .bucket: BucketListView()
                 case .github: GitHubView()
+                case .youtube: YouTubeView()
                 }
             }
             // Content that's taller than the window is cut at the bottom, never pushing the top bar out of view.
@@ -143,14 +144,16 @@ struct TopBar: View {
                 ReadingTimerPill()
                 UpdatePill()
                 Button { state.assistantOpen.toggle() } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "sparkles")
+                    HStack(spacing: 7) {
+                        AssistantAvatar(size: 26)
                         Text(assistantName)
                     }
                     .font(Theme.ui(13, weight: .semibold))
                     .foregroundStyle(Theme.stickerInk)
-                    .padding(.horizontal, 14).frame(height: 42)
-                    .background(Capsule().fill(Theme.lime))
+                    .padding(.leading, 8).padding(.trailing, 14).frame(height: 42)
+                    // The same colours as the assistant's orb in the chat.
+                    .background(Capsule().fill(LinearGradient(colors: [Theme.lime, Theme.mint, Theme.cyan.opacity(0.85), Theme.lavender, Theme.pink],
+                                                              startPoint: .leading, endPoint: .trailing)))
                 }
                 .buttonStyle(.plain)
                 .help("\(assistantName) (⌘J)")

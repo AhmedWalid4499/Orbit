@@ -39,6 +39,23 @@ struct ProfileCard: Codable, Equatable {
                 case .other: "link"
                 }
             }
+            /// The service's real logo (nil for a website or other link).
+            var brand: Brand? {
+                switch self {
+                case .linkedin: .linkedin
+                case .github: .github
+                case .instagram: .instagram
+                case .x: .x
+                case .youtube: .youtube
+                case .tiktok: .tiktok
+                case .facebook: .facebook
+                case .behance: .behance
+                case .dribbble: .dribbble
+                case .calendly: .calendly
+                case .whatsapp: .whatsapp
+                case .website, .other: nil
+                }
+            }
             var placeholder: String {
                 switch self {
                 case .linkedin: "linkedin.com/in/yourname"
@@ -262,4 +279,74 @@ enum CardPhoto {
     }
 
     static func clear() { UserDefaults.standard.removeObject(forKey: key) }
+}
+
+/// Your card as one small, self-contained web page (photo, links with their logos, Save contact), made every time
+/// the card is shared or saved. It works offline and can be opened, emailed or hosted anywhere.
+enum CardHTML {
+    static func page(_ card: ProfileCard, photo: PlatformImage?) -> String {
+        func esc(_ s: String) -> String {
+            s.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
+                .replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;")
+        }
+        let accent = card.isDark ? "#EDAA2F" : (card.color.hexString ?? "#E6FF1F")
+        let img = (card.showPhoto ? (CardPhoto.image ?? photo) : nil)?.jpeg(maxSide: 900, quality: 0.78).map { "data:image/jpeg;base64,\($0.base64EncodedString())" }
+        let role = [card.headline, card.company].filter { !$0.isEmpty }.joined(separator: " · ")
+        let vcf = "data:text/vcard;charset=utf-8," + (card.vCard.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? "")
+        func icon(_ brand: Brand?) -> String {
+            guard let brand, !brand.path.isEmpty else {
+                return ##"<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>"##
+            }
+            let hex = String(format: "#%06X", brand.hex)
+            return ##"<svg viewBox="0 0 24 24" class="b" style="background:\##(hex)"><path fill="#fff" transform="translate(4.2 4.2) scale(.65)" d="\##(brand.path)"/></svg>"##
+        }
+        var rows = ""
+        if !card.email.isEmpty {
+            rows += ##"<a href="mailto:\##(esc(card.email))"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm9 7 8.5-5.5h-17z"/></svg><span><b>Email</b><i>\##(esc(card.email))</i></span></a>"##
+        }
+        if !card.phone.isEmpty {
+            rows += ##"<a href="tel:\##(esc(card.phone.filter { $0.isNumber || $0 == "+" }))"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg><span><b>Call</b><i>\##(esc(card.phone))</i></span></a>"##
+        }
+        for l in card.filledLinks {
+            let title = l.kind == .other ? (l.handle.isEmpty ? "Link" : l.handle) : l.kind.title
+            rows += ##"<a href="\##(esc(l.url))" target="_blank" rel="noopener">\##(icon(l.kind.brand))<span><b>\##(esc(title))</b><i>\##(esc(l.kind == .other ? l.display : l.handle))</i></span></a>"##
+        }
+        return """
+        <!doctype html>
+        <html lang="en"><head><meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>\(esc(card.name.isEmpty ? "My card" : card.name))</title>
+        <style>
+        *{box-sizing:border-box;margin:0}
+        body{font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0b0b0c;color:#fff;min-height:100vh;display:grid;place-items:center;padding:24px}
+        .card{width:100%;max-width:420px;border-radius:32px;overflow:hidden;background:#111113;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+        .hero{position:relative;height:\(img == nil ? "160px" : "380px");background:\(img.map { "url(\($0)) center/cover" } ?? accent)}
+        .hero:after{content:"";position:absolute;inset:0;background:linear-gradient(to bottom,transparent 45%,#111113)}
+        .body{padding:0 26px 26px;margin-top:-70px;position:relative}
+        h1{font:700 34px/1.05 ui-serif,Georgia,serif;letter-spacing:-.01em}
+        .role{opacity:.82;margin-top:6px}.bio{opacity:.9;font-size:14px;margin-top:10px}
+        .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:\(accent);margin-left:6px;vertical-align:middle}
+        .links{display:grid;gap:8px;margin-top:20px}
+        .links a{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:16px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:#fff;text-decoration:none}
+        .links a:hover{background:rgba(255,255,255,.12)}
+        .links svg{width:30px;height:30px;flex:none;color:\(accent)}
+        .links svg.b{border-radius:8px}
+        .links span{display:flex;flex-direction:column;min-width:0}
+        .links b{font-size:14px}.links i{font-style:normal;font-size:12px;opacity:.6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .save{display:block;margin-top:16px;text-align:center;padding:13px;border-radius:999px;background:\(accent);color:#111;font-weight:700;text-decoration:none}
+        footer{text-align:center;font-size:11px;opacity:.4;margin-top:14px}
+        </style></head>
+        <body><div class="card">
+        <div class="hero"></div>
+        <div class="body">
+        <h1>\(esc(card.name))<span class="dot"></span></h1>
+        \(role.isEmpty ? "" : "<p class=\"role\">\(esc(role))</p>")
+        \(card.location.isEmpty ? "" : "<p class=\"role\" style=\"font-size:13px\">\(esc(card.location))</p>")
+        \(card.bio.isEmpty ? "" : "<p class=\"bio\">\(esc(card.bio))</p>")
+        <div class="links">\(rows)</div>
+        <a class="save" href="\(vcf)" download="\(esc(card.name.isEmpty ? "contact" : card.name)).vcf">Save contact</a>
+        <footer>Made with Orbit</footer>
+        </div></div></body></html>
+        """
+    }
 }

@@ -327,10 +327,14 @@ struct ReadingView: View {
                 if key == nil || key == "highlights" || count > 0 {
                     Button { withAnimation(.snappy) { library = key } } label: {
                         HStack(spacing: 7) {
-                            Image(systemName: symbol).font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(key == nil ? (library == nil ? Theme.onInverse : Theme.ink) : Theme.stickerInk)
-                                .frame(width: 22, height: 22)
-                                .background(Circle().fill(key == nil ? .clear : color))
+                            if let brand = Brand.forLibrary(key ?? "") {
+                                BrandLogo(brand: brand, size: 22)
+                            } else {
+                                Image(systemName: symbol).font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(key == nil ? (library == nil ? Theme.onInverse : Theme.ink) : Theme.stickerInk)
+                                    .frame(width: 22, height: 22)
+                                    .background(Circle().fill(key == nil ? .clear : color))
+                            }
                             Text(title).font(Theme.ui(13, weight: .semibold))
                             Text("\(count)").font(Theme.ui(11, weight: .semibold)).opacity(0.6)
                         }
@@ -953,9 +957,26 @@ struct ReadingSourcesSheet: View {
     @ObservedObject private var sync = ReadingSync.shared
     @State private var busy: String?
     @State private var importingCSV = false
+    @State private var confirmDisconnect: String?
     @Query private var books: [Book]
 
     var body: some View {
+        content
+            .confirmationDialog(confirmDisconnect == "apple" ? "Disconnect Apple Books?" : "Disconnect Kindle?",
+                                isPresented: Binding(get: { confirmDisconnect != nil }, set: { if !$0 { confirmDisconnect = nil } }), titleVisibility: .visible) {
+                Button("Disconnect and remove its books", role: .destructive) {
+                    if let key = confirmDisconnect {
+                        let n = sync.disconnect(key, context: context)
+                        sync.setResult(key, "Disconnected. Removed \(n) book\(n == 1 ? "" : "s") that came only from it.")
+                    }
+                    confirmDisconnect = nil
+                }
+            } message: {
+                Text("Books that came only from \(confirmDisconnect == "apple" ? "Apple Books" : "Kindle") are deleted from Orbit, on all your devices. Books also on Goodreads or added by you stay.")
+            }
+    }
+
+    private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Connect & import").font(Theme.display(28))
@@ -1011,6 +1032,9 @@ struct ReadingSourcesSheet: View {
                 source("Apple Books", symbol: "book.fill", color: Theme.orange, key: "apple", linked: sync.appleBooksLinked) {
                     Text("Reads the Books library on this Mac: what you've finished and how far along you are. Refreshes every day by itself.")
                     HStack {
+                        if sync.appleBooksLinked {
+                            Button("Disconnect", role: .destructive) { confirmDisconnect = "apple" }
+                        }
                         Spacer()
                         Button(sync.appleBooksLinked ? "Import again" : "Import from Apple Books") {
                             _ = sync.importLocal("apple", source: "apple-books", category: "Apple Books", context: context, load: AppleBooks.load)
@@ -1022,6 +1046,9 @@ struct ReadingSourcesSheet: View {
                 source("Kindle", symbol: "flame.fill", color: Theme.cyan, key: "kindle", linked: sync.kindleLinked) {
                     Text("Reads the library the Kindle app on this Mac has downloaded (Amazon doesn't let other apps sign in to your account). Open Kindle for Mac and sign in first so it syncs.")
                     HStack {
+                        if sync.kindleLinked {
+                            Button("Disconnect", role: .destructive) { confirmDisconnect = "kindle" }
+                        }
                         Link("Also link Kindle to Goodreads", destination: URL(string: "https://www.goodreads.com/user/edit?tab=apps")!)
                             .help("Kindle reading progress then flows into Goodreads too")
                         Spacer()
@@ -1136,8 +1163,11 @@ struct ReadingSourcesSheet: View {
     private func source<Content: View>(_ name: String, symbol: String, color: Color, key: String, linked: Bool,
                                        @ViewBuilder content: () -> Content) -> some View {
         HStack(alignment: .top, spacing: 14) {
-            Image(systemName: symbol).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.stickerInk)
-                .frame(width: 38, height: 38).background(Circle().fill(color))
+            if let brand = Brand.forLibrary(key) { BrandLogo(brand: brand, size: 38) }
+            else {
+                Image(systemName: symbol).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.stickerInk)
+                    .frame(width: 38, height: 38).background(Circle().fill(color))
+            }
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text(name).font(Theme.ui(15, weight: .semibold))

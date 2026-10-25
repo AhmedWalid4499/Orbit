@@ -10,6 +10,8 @@ struct PhoneTasks: View {
     @Query(sort: \TaskItem.createdAt, order: .reverse) private var tasks: [TaskItem]
 
     @State private var filter: Filter = .today
+    @AppStorage("tasksArea") private var areaRaw = ""
+    private var area: Area? { Area(rawValue: areaRaw) }
     @State private var draft = ""
     @State private var editing: TaskItem?
     @FocusState private var adding: Bool
@@ -17,14 +19,14 @@ struct PhoneTasks: View {
     private var tomorrow: Date { Date.now.startOfDay.adding(days: 1) }
 
     private func items(for f: Filter) -> [TaskItem] {
-        let open = tasks.filter { !$0.isDone }
+        let open = tasks.filter { !$0.isDone && (area == nil || $0.area == area) }
         let list: [TaskItem]
         switch f {
         case .today: list = open.filter { ($0.due ?? .distantFuture) < tomorrow }
         case .upcoming: list = open.filter { ($0.due ?? .distantPast) >= tomorrow }
         case .inbox: list = open.filter { $0.due == nil }
         case .all: list = open
-        case .completed: return tasks.filter(\.isDone).sorted { ($0.completedAt ?? .now) > ($1.completedAt ?? .now) }
+        case .completed: return tasks.filter { $0.isDone && (area == nil || $0.area == area) }.sorted { ($0.completedAt ?? .now) > ($1.completedAt ?? .now) }
         case .area(let a): list = open.filter { $0.area == a }
         case .reminders, .shared: return []
         }
@@ -35,7 +37,7 @@ struct PhoneTasks: View {
     }
 
     private var filters: [Filter] {
-        [.today, .upcoming, .inbox, .all, .completed, .shared] + Area.allCases.map { .area($0) } + (apple.remindersEnabled ? [.reminders] : [])
+        [.today, .upcoming, .inbox, .completed, .shared] + (apple.remindersEnabled ? [.reminders] : [])
     }
 
     var body: some View {
@@ -57,6 +59,20 @@ struct PhoneTasks: View {
                                 .background(Capsule().fill(filter == f ? Theme.inverse : Theme.card))
                             }
                             .buttonStyle(.plain)
+                        }
+                        // One menu for the seven areas, instead of a chip each.
+                        Menu {
+                            Button("All areas") { areaRaw = "" }
+                            ForEach(Area.allCases) { a in Button { areaRaw = a.rawValue } label: { Label(a.title, systemImage: a.symbol) } }
+                        } label: {
+                            HStack(spacing: 5) {
+                                Circle().fill(area?.color ?? Theme.inkMuted).frame(width: 7, height: 7)
+                                Text(area?.title ?? "Area")
+                                Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
+                            }
+                            .font(Theme.ui(13, weight: .semibold)).foregroundStyle(Theme.ink)
+                            .padding(.horizontal, 12).padding(.vertical, 8)
+                            .background(Capsule().fill(area == nil ? Theme.card : area!.color.opacity(0.35)))
                         }
                     }
                     .padding(.horizontal, 16)
@@ -136,7 +152,7 @@ struct PhoneTasks: View {
         guard !parsed.title.isEmpty else { return }
         if parsed.kind == .event { parsed.kind = .task }
         if parsed.kind == .task {
-            if case .area(let a) = filter, parsed.area == nil { parsed.area = a }
+            if let a = area, parsed.area == nil { parsed.area = a }
             if filter == .today, parsed.date == nil { parsed.date = .now.startOfDay }
         }
         parsed.save(in: context)

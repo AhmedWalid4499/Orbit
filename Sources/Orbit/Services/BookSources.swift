@@ -516,10 +516,10 @@ final class ReadingSync: ObservableObject {
     func syncIfDue(context: ModelContext) async {
         // As soon as Full Disk Access is on, bring in Apple Books and Kindle without waiting for a click.
         if LocalLibraries.hasAccess {
-            if !appleBooksLinked, LocalLibraries.booksInstalled {
+            if !appleBooksLinked, !UserDefaults.standard.bool(forKey: "appleBooksOff"), LocalLibraries.booksInstalled {
                 importLocal("apple", source: "apple-books", category: "Apple Books", context: context, load: AppleBooks.load)
             }
-            if !kindleLinked, LocalLibraries.kindleInstalled {
+            if !kindleLinked, !UserDefaults.standard.bool(forKey: "kindleOff"), LocalLibraries.kindleInstalled {
                 importLocal("kindle", source: "kindle", category: "Kindle", context: context, load: KindleMac.load)
             }
         }
@@ -545,6 +545,42 @@ final class ReadingSync: ObservableObject {
         lastSync = Date.now.timeIntervalSince1970
     }
 
+    /// Stops syncing Apple Books ("apple") or Kindle ("kindle") and removes what came from it: books only in that
+    /// library are deleted (with their reading sessions and Kindle highlights); books also on another shelf just lose the tag.
+    /// Returns how many books were deleted.
+    @discardableResult
+    func disconnect(_ key: String, context: ModelContext) -> Int {
+        let source = key == "apple" ? "apple-books" : "kindle"
+        let category = key == "apple" ? "Apple Books" : "Kindle"
+        if key == "apple" { appleBooksLinked = false } else { kindleLinked = false }
+        UserDefaults.standard.set(true, forKey: key == "apple" ? "appleBooksOff" : "kindleOff")
+        lastResults[key] = nil
+        let books = (try? context.fetch(FetchDescriptor<Book>())) ?? []
+        let sessions = (try? context.fetch(FetchDescriptor<ReadingSession>())) ?? []
+        var deleted = 0
+        for b in books {
+            let from = b.sources.isEmpty ? [b.source] : b.sources
+            guard from.contains(source) || b.source == source else { continue }
+            let others = from.filter { $0 != source }
+            if others.isEmpty {
+                for s in sessions where s.bookUUID == b.uuid && !b.uuid.isEmpty { context.delete(s) }
+                context.delete(b)
+                deleted += 1
+            } else {
+                b.sources = others
+                if b.source == source { b.source = others[0] }
+                b.categories.removeAll { $0 == category }
+            }
+        }
+        if key == "kindle" {
+            for h in (try? context.fetch(FetchDescriptor<Highlight>())) ?? [] where h.source.hasPrefix("kindle") { context.delete(h) }
+        }
+        let still = books.filter { !$0.isDeleted }.contains { $0.categories.contains(category) }
+        if !still { for c in (try? context.fetch(FetchDescriptor<BookCategory>())) ?? [] where c.name == category { context.delete(c) } }
+        try? context.save()
+        return deleted
+    }
+
     /// Imports Apple Books / Kindle; remembers the source for daily sync after the first success.
     @discardableResult
     func importLocal(_ key: String, source: String, category: String, context: ModelContext,
@@ -553,6 +589,7 @@ final class ReadingSync: ObservableObject {
             let items = try load()
             let out = BookLibrary.merge(items, source: source, category: category, context: context)
             if key == "apple" { appleBooksLinked = true } else { kindleLinked = true }
+            UserDefaults.standard.set(false, forKey: key == "apple" ? "appleBooksOff" : "kindleOff")
             lastResults[key] = "Imported \(items.count) books — \(out.added) new, \(out.updated) updated. Refreshes daily."
             return true
         } catch {

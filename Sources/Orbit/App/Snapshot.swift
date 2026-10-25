@@ -117,6 +117,9 @@ extension Snapshot {
             renderAlone("tabs", width: 520, height: 720, Form { TabsSection() }.formStyle(.grouped))
             renderAlone("inbox-window", width: 520, height: 360, Form { InboxWindowControls() }.formStyle(.grouped))
             renderAlone("memory", width: 520, height: 420, Form { MemorySection() }.formStyle(.grouped))
+            renderAlone("brands", width: 720, height: 300, LazyVGrid(columns: Array(repeating: GridItem(.fixed(64)), count: 10), spacing: 14) {
+                ForEach(Brand.allCases, id: \.self) { b in VStack(spacing: 4) { BrandLogo(brand: b, size: 36); BrandLogo(brand: b, size: 20, style: .glyph) } }
+            }.padding(16).background(Theme.canvas))
             renderAlone("mail", width: 620, height: 720, wait: 1, MailSheet(id: "demo1", account: "alex@example.com"))
             renderAlone("place-chat", width: 420, height: 320, wait: 2.5, PlaceChatCard(place: ChatPlace(name: "Zooba", address: "26 Taha Hussein, Zamalek", category: "food", lat: 30.0612, lon: 31.2195), note: "Saved to Go to") {}.padding(20))
             renderAlone("shared-lists", width: 760, height: 640, wait: 1, ScrollView { SharedListsView().padding(28) }.background(Theme.canvas))

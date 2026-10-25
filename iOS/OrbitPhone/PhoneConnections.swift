@@ -104,9 +104,17 @@ struct PhoneConnections: View {
         .sheet(isPresented: $readingSources) { ReadingSourcesSheet() }
     }
 
+    @ViewBuilder
     private func icon(_ symbol: String, _ color: Color, ink: Color = Theme.stickerInk) -> some View {
-        Image(systemName: symbol).font(.system(size: 13, weight: .semibold)).foregroundStyle(ink)
-            .frame(width: 32, height: 32).background(RoundedRectangle(cornerRadius: 9).fill(color))
+        // The real logo for each service.
+        let brands: [String: Brand] = ["envelope.fill": .gmail, "chevron.left.forwardslash.chevron.right": .github, "calendar": .appleCalendar,
+                                       "checklist": .appleReminders, "books.vertical.fill": .goodreads]
+        if let brand = brands[symbol] {
+            BrandLogo(brand: brand, size: 32)
+        } else {
+            Image(systemName: symbol).font(.system(size: 13, weight: .semibold)).foregroundStyle(ink)
+                .frame(width: 32, height: 32).background(RoundedRectangle(cornerRadius: 9).fill(color))
+        }
     }
 
     private func row(_ symbol: String, _ color: Color, _ title: String, detail: String) -> some View {

@@ -17,13 +17,16 @@ final class MoneyCoach: ObservableObject {
         let headline: String
         let tips: [Tip]
         var generatedAt: Date = .now
+        /// Start of the budget month the advice was written for, so another device that starts a new month makes it rewrite.
+        var period: Double? = nil
 
-        enum CodingKeys: String, CodingKey { case headline, tips, generatedAt }
+        enum CodingKeys: String, CodingKey { case headline, tips, generatedAt, period }
         init(from d: Decoder) throws {
             let c = try d.container(keyedBy: CodingKeys.self)
             headline = try c.decode(String.self, forKey: .headline)
             tips = try c.decode([Tip].self, forKey: .tips)
             generatedAt = try c.decodeIfPresent(Date.self, forKey: .generatedAt) ?? .now
+            period = try c.decodeIfPresent(Double.self, forKey: .period)
         }
     }
 
@@ -50,7 +53,8 @@ final class MoneyCoach: ObservableObject {
     /// Refreshes once a day when Money is opened; `force` for the refresh button.
     func refresh(context: ModelContext, force: Bool = false) async {
         guard !loading, !Snapshot.isActive, AIAssistant.shared.hasKey, let claude = ClaudeClient() else { return }
-        if !force, let a = advice, a.generatedAt.isToday { return }
+        let period = BudgetPeriod.current.start.timeIntervalSince1970
+        if !force, let a = advice, a.generatedAt.isToday, a.period == period { return }
         let txns = (try? context.fetch(FetchDescriptor<Transaction>())) ?? []
         guard txns.contains(where: \.isExpense) else { return }
 
@@ -79,6 +83,7 @@ final class MoneyCoach: ObservableObject {
         do {
             var result = try await claude.structured(Advice.self, system: system, user: Self.summary(context: context), schema: schema, effort: "medium")
             result.generatedAt = .now
+            result.period = period
             advice = result
             if let data = try? JSONEncoder().encode(result) { UserDefaults.standard.set(data, forKey: cacheKey) }
         } catch {
@@ -131,6 +136,8 @@ struct MoneyCoachCard: View {
     @EnvironmentObject private var state: AppState
     @ObservedObject private var coach = MoneyCoach.shared
     @ObservedObject private var ai = AIAssistant.shared
+    /// Changes when a new budget month starts here or on another device.
+    @AppStorage(BudgetPeriod.key) private var periodStart = 0.0
 
     private let ink = Color(hex: 0xF4F4F5)
 
@@ -194,6 +201,6 @@ struct MoneyCoachCard: View {
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Color(hex: 0x141416)))
-        .task { await coach.refresh(context: context) }
+        .task(id: periodStart) { await coach.refresh(context: context) }
     }
 }

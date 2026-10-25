@@ -34,8 +34,7 @@ struct PhoneMore: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { state.openAssistant() } label: {
-                    Image(systemName: "sparkles").font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.stickerInk)
-                        .frame(width: 30, height: 30).background(Circle().fill(Theme.lime))
+                    AssistantAvatar(size: 30)
                 }
             }
         }
@@ -50,6 +49,7 @@ struct PhoneMore: View {
         case .documents: Theme.mint
         case .insights: Theme.lime
         case .github: Theme.lavender
+        case .youtube: Theme.peach
         default: Theme.silver
         }
     }
@@ -78,6 +78,10 @@ struct PhoneBucket: View {
 
 struct PhoneDocuments: View {
     var body: some View { DocumentsView().phoneChrome("Documents") }
+}
+
+struct PhoneYouTube: View {
+    var body: some View { YouTubeView().phoneChrome("YouTube") }
 }
 
 struct PhoneGitHub: View {
@@ -109,6 +113,7 @@ struct PhoneNotes: View {
                     Label(showJournal ? "Today's entry" : "New note", systemImage: showJournal ? "sun.max" : "square.and.pencil").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(PrimaryButtonStyle()).plainRow()
+                if !showJournal { KeepImportButton().plainRow() }
             }
             ForEach(visible) { note in
                 Button { open = note } label: { NoteRow(note: note, selected: false) }

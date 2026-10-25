@@ -9,9 +9,9 @@ struct TasksView: View {
             switch self {
             case .today: "Today"
             case .upcoming: "Upcoming"
-            case .inbox: "No date"
+            case .inbox: "Anytime"
             case .all: "All open"
-            case .completed: "Completed"
+            case .completed: "Done"
             case .area(let a): a.title
             case .reminders: "Apple Reminders"
             case .shared: "Shared lists"
@@ -37,20 +37,23 @@ struct TasksView: View {
     @Query(sort: \TaskItem.createdAt, order: .reverse) private var tasks: [TaskItem]
 
     @State private var filter: Filter = .today
+    /// Narrows whichever view is open to one area (Work, Health…); nil shows all.
+    @AppStorage("tasksArea") private var areaRaw = ""
     @State private var draft = ""
     @State private var editing: TaskItem?
 
     private var tomorrow: Date { Date.now.startOfDay.adding(days: 1) }
+    private var area: Area? { Area(rawValue: areaRaw) }
 
     private func items(for f: Filter) -> [TaskItem] {
-        let open = tasks.filter { !$0.isDone }
+        let open = tasks.filter { !$0.isDone && (area == nil || $0.area == area) }
         let list: [TaskItem]
         switch f {
         case .today: list = open.filter { ($0.due ?? .distantFuture) < tomorrow }
         case .upcoming: list = open.filter { ($0.due ?? .distantPast) >= tomorrow }
         case .inbox: list = open.filter { $0.due == nil }
         case .all: list = open
-        case .completed: return tasks.filter(\.isDone).sorted { ($0.completedAt ?? .now) > ($1.completedAt ?? .now) }
+        case .completed: return tasks.filter { $0.isDone && (area == nil || $0.area == area) }.sorted { ($0.completedAt ?? .now) > ($1.completedAt ?? .now) }
         case .area(let a): list = open.filter { $0.area == a }
         case .reminders, .shared: return []
         }
@@ -70,6 +73,7 @@ struct TasksView: View {
                         .font(Theme.display(38, weight: .regular))
                         .foregroundStyle(Theme.inkMuted)
                     Spacer()
+                    if filter != .shared && filter != .reminders { areaMenu }
                 }
                 if filter != .reminders && filter != .completed && filter != .shared { addBar }
                 ScrollView {
@@ -99,20 +103,12 @@ struct TasksView: View {
     private var sidebar: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 4) {
-                ForEach([Filter.today, .upcoming, .inbox, .all, .completed], id: \.self) { f in
+                ForEach([Filter.today, .upcoming, .inbox, .completed], id: \.self) { f in
                     FilterRow(filter: f, count: f == .completed ? nil : items(for: f).count, selected: filter == f) { filter = f }
                 }
-                Text("Areas").font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkMuted)
+                Text("Lists").font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkMuted)
                     .padding(.top, 18).padding(.bottom, 4).padding(.leading, 12)
-                ForEach(Area.allCases) { a in
-                    FilterRow(filter: .area(a), count: items(for: .area(a)).count, selected: filter == .area(a), tint: a.color) {
-                        filter = .area(a)
-                    }
-                }
                 FilterRow(filter: .shared, count: nil, selected: filter == .shared) { filter = .shared }
-                    .padding(.top, 14)
-                Text("Connected").font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkMuted)
-                    .padding(.top, 18).padding(.bottom, 4).padding(.leading, 12)
                 if apple.remindersEnabled {
                     FilterRow(filter: .reminders, count: apple.reminders.count, selected: filter == .reminders) { filter = .reminders }
                 } else {
@@ -120,11 +116,32 @@ struct TasksView: View {
                         Label("Connect Apple Reminders", systemImage: "link")
                     }
                     .buttonStyle(SoftButtonStyle())
-                    .padding(.leading, 6)
+                    .padding(.leading, 6).padding(.top, 4)
                 }
             }
         }
         .scrollIndicators(.never)
+    }
+
+    /// "All areas" or one area, applied to the open view.
+    private var areaMenu: some View {
+        Menu {
+            Button { areaRaw = "" } label: { Label("All areas", systemImage: area == nil ? "checkmark" : "square.grid.2x2") }
+            Divider()
+            ForEach(Area.allCases) { a in
+                Button { areaRaw = a.rawValue } label: { Label(a.title, systemImage: area == a ? "checkmark" : a.symbol) }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Circle().fill(area?.color ?? Theme.inkMuted).frame(width: 8, height: 8)
+                Text(area?.title ?? "All areas").font(Theme.ui(13, weight: .semibold))
+                Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
+            }
+            .foregroundStyle(Theme.ink)
+            .padding(.horizontal, 12).padding(.vertical, 7)
+            .background(Capsule().fill(Theme.card))
+        }
+        .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
     }
 
     private var addBar: some View {
@@ -149,7 +166,7 @@ struct TasksView: View {
         // In the task list everything becomes a task; a time just sets the due date.
         if parsed.kind == .event { parsed.kind = .task }
         if parsed.kind == .task {
-            if case .area(let a) = filter, parsed.area == nil { parsed.area = a }
+            if let a = area, parsed.area == nil { parsed.area = a }
             if filter == .today, parsed.date == nil { parsed.date = .now.startOfDay }
         }
         parsed.save(in: context)

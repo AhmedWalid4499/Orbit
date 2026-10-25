@@ -112,7 +112,9 @@ struct MailSheet: View {
         guard let m = message, !drafting else { return }
         drafting = true
         Task {
-            do { reply = try await MailReader.draftReply(to: m, intent: intent) } catch { self.error = error.localizedDescription }
+            // Notes typed in the reply box count too, so "Draft reply" turns them into a real email.
+            let notes = intent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? reply : intent
+            do { reply = try await MailReader.draftReply(to: m, intent: notes) } catch { self.error = error.localizedDescription }
             drafting = false
         }
     }

@@ -38,6 +38,7 @@ struct NotesView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(PrimaryButtonStyle())
+                if !showJournal { KeepImportButton() }
 
                 ScrollView {
                     LazyVStack(spacing: 6) {

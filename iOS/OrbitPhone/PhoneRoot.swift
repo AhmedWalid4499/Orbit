@@ -155,6 +155,7 @@ struct PhoneSection: View {
         case .bucket: PhoneBucket()
         case .documents: PhoneDocuments()
         case .github: PhoneGitHub()
+        case .youtube: PhoneYouTube()
         default: EmptyView()
         }
     }
@@ -195,8 +196,7 @@ struct PhoneChrome: ViewModifier {
                     Button { state.newTaskOpen = true } label: { Image(systemName: "plus") }
                         .accessibilityLabel("Quick add")
                     Button { state.openAssistant() } label: {
-                        Image(systemName: "sparkles").font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.stickerInk)
-                            .frame(width: 30, height: 30).background(Circle().fill(Theme.lime))
+                        AssistantAvatar(size: 30)
                     }
                     .accessibilityLabel(AssistantName.current)
                     Menu {

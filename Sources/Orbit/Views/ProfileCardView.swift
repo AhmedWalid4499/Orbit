@@ -142,7 +142,7 @@ struct CardFace: View {
                     if !card.email.isEmpty { pill("envelope.fill", "Email", accent, url: "mailto:\(card.email)") }
                     if !card.phone.isEmpty { pill("phone.fill", "Call", accent, url: "tel:\(card.phone.filter { $0.isNumber || $0 == "+" })") }
                     ForEach(card.filledLinks.prefix(6)) { link in
-                        pill(link.kind.symbol, link.kind == .other ? (link.handle.isEmpty ? "Link" : link.handle) : link.kind.title, accent, url: link.url)
+                        pill(link.kind.symbol, link.kind == .other ? (link.handle.isEmpty ? "Link" : link.handle) : link.kind.title, accent, url: link.url, brand: link.kind.brand)
                     }
                 }
                 .padding(.top, 8)
@@ -166,10 +166,11 @@ struct CardFace: View {
     }
 
     /// A rounded link button, like the topic chips on a profile page.
-    private func pill(_ symbol: String, _ title: String, _ accent: Color, url: String) -> some View {
+    private func pill(_ symbol: String, _ title: String, _ accent: Color, url: String, brand: Brand? = nil) -> some View {
         Button { if interactive, let u = URL(string: url) { openURL(u) } } label: {
             HStack(spacing: 7) {
-                Image(systemName: symbol).font(.system(size: 12, weight: .bold)).foregroundStyle(accent)
+                if let brand { BrandLogo(brand: brand, size: 18) }
+                else { Image(systemName: symbol).font(.system(size: 12, weight: .bold)).foregroundStyle(accent) }
                 Text(title).font(.system(size: 14, weight: .medium)).lineLimit(1)
             }
             .padding(.horizontal, 14).padding(.vertical, 9)
@@ -243,9 +244,13 @@ struct CardFace: View {
     private func linkRow(_ link: ProfileCard.Link) -> some View {
         Button { if interactive, let u = URL(string: link.url) { openURL(u) } } label: {
             HStack(spacing: 11) {
-                Image(systemName: link.kind.symbol).font(.system(size: 12, weight: .bold))
-                    .frame(width: 30, height: 30)
-                    .background(Circle().fill(ink.opacity(0.12)))
+                if let brand = link.kind.brand {
+                    BrandLogo(brand: brand, size: 30)
+                } else {
+                    Image(systemName: link.kind.symbol).font(.system(size: 12, weight: .bold))
+                        .frame(width: 30, height: 30)
+                        .background(Circle().fill(ink.opacity(0.12)))
+                }
                 VStack(alignment: .leading, spacing: 1) {
                     Text(link.kind == .other ? (link.handle.isEmpty ? "Link" : link.handle) : link.kind.title)
                         .font(.system(size: 14, weight: .semibold))
@@ -288,7 +293,7 @@ struct ProfileCardSheet: View {
     @State private var pickedPhoto: PhotosPickerItem?
     #endif
     private var backdrop: PlatformImage? { cardPhotoData.isEmpty ? nil : CardPhoto.image }
-    @State private var files: (png: URL, vcf: URL)?
+    @State private var files: (png: URL, vcf: URL, html: URL)?
     @State private var copied: String?
     @ObservedObject private var cloud = CloudSync.shared
     @State private var publishStatus: String?
@@ -562,7 +567,7 @@ struct ProfileCardSheet: View {
         VStack(spacing: 10) {
             #if os(iOS)
             if let files {
-                ShareLink(items: [files.png, files.vcf]) { Label("Share card…", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity) }
+                ShareLink(items: [files.png, files.vcf, files.html]) { Label("Share card…", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity) }
                     .buttonStyle(PrimaryButtonStyle())
             }
             HStack(spacing: 10) {
@@ -572,7 +577,7 @@ struct ProfileCardSheet: View {
             #else
             HStack(spacing: 10) {
                 if let files {
-                    ShareLink(items: [files.png, files.vcf]) { Label("Share card…", systemImage: "square.and.arrow.up") }
+                    ShareLink(items: [files.png, files.vcf, files.html]) { Label("Share card…", systemImage: "square.and.arrow.up") }
                         .buttonStyle(PrimaryButtonStyle()).frame(width: 170)
                 }
                 Button { copyImage() } label: { Label("Copy image", systemImage: "doc.on.doc") }.buttonStyle(SoftButtonStyle())
@@ -585,6 +590,8 @@ struct ProfileCardSheet: View {
                     .buttonStyle(SoftButtonStyle())
                 Button { save(files?.vcf, as: "\(fileStem).vcf", type: .vCard) } label: { Label("Save contact…", systemImage: "person.crop.square") }
                     .buttonStyle(SoftButtonStyle())
+                Button { save(files?.html, as: "\(fileStem).html", type: .html) } label: { Label("Save web page…", systemImage: "globe") }
+                    .buttonStyle(SoftButtonStyle()).help("Your card as a small web page you can open, email or put online")
             }
             #endif
             if let copied { Text(copied).font(Theme.ui(11, weight: .medium)).foregroundStyle(Theme.good) }
@@ -599,10 +606,15 @@ struct ProfileCardSheet: View {
     @MainActor private func refreshFiles() {
         let dir = FileManager.default.temporaryDirectory.appending(path: "orbit-card", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let png = dir.appending(path: "\(fileStem).png"), vcf = dir.appending(path: "\(fileStem).vcf")
+        let png = dir.appending(path: "\(fileStem).png"), vcf = dir.appending(path: "\(fileStem).vcf"), html = dir.appending(path: "\(fileStem).html")
         if let data = renderPNG() { try? data.write(to: png) }
         try? card.vCard.data(using: .utf8)?.write(to: vcf)
-        files = (png, vcf)
+        // Every version of the card also becomes its own little web page, kept in Orbit's folder too.
+        let page = CardHTML.page(card, photo: profile.photo)
+        try? page.data(using: .utf8)?.write(to: html)
+        let kept = URL.applicationSupportDirectory.appending(path: "Orbit/My card.html")
+        try? page.data(using: .utf8)?.write(to: kept)
+        files = (png, vcf, html)
     }
 
     @MainActor private func renderPNG() -> Data? {

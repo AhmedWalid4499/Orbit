@@ -108,12 +108,16 @@ enum MailReader {
         let me = Platform.userName.split(separator: " ").first.map(String.init) ?? ""
         struct Out: Decodable { let reply: String }
         let out = try await client.structured(Out.self, system: """
-            Write an email reply for \(me.isEmpty ? "the user" : me). Match the tone of the email (casual for friends, polite for work), keep it short and natural, \
-            like a person wrote it: greeting, the point, a friendly close and their first name. Plain text, no subject line, no placeholders like [Name]. \
-            If they said what they want to say, say exactly that. Reply in the email's language.
-            """, user: "EMAIL FROM \(m.from)\nSUBJECT: \(m.subject)\n\n\(m.body.prefix(6000))\n\nWHAT I WANT TO SAY: \(intent.isEmpty ? "(decide a sensible reply)" : intent)",
+            You write email replies for \(me.isEmpty ? "the user" : me). Read the email carefully and write the complete reply they would send.
+            - Their notes are rough instructions about what to say ("yes 8:30 works", "decline politely, busy that week"), not the reply itself. \
+            Never copy the notes word for word: turn them into a proper, well-written reply that answers what the email actually asks, \
+            mentions the specifics (names, dates, times, places from the email) and adds the small courtesies a person would.
+            - Without notes, write the most sensible reply to what the email asks.
+            - Match the tone of the email (casual for friends, polite for work). Greeting with their name, 2-5 short sentences, a friendly close, then \(me.isEmpty ? "their first name" : me).
+            - Plain text, no subject line, no placeholders like [Name]. Reply in the email's language.
+            """, user: "THE EMAIL\nFrom: \(m.from)\nSubject: \(m.subject)\n\n\(m.body.prefix(6000))\n\nMY NOTES FOR THE REPLY: \(intent.isEmpty ? "(none, decide a sensible reply)" : intent)",
             schema: ["type": "object", "properties": ["reply": ["type": "string"]], "required": ["reply"], "additionalProperties": false],
-            effort: "low", maxTokens: 4000)
+            effort: "medium", maxTokens: 6000)
         return out.reply
     }
 

@@ -164,6 +164,8 @@ final class YouTubeStore: ObservableObject {
 /// Insights › YouTube: the channel at a glance, subscriber growth and the latest videos.
 struct YouTubeCard: View {
     @ObservedObject private var yt = YouTubeStore.shared
+    /// How many of the latest videos to list.
+    var videoCount = 5
 
     private struct Point: Identifiable { let id: String; let day: Date; let subs: Int }
     private var points: [Point] {
@@ -208,7 +210,7 @@ struct YouTubeCard: View {
                     }
                     if !yt.videos.isEmpty {
                         Text("Latest videos").font(Theme.ui(14, weight: .semibold))
-                        ForEach(yt.videos.prefix(5)) { v in
+                        ForEach(yt.videos.prefix(videoCount)) { v in
                             Button { Platform.open(URL(string: "https://youtu.be/\(v.id)")!) } label: {
                                 HStack(spacing: 10) {
                                     AsyncImage(url: URL(string: v.thumbnail)) { img in img.resizable().scaledToFill() } placeholder: { Theme.card }
@@ -251,10 +253,10 @@ struct YouTubeConnectionRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 12) {
-                Image(systemName: "play.rectangle.fill").foregroundStyle(.red).frame(width: 28)
+                BrandLogo(brand: .youtube, size: 28)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(yt.channel?.title ?? "YouTube").font(.headline)
-                    Text(yt.isConnected ? "Subscribers, views and your latest videos, in Insights." : "See your channel's subscribers, views and latest videos in Insights.")
+                    Text(yt.isConnected ? "Subscribers, views and your latest videos, on the YouTube tab." : "See your channel's subscribers, views and latest videos on the YouTube tab.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -266,5 +268,43 @@ struct YouTubeConnectionRow: View {
             }
             if let e = yt.error { Text(e).font(.caption).foregroundStyle(Theme.orange).fixedSize(horizontal: false, vertical: true) }
         }
+    }
+}
+
+/// The YouTube tab: your channel at a glance, or a button to connect it.
+struct YouTubeView: View {
+    @ObservedObject private var yt = YouTubeStore.shared
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                if !Platform.isPhone {
+                    HStack(spacing: 12) {
+                        BrandLogo(brand: .youtube, size: 34)
+                        Text("YouTube").font(Theme.display(38))
+                    }
+                }
+                if yt.isConnected {
+                    YouTubeCard(videoCount: 25)
+                } else {
+                    VStack(alignment: .leading, spacing: 12) {
+                        BrandLogo(brand: .youtube, size: 56)
+                        Text("Your channel, in Orbit").font(Theme.display(26))
+                        Text("Connect your YouTube channel to see subscribers, views and how your latest videos are doing, with growth over time. Orbit only reads; it never posts.")
+                            .font(Theme.ui(14)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
+                        if let e = yt.error { Text(e).font(Theme.ui(12)).foregroundStyle(Theme.orange) }
+                        Button { Task { await yt.connect() } } label: {
+                            Label(yt.loading ? "Connecting…" : "Connect YouTube", systemImage: "link")
+                        }
+                        .buttonStyle(PrimaryButtonStyle()).fixedSize().disabled(yt.loading)
+                    }
+                    .padding(28)
+                    .frame(maxWidth: 560, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 24, style: .continuous).fill(Theme.card))
+                }
+            }
+            .padding(.horizontal, Theme.pagePadding).padding(.top, 10).padding(.bottom, 32)
+        }
+        .scrollIndicators(.never)
     }
 }

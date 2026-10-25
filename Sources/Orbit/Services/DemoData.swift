@@ -230,6 +230,19 @@ enum Snapshot {
 enum AskTest {
     static func runIfRequested(apple: AppleSync) {
         guard let q = ProcessInfo.processInfo.environment["ORBIT_ASK_TEST"] else { return }
+        // "mail:<notes>" drafts a reply to a sample email instead.
+        if q.hasPrefix("mail:") {
+            Task {
+                let m = MailMessage(id: "t", threadID: "t", account: "alex@example.com", from: "Sara <sara@example.com>", fromAddress: "sara@example.com",
+                                    to: "alex@example.com", subject: "Dinner Saturday?", date: .now,
+                                    body: "Hey Alex!\n\nAre we still on for Saturday at 8? I booked a table at Zooba in Zamalek, the one with the terrace.\n\nLet me know if 8 still works or if we should push it to 8:30.\n\nSara",
+                                    messageIDHeader: "", references: "", unread: true)
+                do { print("MAIL DRAFT:\n" + (try await MailReader.draftReply(to: m, intent: String(q.dropFirst(5))))) } catch { print("MAIL error: \(error)") }
+                fflush(stdout)
+                exit(0)
+            }
+            return
+        }
         Task {
             let container = Snapshot.demoContainer()
             let store = AssistantStore.shared

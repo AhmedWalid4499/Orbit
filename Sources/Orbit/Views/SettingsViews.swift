@@ -104,22 +104,26 @@ struct ConnectionsSettings: View {
         Section("Built in — works now") {
             ConnectionRow(name: "Apple Calendar",
                           detail: "Shows every calendar on this \(Platform.isPhone ? "iPhone" : "Mac") — iCloud, Google, Outlook, Exchange.",
-                          symbol: "calendar", connected: apple.calendarEnabled && apple.calendarAccess == .granted,
+                          symbol: "calendar", brand: .appleCalendar, connected: apple.calendarEnabled && apple.calendarAccess == .granted,
                           denied: apple.calendarAccess == .denied,
                           connect: { Task { await apple.connectCalendar() } },
                           disconnect: apple.disconnectCalendar)
             ConnectionRow(name: "Apple Reminders",
                           detail: "Shows open reminders next to your tasks and completes them both ways.",
-                          symbol: "checklist", connected: apple.remindersEnabled && apple.remindersAccess == .granted,
+                          symbol: "checklist", brand: .appleReminders, connected: apple.remindersEnabled && apple.remindersAccess == .granted,
                           denied: apple.remindersAccess == .denied,
                           connect: { Task { await apple.connectReminders() } },
                           disconnect: apple.disconnectReminders)
         }
-        Section("Google: Gmail and Calendar") { GmailSettings() }
-        Section("GitHub") {
+        Section {
+            GmailSettings()
+        } header: {
+            HStack(spacing: 6) { BrandLogo(brand: .gmail, size: 14, style: .glyph); BrandLogo(brand: .googleCalendar, size: 14, style: .glyph); Text("Google: Gmail and Calendar") }
+        }
+        Section {
             if gh.isConnected {
                 HStack(spacing: 12) {
-                    Image(systemName: "chevron.left.forwardslash.chevron.right").frame(width: 28)
+                    BrandLogo(brand: .github, size: 28)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("@\(gh.username)").font(.headline)
                         Text(gh.hasToken ? "Token saved — private repos and contributions included." : "Public data only. Add a token on the GitHub tab for private repos.")
@@ -131,10 +135,14 @@ struct ConnectionsSettings: View {
             } else {
                 GitHubConnectCard()
             }
+        } header: {
+            HStack(spacing: 6) { BrandLogo(brand: .github, size: 14, style: .glyph); Text("GitHub") }
         }
         Section("Reading") {
             HStack(spacing: 12) {
-                Image(systemName: "books.vertical").frame(width: 28)
+                HStack(spacing: -8) {
+                    BrandLogo(brand: .goodreads, size: 24); BrandLogo(brand: .appleBooks, size: 24); BrandLogo(brand: .kindle, size: 24)
+                }
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Goodreads, Apple Books, Kindle").font(.headline)
                     Text("Sync your shelves and import your libraries.").font(.caption).foregroundStyle(.secondary)
@@ -157,6 +165,7 @@ struct ConnectionRow: View {
     let name: String
     let detail: String
     let symbol: String
+    var brand: Brand? = nil
     let connected: Bool
     let denied: Bool
     let connect: () -> Void
@@ -164,7 +173,7 @@ struct ConnectionRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: symbol).frame(width: 28)
+            if let brand { BrandLogo(brand: brand, size: 28) } else { Image(systemName: symbol).frame(width: 28) }
             VStack(alignment: .leading, spacing: 2) {
                 Text(name).font(.headline)
                 Text(denied ? "Access denied — allow Orbit in System Settings › Privacy & Security." : detail)
@@ -294,7 +303,7 @@ struct GmailSettings: View {
         VStack(alignment: .leading, spacing: 10) {
             ForEach(inbox.accounts, id: \.self) { email in
                 HStack {
-                    Image(systemName: "envelope.fill").frame(width: 28)
+                    BrandLogo(brand: .gmail, size: 28)
                     Text(email).font(.headline)
                     Label("Connected", systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(Theme.good)
                     Spacer()

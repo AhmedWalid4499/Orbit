@@ -11,7 +11,7 @@ enum OrbitSchema {
 }
 
 enum Tab: String, CaseIterable, Identifiable {
-    case today, insights, calendar, tasks, habits, bucket, money, notes, reading, documents, github
+    case today, insights, calendar, tasks, habits, bucket, money, notes, reading, documents, github, youtube
     var id: String { rawValue }
 
     var title: String {
@@ -24,6 +24,8 @@ enum Tab: String, CaseIterable, Identifiable {
             return first.isEmpty ? "Reading" : "\(first)'s Reading"
         case .github:
             return "GitHub"
+        case .youtube:
+            return "YouTube"
         case .bucket:
             return "Bucket list"
         case .documents:
@@ -48,11 +50,12 @@ enum Tab: String, CaseIterable, Identifiable {
         case .bucket: "mountain.2.fill"
         case .documents: "doc.text.fill"
         case .github: "chevron.left.forwardslash.chevron.right"
+        case .youtube: "play.rectangle.fill"
         }
     }
 
     /// Nav groups: day, plan, life.
-    static let groups: [[Tab]] = [[.today, .insights], [.calendar, .tasks, .habits, .bucket], [.money, .notes, .reading, .documents, .github]]
+    static let groups: [[Tab]] = [[.today, .insights], [.calendar, .tasks, .habits, .bucket], [.money, .notes, .reading, .documents, .github, .youtube]]
 
     /// Tabs you turned off in Settings › General › Tabs (synced). Today is always there.
     static var hidden: Set<Tab> {
@@ -75,6 +78,7 @@ enum Tab: String, CaseIterable, Identifiable {
         case .reading: "Books from Goodreads, Apple Books or Kindle"
         case .documents: "Passports, IDs and warranties"
         case .github: "Your GitHub repos and pull requests"
+        case .youtube: "Your channel's subscribers, views and videos"
         }
     }
 

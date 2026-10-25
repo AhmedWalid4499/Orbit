@@ -9,6 +9,7 @@ struct PhoneRoot: View {
     @EnvironmentObject private var apple: AppleSync
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var phase
+    @ObservedObject private var wake = WakeListener.shared
     @ObservedObject private var cloud = CloudSync.shared
     @ObservedObject private var focus = FocusTimer.shared
     @ObservedObject private var reading = ReadingTimer.shared
@@ -30,6 +31,11 @@ struct PhoneRoot: View {
             }
         }
         .tint(Theme.ink)
+        // Voice mode ("Hey <name>"): the orb in the middle of the screen, over everything.
+        .overlay {
+            if wake.inConversation { VoiceOrbView().transition(.opacity) }
+        }
+        .animation(.easeOut(duration: 0.25), value: wake.inConversation)
         .sheet(isPresented: $state.assistantOpen) { AssistantPanel().presentationDragIndicator(.visible) }
         .sheet(isPresented: $state.searchOpen) { SearchView() }
         .fullScreenCover(isPresented: $state.tourOpen) { TourView { state.tourOpen = false } }
@@ -73,6 +79,7 @@ struct PhoneRoot: View {
             // For testing: `-open habits` (or any tab), `-sheet plan|review|card|assistant|settings|capture|search`.
             let args = ProcessInfo.processInfo.arguments
             if let i = args.firstIndex(of: "-open"), i + 1 < args.count, let t = Tab(rawValue: args[i + 1]) { show(t) }
+            if args.contains("-voice") { try? await Task.sleep(for: .seconds(1.5)); WakeListener.shared.preview() }
             if let i = args.firstIndex(of: "-sheet"), i + 1 < args.count {
                 switch args[i + 1] {
                 case "plan": state.planOpen = true
@@ -90,6 +97,7 @@ struct PhoneRoot: View {
         .task(id: phase) {
             // While Orbit is open: sync every two minutes, keep reminders current, refresh email and reading now and then.
             // Hands-free listening only while Orbit is on screen.
+            WakeListener.shared.apple = apple
             WakeListener.shared.appActive = phase == .active
             guard phase == .active, !Snapshot.isActive else { return }
             Task { await WelcomeVoice.greetIfDue(context: context, apple: apple) }

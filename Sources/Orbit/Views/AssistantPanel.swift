@@ -64,7 +64,12 @@ struct AssistantPanel: View {
             }
         }
         .modifier(PanelChrome(embedded: embedded))
-        .onAppear { onScreen = true; focused = true; sendSeed() }
+        .onAppear {
+            onScreen = true
+            // On iPhone the keyboard only comes up when you tap the message box.
+            if !Platform.isPhone { focused = true }
+            sendSeed()
+        }
         .onChange(of: state.assistantSeed) { sendSeed() }
         .onChange(of: store.busy) { _, busy in if !busy { replyFinished() } }
         .onDisappear { onScreen = false; dictation.cancel(); speaker.stop(); voiceTurn = false }
@@ -131,6 +136,8 @@ struct AssistantPanel: View {
             } label: { Image(systemName: speaks ? "speaker.wave.2.fill" : "speaker.slash") }
                 .buttonStyle(.plain).foregroundStyle(speaks ? Theme.ink : Theme.inkMuted)
                 .help(speaks ? "Reading replies aloud. Click to turn off." : "Read replies aloud")
+            Button { wake.startConversation() } label: { Image(systemName: "waveform") }
+                .buttonStyle(.plain).help("Talk hands-free")
             Button { wake.enabled.toggle() } label: { Image(systemName: wake.enabled ? "ear.fill" : "ear") }
                 .buttonStyle(.plain).foregroundStyle(wake.enabled ? Theme.ink : Theme.inkMuted)
                 .help(wake.enabled ? "Listening for “Hey \(assistantName)”. Click to stop." : "Answer hands-free when you say “Hey \(assistantName)”")
@@ -203,6 +210,9 @@ struct AssistantPanel: View {
                 .padding(16)
             }
             .scrollIndicators(.never)
+            // Scrolling or tapping the conversation puts the keyboard away.
+            .scrollDismissesKeyboard(.interactively)
+            .simultaneousGesture(TapGesture().onEnded { focused = false })
             .onChange(of: store.items.count) { withAnimation { proxy.scrollTo(store.items.last?.id, anchor: .bottom) } }
             .onChange(of: store.revealed) { proxy.scrollTo("live", anchor: .bottom) }
         }
@@ -304,6 +314,10 @@ struct AssistantPanel: View {
                         .focused($focused)
                         .onSubmit { send(draft) }
                 }
+                if Platform.isPhone && focused {
+                    Button { focused = false } label: { Image(systemName: "keyboard.chevron.compact.down").font(.system(size: 14, weight: .semibold)) }
+                        .buttonStyle(.plain).foregroundStyle(Theme.inkSecondary).accessibilityLabel("Hide keyboard")
+                }
                 MicButton { heard in sendVoice(heard) }
                     .disabled(store.busy)
                 Button { send(draft) } label: {
@@ -325,6 +339,7 @@ struct AssistantPanel: View {
         guard !t.isEmpty || !attachments.isEmpty, !store.busy else { return }
         if !dictation.listening && t == draft.trimmingCharacters(in: .whitespacesAndNewlines) { voiceTurn = false }
         draft = ""
+        if Platform.isPhone { focused = false }
         let files = attachments
         attachments = []
         speaker.stop()

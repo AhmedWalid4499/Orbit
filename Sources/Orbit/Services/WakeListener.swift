@@ -1,28 +1,38 @@
 import Foundation
 import AVFoundation
 import Speech
+import SwiftData
 
-/// Hands-free: while Orbit is open it listens (on this device, nothing is sent anywhere) for "Hey <assistant name>",
-/// then sends what you say after it to the assistant and reads the answer aloud. Right after an answer you can
-/// carry on without the wake word for a few seconds. Off by default; Settings › AI › Voice.
+/// Hands-free voice mode. While Orbit is open it listens (on this device, nothing is sent anywhere) for
+/// "Hey <assistant name>". Then the big orb takes the middle of the screen and you just talk: it answers out loud,
+/// listens again, and keeps the conversation going until you say "stop" / "bye", tap the orb's ✕, or go quiet for
+/// a while. The chat isn't opened; the conversation is still saved in your past chats. Settings › AI › Voice.
 @MainActor
 final class WakeListener: ObservableObject {
     static let shared = WakeListener()
 
-    /// Whether hands-free is switched on (synced).
+    /// Whether "Hey <name>" is listened for (per device).
     @Published var enabled = UserDefaults.standard.bool(forKey: "wake.enabled") {
         didSet {
             UserDefaults.standard.set(enabled, forKey: "wake.enabled")
-            if enabled { error = nil; Task { await permissions() } } else { stop() }
+            if enabled { error = nil; Task { await permissions() } } else if !inConversation { stop() }
         }
     }
     /// The app is in front (iPhone) or running (Mac).
-    var appActive = true { didSet { if !appActive { stop() } } }
+    var appActive = true { didSet { if !appActive { endConversation(); stop() } } }
+    /// Calendar and reminders for the assistant (set by the window).
+    var apple: AppleSync?
 
     @Published private(set) var listening = false
-    /// What you said after the wake word, while you're still talking.
+    /// A voice conversation is going on: the orb is in the middle of the screen.
+    @Published private(set) var inConversation = false
+    /// What you're saying right now.
     @Published private(set) var heard = ""
+    /// Your last question, shown under the orb while it thinks and answers.
+    @Published private(set) var lastQuestion = ""
     @Published private(set) var awake = false
+    /// How loud you are (0…1), for the orb's pulse.
+    @Published private(set) var level: Float = 0
     @Published var error: String?
 
     private let engine = AVAudioEngine()
@@ -31,15 +41,13 @@ final class WakeListener: ObservableObject {
     private var transcript = ""
     private var lastChange = Date.now
     private var startedAt = Date.now
-    /// The next listening session follows an answer, so no wake word is needed.
-    private var followUp = false
     private var allowed = false
     private var loop: Task<Void, Never>?
 
     private init() {
         loop = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(300))
+                try? await Task.sleep(for: .milliseconds(250))
                 await self?.tick()
             }
         }
@@ -50,8 +58,43 @@ final class WakeListener: ObservableObject {
         Dictation.shared.listening || Speaker.shared.speaking || AssistantStore.shared.busy
     }
 
+    // MARK: Conversation
+
+    /// Starts talking without the wake word (the voice button in the chat).
+    func startConversation() {
+        Task {
+            if !allowed { guard await permissions() else { return } }
+            inConversation = true
+            if listening { awake = true; transcript = ""; heard = "" }
+        }
+    }
+
+    /// Demo only (`-voice` launch option): shows voice mode with a sample question, no microphone.
+    func preview() {
+        guard Snapshot.isDemo else { return }
+        inConversation = true
+        awake = true
+        heard = "Where can I get a good coffee near me?"
+    }
+
+    /// Ends voice mode: stops speaking, and goes back to waiting for "Hey <name>" (if that's on).
+    func endConversation() {
+        guard inConversation else { return }
+        inConversation = false
+        awake = false
+        heard = ""
+        lastQuestion = ""
+        Speaker.shared.stop()
+        if listening { restart() }
+    }
+
+    /// Tapping the orb while it talks: stop and listen.
+    func interrupt() {
+        if Speaker.shared.speaking { Speaker.shared.stop() }
+    }
+
     private func tick() async {
-        guard enabled, appActive, !Snapshot.isActive else { if listening { stop() }; return }
+        guard (enabled || inConversation), appActive, !Snapshot.isActive else { if listening { stop() }; return }
         if busy {
             if listening { stop() }
             return
@@ -64,8 +107,10 @@ final class WakeListener: ObservableObject {
         let quiet = Date.now.timeIntervalSince(lastChange)
         if awake {
             // You stopped talking: send it.
-            if !heard.isEmpty && quiet > 1.4 { fire(heard); return }
-            if heard.isEmpty && quiet > 6 { awake = false; restart() }
+            if !heard.isEmpty && quiet > 1.3 { fire(heard); return }
+            // Nothing said for a long while: the conversation is over.
+            if heard.isEmpty && quiet > (inConversation ? 45 : 8) { endConversation(); return }
+            if heard.isEmpty && Date.now.timeIntervalSince(startedAt) > 50 { restart() }
         } else if Date.now.timeIntervalSince(startedAt) > 50 && quiet > 2 {
             // Keep each listening session short so the recogniser stays quick and accurate.
             restart()
@@ -77,7 +122,7 @@ final class WakeListener: ObservableObject {
         guard let recognizer, recognizer.isAvailable else { error = "Speech recognition isn't available right now."; return }
         let req = SFSpeechAudioBufferRecognitionRequest()
         req.shouldReportPartialResults = true
-        req.addsPunctuation = false
+        req.addsPunctuation = true
         req.contextualStrings = ["Hey \(AssistantName.current)", AssistantName.current]
         if recognizer.supportsOnDeviceRecognition { req.requiresOnDeviceRecognition = true }
         request = req
@@ -90,7 +135,15 @@ final class WakeListener: ObservableObject {
         input.removeTap(onBus: 0)
         let format = input.outputFormat(forBus: 0)
         guard format.sampleRate > 0 else { error = "No microphone found."; return }
-        input.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in req.append(buffer) }
+        input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
+            req.append(buffer)
+            let data = buffer.floatChannelData?[0]
+            let n = Int(buffer.frameLength)
+            var sum: Float = 0
+            if let data { for i in 0..<n { sum += data[i] * data[i] } }
+            let rms = n > 0 ? sqrt(sum / Float(n)) : 0
+            Task { @MainActor in self?.level = min(1, rms * 14) }
+        }
         do {
             engine.prepare()
             try engine.start()
@@ -101,8 +154,8 @@ final class WakeListener: ObservableObject {
         }
         transcript = ""
         heard = ""
-        awake = followUp
-        followUp = false
+        // In a conversation every listen is a question; otherwise wait for the wake word.
+        awake = inConversation
         startedAt = .now
         lastChange = .now
         listening = true
@@ -112,15 +165,16 @@ final class WakeListener: ObservableObject {
             Task { @MainActor in
                 guard let self else { return }
                 if let text, text != self.transcript { self.transcript = text; self.lastChange = .now; self.update() }
-                if ended, self.listening, !self.awake { self.restart() }
+                if ended, self.listening, self.heard.isEmpty { self.restart() }
             }
         }
     }
 
-    /// Looks for the wake word; once heard, everything after it is the question.
+    /// Looks for the wake word; once heard, voice mode starts and everything after it is the question.
     private func update() {
         if let r = Self.wakeRange(in: transcript) {
             awake = true
+            inConversation = true
             heard = String(transcript[r.upperBound...]).trimmingCharacters(in: CharacterSet(charactersIn: " ,.!?"))
         } else if awake {
             heard = transcript.trimmingCharacters(in: .whitespaces)
@@ -131,10 +185,28 @@ final class WakeListener: ObservableObject {
         let question = text.trimmingCharacters(in: .whitespacesAndNewlines)
         stop()
         awake = false
+        heard = ""
         guard !question.isEmpty else { return }
-        followUp = true
-        AssistantStore.shared.speakNextReply = true
-        AppState.current?.openAssistant(with: question)
+        if Self.isGoodbye(question) { endConversation(); return }
+        lastQuestion = question
+        guard let context = OrbitStore.container?.mainContext else { return }
+        let store = AssistantStore.shared
+        store.speakNextReply = true
+        let apple = apple ?? AppleSync()
+        Task { await store.send(question, context: context, apple: apple) }
+    }
+
+    /// "Stop", "that's all", "bye", "thank you, that's it"…
+    static func isGoodbye(_ text: String) -> Bool {
+        let t = text.lowercased().replacingOccurrences(of: #"[^\p{L}' ]"#, with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespaces)
+        let exact = ["stop", "stop it", "stop talking", "be quiet", "cancel", "never mind", "nevermind", "that's all", "thats all",
+                     "that's it", "thats it", "bye", "goodbye", "good bye", "bye bye", "we're done", "were done", "i'm done", "im done",
+                     "thank you that's all", "thanks that's all", "thank you that's it", "thanks that's it", "thanks bye", "thank you bye",
+                     "okay bye", "ok bye", "end", "exit", "quit"]
+        if exact.contains(t) { return true }
+        let words = t.split(separator: " ")
+        return words.count <= 4 && (words.contains("bye") || words.contains("goodbye") || t.hasPrefix("stop"))
     }
 
     private func restart() {
@@ -145,6 +217,7 @@ final class WakeListener: ObservableObject {
     func stop() {
         guard listening || request != nil else { return }
         listening = false
+        level = 0
         engine.stop()
         engine.inputNode.removeTap(onBus: 0)
         request?.endAudio()
@@ -170,6 +243,7 @@ final class WakeListener: ObservableObject {
     private func enabledOff() {
         UserDefaults.standard.set(false, forKey: "wake.enabled")
         enabled = false
+        inConversation = false
     }
 
     // MARK: Matching

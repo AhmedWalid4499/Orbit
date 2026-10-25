@@ -31,6 +31,7 @@ enum WidgetBridge {
         var currency: String
         var lookingForward: [Dream]
         var books: [ShelfBook]?
+        var readThisYear: Int?
     }
 
     private static var lastWritten: Data?
@@ -78,7 +79,8 @@ enum WidgetBridge {
             habits: habits.map { .init(name: $0.name, symbol: $0.symbol, done: $0.isDone(on: today), streak: $0.currentStreak, color: hex($0.area.color)) },
             moneyLeft: max(budget - spent, 0), budget: budget, currency: Fmt.currencyCode,
             lookingForward: dreams.prefix(3).map { .init(title: $0.title, date: $0.targetDate!) },
-            books: shelf)
+            books: shelf,
+            readThisYear: allBooks.filter { $0.status == .read && ($0.finishedAt.map { Calendar.current.isDate($0, equalTo: now, toGranularity: .year) } ?? false) }.count)
 
         let enc = JSONEncoder()
         enc.dateEncodingStrategy = .iso8601

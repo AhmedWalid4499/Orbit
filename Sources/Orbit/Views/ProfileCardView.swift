@@ -3,6 +3,9 @@ import SwiftUI
 import AppKit
 #endif
 import UniformTypeIdentifiers
+#if os(iOS)
+import PhotosUI
+#endif
 
 /// The card itself: what people see when you share it.
 struct CardFace: View {
@@ -11,11 +14,110 @@ struct CardFace: View {
     let qr: PlatformImage?
     /// Links can be tapped (in the app); off when rendering the shareable image.
     var interactive = true
+    /// The card's own background photo; falls back to the profile photo.
+    var backdrop: PlatformImage? = CardPhoto.image
     @Environment(\.openURL) private var openURL
 
     private var ink: Color { card.isDark ? Color(hex: 0xF4F4F5) : Theme.stickerInk }
+    private var cover: PlatformImage? { card.showPhoto ? (backdrop ?? photo) : nil }
 
     var body: some View {
+        if card.style == "photo", let cover { photoCard(cover) } else { colorCard }
+    }
+
+    // MARK: Photo card
+
+    /// Your photo fills the card; name, details, links and the QR code sit on a dark fade at the bottom.
+    private func photoCard(_ cover: PlatformImage) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 2) {
+                Text("orbit").font(.system(size: 15, weight: .black, design: .rounded))
+                Circle().fill(card.color).frame(width: 5, height: 5).offset(y: 4)
+            }
+            .opacity(0.85)
+            .shadow(color: .black.opacity(0.35), radius: 6)
+            Spacer(minLength: 0)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(card.name.isEmpty ? "Your name" : card.name).font(.system(size: 34, weight: .bold, design: .serif))
+                    .lineLimit(2).minimumScaleFactor(0.6)
+                let sub = [card.headline, card.company].filter { !$0.isEmpty }.joined(separator: " · ")
+                if !sub.isEmpty {
+                    Text(sub).font(.system(size: 15, weight: .semibold)).foregroundStyle(card.isDark ? .white : card.color).lineLimit(2)
+                }
+                if !card.location.isEmpty {
+                    Label(card.location, systemImage: "mappin").font(.system(size: 12, weight: .medium)).opacity(0.75)
+                }
+            }
+            if !card.bio.isEmpty {
+                Text(card.bio).font(.system(size: 14, design: .serif)).opacity(0.85).lineLimit(2).fixedSize(horizontal: false, vertical: true)
+            }
+            if !card.email.isEmpty || !card.phone.isEmpty {
+                HStack(spacing: 8) {
+                    if !card.email.isEmpty { glassContact("envelope.fill", card.email, url: "mailto:\(card.email)") }
+                    if !card.phone.isEmpty { glassContact("phone.fill", card.phone, url: "tel:\(card.phone.filter { $0.isNumber || $0 == "+" })") }
+                }
+            }
+            HStack(alignment: .bottom, spacing: 14) {
+                VStack(alignment: .leading, spacing: 10) {
+                    // Round buttons, so the links don't cover the photo.
+                    LazyVGrid(columns: Array(repeating: GridItem(.fixed(42), spacing: 8), count: 4), alignment: .leading, spacing: 8) {
+                        ForEach(card.filledLinks.prefix(8)) { link in
+                            Button { if interactive, let u = URL(string: link.url) { openURL(u) } } label: {
+                                Image(systemName: link.kind.symbol).font(.system(size: 15, weight: .bold))
+                                    .foregroundStyle(card.isDark ? Theme.stickerInk : Theme.stickerInk)
+                                    .frame(width: 42, height: 42)
+                                    .background(Circle().fill(card.isDark ? Color.white : card.color))
+                            }
+                            .buttonStyle(.plain).disabled(!interactive)
+                            .help(link.kind == .other ? link.handle : "\(link.kind.title): \(link.handle)")
+                        }
+                    }
+                    Text(card.qrTarget == "contact" ? "Scan to save my contact" : "Scan to open")
+                        .font(.system(size: 11, weight: .semibold)).opacity(0.7)
+                }
+                Spacer(minLength: 0)
+                if let qr {
+                    qr.swiftUI.interpolation(.none).resizable()
+                        .frame(width: 104, height: 104)
+                        .padding(7)
+                        .background(RoundedRectangle(cornerRadius: 14).fill(.white))
+                }
+            }
+        }
+        .foregroundStyle(.white)
+        .padding(28)
+        .frame(width: 420, height: 620, alignment: .topLeading)
+        .background {
+            ZStack {
+                Color(hex: 0x141416)
+                cover.swiftUI.resizable().scaledToFill().frame(width: 420, height: 620).clipped()
+                // Dark at the top for the mark, clear over the face, then a deep fade for the text.
+                LinearGradient(stops: [.init(color: .black.opacity(0.35), location: 0), .init(color: .clear, location: 0.18),
+                                       .init(color: .clear, location: 0.38), .init(color: .black.opacity(0.62), location: 0.6),
+                                       .init(color: .black.opacity(0.9), location: 1)],
+                               startPoint: .top, endPoint: .bottom)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+    }
+
+    private func glassContact(_ symbol: String, _ text: String, url: String) -> some View {
+        Button { if interactive, let u = URL(string: url) { openURL(u) } } label: {
+            HStack(spacing: 6) {
+                Image(systemName: symbol).font(.system(size: 10, weight: .bold))
+                Text(text).font(.system(size: 12, weight: .medium)).lineLimit(1).truncationMode(.middle)
+            }
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(Capsule().fill(Color.white.opacity(0.16)))
+            .overlay(Capsule().strokeBorder(Color.white.opacity(0.22), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .disabled(!interactive)
+    }
+
+    // MARK: Colour card
+
+    private var colorCard: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .center, spacing: 16) {
                 if card.showPhoto, let photo {
@@ -116,6 +218,11 @@ struct ProfileCardSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var profile = ProfileStore.shared
     @State private var card = ProfileCard.load()
+    @AppStorage(CardPhoto.key) private var cardPhotoData = ""
+    #if os(iOS)
+    @State private var pickedPhoto: PhotosPickerItem?
+    #endif
+    private var backdrop: PlatformImage? { cardPhotoData.isEmpty ? nil : CardPhoto.image }
     @State private var files: (png: URL, vcf: URL)?
     @State private var copied: String?
     @ObservedObject private var cloud = CloudSync.shared
@@ -128,7 +235,7 @@ struct ProfileCardSheet: View {
             VStack(spacing: 16) {
                 // The card fills the width (minus margins) and the buttons line up with its edges.
                 GeometryReader { g in
-                    CardFace(card: card, photo: profile.photo, qr: qrImage)
+                    CardFace(card: card, photo: profile.photo, qr: qrImage, backdrop: backdrop)
                         .scaleEffect(g.size.width / 420, anchor: .topLeading)
                         .frame(width: g.size.width, height: g.size.height, alignment: .topLeading)
                 }
@@ -145,6 +252,13 @@ struct ProfileCardSheet: View {
             refreshFiles()
             schedulePublish(turnedOff: old.publishPublic && !new.publishPublic)
         }
+        .onChange(of: cardPhotoData) { refreshFiles(); schedulePublish(turnedOff: false) }
+        .onChange(of: pickedPhoto) { _, item in
+            Task {
+                if let data = try? await item?.loadTransferable(type: Data.self), let img = PlatformImage(data: data) { CardPhoto.set(img) }
+                pickedPhoto = nil
+            }
+        }
         .onAppear { refreshFiles() }
         #else
         macBody
@@ -156,7 +270,7 @@ struct ProfileCardSheet: View {
             editor.frame(width: 420)
             Rectangle().fill(Theme.line).frame(width: 1)
             VStack(spacing: 18) {
-                CardFace(card: card, photo: profile.photo, qr: qrImage)
+                CardFace(card: card, photo: profile.photo, qr: qrImage, backdrop: backdrop)
                     .shadow(color: .black.opacity(0.15), radius: 18, y: 10)
                     .scaleEffect(0.9)
                     .frame(width: 380, height: 560)
@@ -172,6 +286,7 @@ struct ProfileCardSheet: View {
             refreshFiles()
             schedulePublish(turnedOff: old.publishPublic && !new.publishPublic)
         }
+        .onChange(of: cardPhotoData) { refreshFiles(); schedulePublish(turnedOff: false) }
         .onAppear(perform: refreshFiles)
     }
 
@@ -272,6 +387,31 @@ struct ProfileCardSheet: View {
                 }
 
                 group("Look") {
+                    Picker("Style", selection: $card.style) {
+                        Text("Photo").tag("photo")
+                        Text("Colour").tag("color")
+                    }
+                    .pickerStyle(.segmented)
+                    if card.style == "photo" {
+                        HStack(spacing: 10) {
+                            #if os(macOS)
+                            Button(cardPhotoData.isEmpty ? "Choose a card photo…" : "Change card photo…") { chooseCardPhoto() }
+                                .buttonStyle(SoftButtonStyle())
+                            #else
+                            PhotosPicker(selection: $pickedPhoto, matching: .images) {
+                                Text(cardPhotoData.isEmpty ? "Choose a card photo" : "Change card photo")
+                            }
+                            .buttonStyle(SoftButtonStyle())
+                            #endif
+                            if !cardPhotoData.isEmpty {
+                                Button("Use my profile photo") { CardPhoto.clear() }.buttonStyle(.orbitLink).font(Theme.ui(12))
+                            }
+                        }
+                        Text(backdrop == nil && profile.photo == nil
+                             ? "Choose a photo to fill the card. A portrait photo with your face in the top half works best."
+                             : "A portrait photo with your face in the top half works best. The colour below is used for your links.")
+                            .font(Theme.ui(11)).foregroundStyle(Theme.inkMuted).fixedSize(horizontal: false, vertical: true)
+                    }
                     HStack(spacing: 8) {
                         ForEach(0..<ProfileCard.colors.count, id: \.self) { i in
                             Circle().fill(ProfileCard.colors[i]).frame(width: 28, height: 28)
@@ -304,6 +444,17 @@ struct ProfileCardSheet: View {
     }
 
     /// Publishes a moment after you stop typing; removes the page when you switch publishing off.
+    #if os(macOS)
+    private func chooseCardPhoto() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.message = "Choose a photo for your card"
+        panel.prompt = "Use Photo"
+        guard panel.runModal() == .OK, let url = panel.url, let img = NSImage(contentsOf: url) else { return }
+        CardPhoto.set(img)
+    }
+    #endif
+
     private func schedulePublish(turnedOff: Bool) {
         publishTask?.cancel()
         guard cloud.isSignedIn else { return }
@@ -390,7 +541,7 @@ struct ProfileCardSheet: View {
     }
 
     @MainActor private func renderPNG() -> Data? {
-        let renderer = ImageRenderer(content: CardFace(card: card, photo: profile.photo, qr: qrImage, interactive: false).padding(20))
+        let renderer = ImageRenderer(content: CardFace(card: card, photo: profile.photo, qr: qrImage, interactive: false, backdrop: backdrop).padding(20))
         renderer.scale = 3
         guard let cg = renderer.cgImage else { return nil }
         return ImageData.encode(cg, size: CGSize(width: cg.width, height: cg.height), type: .png, quality: 1, crop: nil)

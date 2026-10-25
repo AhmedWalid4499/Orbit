@@ -111,6 +111,8 @@ struct ProfileCard: Codable, Equatable {
     /// Index into the card colours.
     var colorIndex = 0
     var showPhoto = true
+    /// "photo": your photo fills the card (the colour becomes the accent); "color": a solid colour card.
+    var style = "photo"
     /// What the QR code opens: "contact" (adds you to their contacts) or a link id.
     var qrTarget = "contact"
     /// Public web page: ahmedwalid4499.github.io/Orbit/card/?u=<slug>
@@ -123,7 +125,7 @@ struct ProfileCard: Codable, Equatable {
 
     // Older saved cards don't have every field; fill in defaults instead of failing.
     enum CodingKeys: String, CodingKey {
-        case name, headline, company, email, phone, location, bio, links, colorIndex, showPhoto, qrTarget
+        case name, headline, company, email, phone, location, bio, links, colorIndex, showPhoto, qrTarget, style
         case publicSlug, publishPublic, publicShowContact
     }
     init(from decoder: Decoder) throws {
@@ -138,6 +140,7 @@ struct ProfileCard: Codable, Equatable {
         links = try c.decodeIfPresent([Link].self, forKey: .links) ?? []
         colorIndex = try c.decodeIfPresent(Int.self, forKey: .colorIndex) ?? 0
         showPhoto = try c.decodeIfPresent(Bool.self, forKey: .showPhoto) ?? true
+        style = try c.decodeIfPresent(String.self, forKey: .style) ?? "photo"
         qrTarget = try c.decodeIfPresent(String.self, forKey: .qrTarget) ?? "contact"
         publicSlug = try c.decodeIfPresent(String.self, forKey: .publicSlug) ?? ""
         publishPublic = try c.decodeIfPresent(Bool.self, forKey: .publishPublic) ?? false
@@ -213,11 +216,14 @@ struct ProfileCard: Codable, Equatable {
     /// What the public page shows (email and phone only if you chose to).
     func publicData(photo: PlatformImage?) -> [String: Any] {
         var d: [String: Any] = ["name": name, "headline": headline, "company": company, "location": location, "bio": bio,
-                                "colorIndex": colorIndex,
+                                "colorIndex": colorIndex, "style": style, "cover": "",
                                 "links": filledLinks.map { ["kind": $0.kind.rawValue, "url": $0.url, "display": $0.display, "title": $0.kind.title, "handle": $0.handle] },
                                 "email": publicShowContact ? email : "", "phone": publicShowContact ? phone : "", "photo": ""]
         if showPhoto, let photo, let jpeg = photo.square(side: 200, type: .jpeg, quality: 0.7) {
             d["photo"] = "data:image/jpeg;base64," + jpeg.base64EncodedString()
+        }
+        if style == "photo", showPhoto, let cover = CardPhoto.image ?? photo, let jpeg = cover.jpeg(maxSide: 900, quality: 0.72) {
+            d["cover"] = "data:image/jpeg;base64," + jpeg.base64EncodedString()
         }
         return d
     }
@@ -234,4 +240,26 @@ struct ProfileCard: Codable, Equatable {
          + [email, phone].filter { !$0.isEmpty }
          + filledLinks.map { "\($0.kind.title): \($0.url)" }).joined(separator: "\n")
     }
+}
+
+/// The card's background photo, kept sharper than the 512 px profile photo and synced between devices
+/// (UserDefaults "cardPhoto", a JPEG in base64). Without one, the card uses the profile photo.
+enum CardPhoto {
+    static let key = "cardPhoto"
+    private static var cached: (String, PlatformImage)?
+
+    static var image: PlatformImage? {
+        guard let s = UserDefaults.standard.string(forKey: key), !s.isEmpty else { return nil }
+        if let cached, cached.0 == s { return cached.1 }
+        guard let data = Data(base64Encoded: s), let img = PlatformImage(data: data) else { return nil }
+        cached = (s, img)
+        return img
+    }
+
+    static func set(_ image: PlatformImage) {
+        guard let jpeg = image.jpeg(maxSide: 1400, quality: 0.8) else { return }
+        UserDefaults.standard.set(jpeg.base64EncodedString(), forKey: key)
+    }
+
+    static func clear() { UserDefaults.standard.removeObject(forKey: key) }
 }

@@ -398,7 +398,7 @@ private let syncKinds: [SyncKind] = [
 
 /// Preferences that follow you between Macs (API keys and sign-ins never leave the Keychain).
 /// Preferences that follow you to every device. Connection secrets travel separately, in the key vault.
-private let syncedSettings = ["monthlyBudget", "readingGoal", "currencyCode", "assistantName", "userName", "weatherCity", "profileCard",
+private let syncedSettings = ["monthlyBudget", "readingGoal", "currencyCode", "assistantName", "userName", "weatherCity", "profileCard", "cardPhoto",
                               "goodreadsUser", "readingAutoSync", "appleCalendarEnabled", "appleRemindersEnabled", "googleCalendarEnabled",
                               "emailExpensesEnabled", "aiMorningBrief", "aiSmartCapture", "assistantSpeaks", "focusMinutes", "launchSound",
                               "notify.tasks", "notify.events", "notify.bills", "notify.habits", "notify.journal", "notify.review",
@@ -673,6 +673,10 @@ final class CloudSync: ObservableObject {
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(status) else {
             let msg = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])?["message"] as? String
+            // A missing table comes back as 404 with the table's name in the message.
+            for (table, file) in [("public_cards", "public_cards.sql"), ("shared_lists", "shared_lists.sql")] where (msg ?? "").contains(table) {
+                throw CloudError("This needs a one-time setup in Supabase: run supabase/\(file) in your project's SQL Editor.")
+            }
             if status == 404 || (msg ?? "").contains("orbit_records") {
                 throw CloudError("The Orbit tables aren't set up in Supabase yet (run supabase/schema.sql).")
             }

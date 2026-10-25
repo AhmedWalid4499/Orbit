@@ -58,11 +58,17 @@ extension Snapshot {
             demo.email = "sara@example.com"; demo.bio = "Designing calm software. Coffee, books and long walks."
             demo.links = [.init(kind: .linkedin, value: "linkedin.com/in/sarahassan"), .init(kind: .website, value: "sarahassan.design"),
                           .init(kind: .instagram, value: "@sara.designs"), .init(kind: .github, value: "sarahassan")]
-            let face = ImageRenderer(content: CardFace(card: demo, photo: nil, qr: ProfileCardSheet.qr(demo.qrPayload)).padding(20))
-            face.scale = 2
-            if let cg = face.cgImage {
-                try? NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])?
-                    .write(to: URL(fileURLWithPath: dir).appending(path: "card.png"))
+            // ORBIT_SNAPSHOT_CARDPHOTO=<image> renders the photo style with that picture.
+            let sample = ProcessInfo.processInfo.environment["ORBIT_SNAPSHOT_CARDPHOTO"].flatMap { NSImage(contentsOfFile: $0) }
+            for (name, style) in [("card", "photo"), ("card-color", "color")] {
+                var c = demo
+                c.style = style
+                let face = ImageRenderer(content: CardFace(card: c, photo: nil, qr: ProfileCardSheet.qr(c.qrPayload), backdrop: sample).padding(20))
+                face.scale = 2
+                if let cg = face.cgImage {
+                    try? NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])?
+                        .write(to: URL(fileURLWithPath: dir).appending(path: "\(name).png"))
+                }
             }
             // Sheets don't show up offscreen, so render them on their own.
             @MainActor func renderAlone(_ name: String, width: Double, height: Double, appearance: NSAppearance.Name = .aqua, wait: Double = 0.6, _ view: some View) {

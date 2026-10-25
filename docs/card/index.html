@@ -13,6 +13,7 @@
   * { box-sizing: border-box; }
   body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink); font-family: Inter, system-ui, sans-serif;
          display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 16px; }
+  main { width: 100%; display: flex; justify-content: center; }
   .card { width: 100%; max-width: 420px; border-radius: 32px; padding: 30px; color: var(--card-ink);
           box-shadow: 0 20px 50px rgba(0,0,0,.18); }
   .top { display: flex; gap: 16px; align-items: center; }
@@ -35,6 +36,19 @@
   .save { display: block; width: 100%; margin-top: 20px; padding: 14px; border: 0; border-radius: 999px; background: #111111; color: #fff;
           font: 600 15px Inter, system-ui, sans-serif; cursor: pointer; }
   .dark .save { background: #e6ff1f; color: #111111; }
+  /* Photo style: the picture fills the card, details sit on a dark fade at the bottom. */
+  .card.cover { display: flex; flex-direction: column; min-height: 620px; color: #fff; background-color: #141416;
+                background-size: cover; background-position: center top; }
+  .card.cover .spacer { flex: 1; min-height: 220px; }
+  .card.cover .mark { font: 800 15px/1 system-ui, sans-serif; opacity: .85; text-shadow: 0 1px 8px rgba(0,0,0,.4); }
+  .card.cover .mark i { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); margin-left: 2px; }
+  .card.cover h1 { font-size: 34px; }
+  .card.cover .top, .card.cover .bio { text-shadow: 0 1px 12px rgba(0,0,0,.55); }
+  .card.cover .sub { color: var(--accent); opacity: 1; font-weight: 600; }
+  .card.cover .loc, .card.cover .bio { opacity: .85; }
+  .card.cover .links a { background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.2); }
+  .card.cover .links a:hover { background: rgba(255,255,255,.24); }
+  .card.cover .save { background: var(--accent); color: #111111; }
   .foot { margin-top: 18px; font-size: 12px; color: var(--muted); }
   .foot a { color: inherit; }
   .msg { text-align: center; max-width: 360px; }
@@ -79,12 +93,19 @@ function vcard(d) {
 function render(d) {
   const color = COLORS[Math.min(Math.max(d.colorIndex || 0, 0), COLORS.length - 1)];
   const dark = (d.colorIndex || 0) === COLORS.length - 1;
+  const photoStyle = d.style === "photo" && typeof d.cover === "string" && d.cover.startsWith("data:image/");
   document.title = `${d.name || "Card"} · Orbit`;
-  const card = el("article", { class: "card" + (dark ? " dark" : "") });
-  card.style.background = color;
-  if (dark) card.style.color = "#F4F4F5";
+  const card = el("article", { class: "card" + (photoStyle ? " cover" : dark ? " dark" : "") });
+  if (photoStyle) {
+    card.style.setProperty("--accent", dark ? "#ffffff" : color);
+    card.style.backgroundImage = `linear-gradient(180deg, rgba(0,0,0,.35) 0%, rgba(0,0,0,0) 18%, rgba(0,0,0,0) 38%, rgba(0,0,0,.62) 60%, rgba(0,0,0,.9) 100%), url("${d.cover}")`;
+    card.append(el("div", { class: "mark" }, "orbit", el("i")), el("div", { class: "spacer" }));
+  } else {
+    card.style.background = color;
+    if (dark) card.style.color = "#F4F4F5";
+  }
   const top = el("div", { class: "top" });
-  if (d.photo && d.photo.startsWith("data:image/")) top.append(el("img", { class: "photo", src: d.photo, alt: "" }));
+  if (!photoStyle && d.photo && d.photo.startsWith("data:image/")) top.append(el("img", { class: "photo", src: d.photo, alt: "" }));
   const sub = [d.headline, d.company].filter(Boolean).join(" · ");
   top.append(el("div", {}, el("h1", {}, d.name || ""), sub ? el("div", { class: "sub" }, sub) : null,
                 d.location ? el("div", { class: "loc" }, "📍 " + d.location) : null));

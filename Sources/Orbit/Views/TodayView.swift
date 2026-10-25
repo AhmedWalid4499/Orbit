@@ -776,8 +776,16 @@ struct BriefCard: View {
     @Environment(\.modelContext) private var context
     @EnvironmentObject private var apple: AppleSync
     @ObservedObject private var ai = AIAssistant.shared
+    @Query private var transactions: [Transaction]
+    @AppStorage("monthlyBudget") private var budget = 2000.0
+    @AppStorage(BudgetPeriod.key) private var periodStart = 0.0
 
     private let ink = Color(hex: 0xF4F4F5)
+
+    /// Changes when the money picture does (new budget month, new budget, spending moving by 5% of it).
+    private var moneyKey: String {
+        "\(periodStart)-\(Int(budget))-\(Int(BudgetPeriod.spent(transactions) / max(budget * 0.05, 1)))"
+    }
     private let bg = Color(hex: 0x141416)
 
     var body: some View {
@@ -789,7 +797,7 @@ struct BriefCard: View {
             }
         }
         // Generates once per day, and right after a key is added or the brief is switched on.
-        .task(id: "\(DayKey.key(.now))-\(ai.hasKey)-\(ai.morningBriefEnabled)") {
+        .task(id: "\(DayKey.key(.now))-\(ai.hasKey)-\(ai.morningBriefEnabled)-\(moneyKey)") {
             await ai.refreshBrief(context: context, apple: apple)
         }
     }

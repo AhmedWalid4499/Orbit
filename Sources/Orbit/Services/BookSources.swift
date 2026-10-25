@@ -115,12 +115,28 @@ enum BookLibrary {
                 if BookCovers.isSearchResultURL(book.coverURL) { book.coverURL = "" }
             }
             let onlyKindle = (book.sources.isEmpty ? [book.source] : book.sources) == ["kindle"]
-            if onlyKindle, book.title.range(of: "dictionary|woordenboek|shabdabhandar", options: [.regularExpression, .caseInsensitive]) != nil {
+            if onlyKindle, Self.isBundledDictionary(book.title) {
                 context.delete(book)
             }
         }
         try? context.save()
         UserDefaults.standard.set(true, forKey: key)
+    }
+
+    /// The free dictionaries Kindle installs ("Oxford English - Spanish Dictionary", "Groot woordenboek…"), not books
+    /// that just have the word in their title ("The Dictionary of Lost Words").
+    static func isBundledDictionary(_ title: String) -> Bool {
+        let t = title.lowercased()
+        let edition = ["(hindi edition)", "(arabic edition)", "(marathi edition)", "(dutch edition)", "(german edition)", "(french edition)",
+                       "(spanish edition)", "(italian edition)", "(portuguese edition)", "(japanese edition)", "(chinese edition)",
+                       "(gujarati edition)", "(tamil edition)", "(telugu edition)", "(bengali edition)", "(kannada edition)", "(malayalam edition)"]
+        let publishers = ["oxford", "duden", "van dale", "collins", "merriam", "prabhat", "texlang", "langenscheidt", "zanichelli", "le robert", "houaiss", "daijirin", "progressive"]
+        let isDictionary = t.contains("dictionary") || t.contains("woordenboek") || t.contains("wörterbuch") || t.contains("shabdabhandar")
+            || t.contains("dictionnaire") || t.contains("diccionario") || t.contains("dizionario")
+        guard isDictionary else { return false }
+        return publishers.contains { t.contains($0) } || edition.contains { t.contains($0) }
+            || t.range(of: #"^[\p{L} ]+ (in)?to [\p{L} ]+ dictionary"#, options: .regularExpression) != nil
+            || t.range(of: #"^[\p{L} ]+ - [\p{L} ]+ dictionary"#, options: .regularExpression) != nil
     }
 
     /// One-time cleanup: imported books lose the categories imports gave them, and categories nobody uses any more are removed.

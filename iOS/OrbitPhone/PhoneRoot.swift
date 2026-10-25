@@ -17,6 +17,7 @@ struct PhoneRoot: View {
 
     @State private var tab: PhoneTab = .today
     @State private var morePath: [Tab] = []
+    @State private var resettingTab = false
 
     var body: some View {
         Group {
@@ -45,7 +46,12 @@ struct PhoneRoot: View {
         }
         .sheet(item: Binding(get: { focus.justFinished }, set: { focus.justFinished = $0 })) { FocusDoneSheet(session: $0).presentationDetents([.medium]) }
         .sheet(item: Binding(get: { reading.justFinished }, set: { reading.justFinished = $0 })) { FinishedReadingSheet(session: $0).presentationDetents([.medium]) }
-        .onChange(of: state.tab) { _, t in show(t) }
+        .onChange(of: state.tab) { _, t in
+            // Links set state.tab; it's put back afterwards so tapping the same link again still works.
+            guard !resettingTab else { resettingTab = false; return }
+            show(t)
+            if t != .today { resettingTab = true; state.tab = .today }
+        }
         .onReceive(Reminders.shared.$route.compactMap { $0 }) { route in
             Reminders.shared.route = nil
             switch route {
@@ -83,6 +89,8 @@ struct PhoneRoot: View {
         }
         .task(id: phase) {
             // While Orbit is open: sync every two minutes, keep reminders current, refresh email and reading now and then.
+            // Hands-free listening only while Orbit is on screen.
+            WakeListener.shared.appActive = phase == .active
             guard phase == .active, !Snapshot.isActive else { return }
             Task { await WelcomeVoice.greetIfDue(context: context, apple: apple) }
             var rounds = 0

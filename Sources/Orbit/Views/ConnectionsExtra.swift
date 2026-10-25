@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 /// Every other connection with its own Disconnect: reading sources and the AI keys (Mac and iPhone settings).
 struct OtherConnections: View {

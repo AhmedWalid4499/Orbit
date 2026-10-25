@@ -411,7 +411,7 @@ private let syncKinds: [SyncKind] = [
 /// Preferences that follow you to every device. Connection secrets travel separately, in the key vault.
 private let syncedSettings = ["monthlyBudget", "readingGoal", "currencyCode", "assistantName", "userName", "weatherCity", "profileCard", "cardPhoto", "health.daily",
                               "goodreadsUser", "readingAutoSync", "appleCalendarEnabled", "appleRemindersEnabled", "googleCalendarEnabled",
-                              "emailExpensesEnabled", "aiMorningBrief", "aiSmartCapture", "assistantSpeaks", "welcome.speak", "focusMinutes", "launchSound",
+                              "emailExpensesEnabled", "aiMorningBrief", "aiSmartCapture", "assistantSpeaks", "focusMinutes", "launchSound",
                               "notify.tasks", "notify.events", "notify.bills", "notify.habits", "notify.journal", "notify.review",
                               "notify.subscriptions", "notify.documents", "notify.evening", "notify.trips", "notify.morningHour",
                               "notify.habitHour", "notify.journalHour", "notify.eventLead",

@@ -15,8 +15,12 @@ enum WelcomeVoice {
         let ai = AIAssistant.shared
         guard isOn, ai.hasKey, !Snapshot.isActive, Date.now.timeIntervalSince1970 - lastSpoken > 3600 else { return }
         lastSpoken = Date.now.timeIntervalSince1970
-        if ai.morningBriefEnabled { await ai.refreshBrief(context: context, apple: apple) }
-        Speaker.shared.speak(script(ai.hasTodaysBrief ? ai.brief : nil))
+        if ai.morningBriefEnabled {
+            await ai.refreshBrief(context: context, apple: apple)
+            // The Today screen may be writing it already: wait for that (up to 40 s) rather than skip the brief.
+            for _ in 0..<80 where ai.briefState == .loading { try? await Task.sleep(for: .milliseconds(500)) }
+        }
+        Speaker.shared.speak(script(ai.hasTodaysBrief ? ai.brief : nil), quiet: true)
     }
 
     static func script(_ brief: MorningBrief?) -> String {

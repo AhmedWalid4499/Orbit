@@ -38,6 +38,8 @@ enum BillTracker {
         let from = due.adding(days: -20), to = due.adding(days: 11)
         return transactions.first { t in
             guard t.isExpense, t.date >= from, t.date < to else { return false }
+            // "Mark paid" logs an expense for that month; it mustn't also pay next month's.
+            if t.source == "bill" { return t.sourceID == paymentID(bill, due: due) }
             let title = t.title.lowercased()
             return words.contains { title.contains($0) }
         }

@@ -38,6 +38,8 @@ final class AssistantStore: ObservableObject {
     @Published private(set) var busy = false
     @Published private(set) var revealed = ""      // text of the reply being written, shown at a calm pace
     @Published var error: String?
+    /// Read the next reply aloud even if "Read replies aloud" is off (you spoke to the assistant).
+    var speakNextReply = false
 
     private var system = ""
     private var messages: [[String: Any]] = []
@@ -102,7 +104,11 @@ final class AssistantStore: ObservableObject {
         save()
         busy = true
         error = nil
-        defer { busy = false; save() }
+        // Replies are read aloud as they're written, sentence by sentence, when voice is on.
+        let talk = speakNextReply || UserDefaults.standard.bool(forKey: "assistantSpeaks")
+        speakNextReply = false
+        if talk { Speaker.shared.liveBegin() }
+        defer { busy = false; save(); if talk { Speaker.shared.liveEnd() } }
 
         for _ in 0..<12 {
             received = ""
@@ -112,7 +118,10 @@ final class AssistantStore: ObservableObject {
             let turn: ClaudeClient.Turn
             do {
                 turn = try await client.streamTurn(system: system, messages: messages, tools: AssistantTools.definitions + AssistantTools.serverTools,
-                                                   effort: "medium") { [weak self] t in self?.received = t }
+                                                   effort: "medium") { [weak self] t in
+                    self?.received = t
+                    if talk { Speaker.shared.liveFeed(t) }
+                }
             } catch {
                 streamDone = true
                 reveal.cancel()
@@ -121,6 +130,7 @@ final class AssistantStore: ObservableObject {
                 return
             }
             streamDone = true
+            if talk { Speaker.shared.liveFeed(turn.text, final: true) }
             await reveal.value
             revealed = ""
             messages.append(["role": "assistant", "content": turn.replayBlocks])

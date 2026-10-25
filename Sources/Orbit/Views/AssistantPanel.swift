@@ -16,6 +16,7 @@ struct AssistantPanel: View {
     @AppStorage("assistantSpeaks") private var speaks = false
     @ObservedObject private var dictation = Dictation.shared
     @ObservedObject private var speaker = Speaker.shared
+    @ObservedObject private var wake = WakeListener.shared
     @State private var draft = ""
     @State private var attachments: [ChatAttachment] = []
     @State private var picking = false
@@ -23,6 +24,8 @@ struct AssistantPanel: View {
     @State private var fileError: String?
     /// The last message was spoken, so keep the conversation going by voice.
     @State private var voiceTurn = false
+    /// The chat is showing (the AI tab can be left while a reply is read out).
+    @State private var onScreen = false
     @FocusState private var focused: Bool
 
     private let suggestions: [(String, String, Color)] = [
@@ -61,10 +64,10 @@ struct AssistantPanel: View {
             }
         }
         .modifier(PanelChrome(embedded: embedded))
-        .onAppear { focused = true; sendSeed() }
+        .onAppear { onScreen = true; focused = true; sendSeed() }
         .onChange(of: state.assistantSeed) { sendSeed() }
         .onChange(of: store.busy) { _, busy in if !busy { replyFinished() } }
-        .onDisappear { dictation.cancel(); speaker.stop(); voiceTurn = false }
+        .onDisappear { onScreen = false; dictation.cancel(); speaker.stop(); voiceTurn = false }
         .fileImporter(isPresented: $picking, allowedContentTypes: ChatAttachment.allowedTypes, allowsMultipleSelection: true) { result in
             if case .success(let urls) = result { add(urls) }
         }
@@ -94,10 +97,11 @@ struct AssistantPanel: View {
     }
 
     /// Reads the reply aloud if that's on, then listens again when you were talking.
+    /// The reply was read aloud while it was written; when you were talking, listen again once it's done.
     private func replyFinished() {
-        guard speaks, store.error == nil, let last = store.items.last(where: { $0.role == .assistant }) else { voiceTurn = false; return }
-        speaker.speak(last.text) {
-            guard voiceTurn, state.assistantOpen || embedded else { return }
+        guard voiceTurn, store.error == nil else { voiceTurn = false; return }
+        speaker.whenDone {
+            guard voiceTurn, onScreen else { return }
             Task { await dictation.start { heard in sendVoice(heard) } }
         }
     }
@@ -105,6 +109,7 @@ struct AssistantPanel: View {
     private func sendVoice(_ heard: String) {
         guard !heard.isEmpty else { voiceTurn = false; return }
         voiceTurn = true
+        store.speakNextReply = true
         send(heard)
     }
 
@@ -115,7 +120,8 @@ struct AssistantPanel: View {
                 Text(assistantName).font(Theme.display(20))
                 HStack(spacing: 5) {
                     Circle().fill(store.busy ? Theme.orange : Theme.good).frame(width: 6, height: 6)
-                    Text(store.busy ? "Thinking…" : speaker.speaking ? "Speaking…" : "Here for anything").font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
+                    Text(store.busy ? "Thinking…" : speaker.speaking ? "Speaking…" : wake.awake ? "Listening…" : wake.listening ? "Say “Hey \(assistantName)”" : "Here for anything")
+                        .font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
                 }
             }
             Spacer()
@@ -125,6 +131,9 @@ struct AssistantPanel: View {
             } label: { Image(systemName: speaks ? "speaker.wave.2.fill" : "speaker.slash") }
                 .buttonStyle(.plain).foregroundStyle(speaks ? Theme.ink : Theme.inkMuted)
                 .help(speaks ? "Reading replies aloud. Click to turn off." : "Read replies aloud")
+            Button { wake.enabled.toggle() } label: { Image(systemName: wake.enabled ? "ear.fill" : "ear") }
+                .buttonStyle(.plain).foregroundStyle(wake.enabled ? Theme.ink : Theme.inkMuted)
+                .help(wake.enabled ? "Listening for “Hey \(assistantName)”. Click to stop." : "Answer hands-free when you say “Hey \(assistantName)”")
             if !embedded || Platform.isPhone { PastChatsMenu() }
             Button { store.newChat() } label: { Image(systemName: "square.and.pencil") }
                 .buttonStyle(.plain).help("New chat").disabled(store.busy)

@@ -1,0 +1,228 @@
+import Foundation
+import AVFoundation
+import Speech
+
+/// Hands-free: while Orbit is open it listens (on this device, nothing is sent anywhere) for "Hey <assistant name>",
+/// then sends what you say after it to the assistant and reads the answer aloud. Right after an answer you can
+/// carry on without the wake word for a few seconds. Off by default; Settings › AI › Voice.
+@MainActor
+final class WakeListener: ObservableObject {
+    static let shared = WakeListener()
+
+    /// Whether hands-free is switched on (synced).
+    @Published var enabled = UserDefaults.standard.bool(forKey: "wake.enabled") {
+        didSet {
+            UserDefaults.standard.set(enabled, forKey: "wake.enabled")
+            if enabled { error = nil; Task { await permissions() } } else { stop() }
+        }
+    }
+    /// The app is in front (iPhone) or running (Mac).
+    var appActive = true { didSet { if !appActive { stop() } } }
+
+    @Published private(set) var listening = false
+    /// What you said after the wake word, while you're still talking.
+    @Published private(set) var heard = ""
+    @Published private(set) var awake = false
+    @Published var error: String?
+
+    private let engine = AVAudioEngine()
+    private var request: SFSpeechAudioBufferRecognitionRequest?
+    private var recognition: SFSpeechRecognitionTask?
+    private var transcript = ""
+    private var lastChange = Date.now
+    private var startedAt = Date.now
+    /// The next listening session follows an answer, so no wake word is needed.
+    private var followUp = false
+    private var allowed = false
+    private var loop: Task<Void, Never>?
+
+    private init() {
+        loop = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(300))
+                await self?.tick()
+            }
+        }
+    }
+
+    /// Something else is using the microphone or the speaker, so wait.
+    private var busy: Bool {
+        Dictation.shared.listening || Speaker.shared.speaking || AssistantStore.shared.busy
+    }
+
+    private func tick() async {
+        guard enabled, appActive, !Snapshot.isActive else { if listening { stop() }; return }
+        if busy {
+            if listening { stop() }
+            return
+        }
+        if !listening {
+            if !allowed { guard await permissions() else { return } }
+            start()
+            return
+        }
+        let quiet = Date.now.timeIntervalSince(lastChange)
+        if awake {
+            // You stopped talking: send it.
+            if !heard.isEmpty && quiet > 1.4 { fire(heard); return }
+            if heard.isEmpty && quiet > 6 { awake = false; restart() }
+        } else if Date.now.timeIntervalSince(startedAt) > 50 && quiet > 2 {
+            // Keep each listening session short so the recogniser stays quick and accurate.
+            restart()
+        }
+    }
+
+    private func start() {
+        let recognizer = SFSpeechRecognizer() ?? SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+        guard let recognizer, recognizer.isAvailable else { error = "Speech recognition isn't available right now."; return }
+        let req = SFSpeechAudioBufferRecognitionRequest()
+        req.shouldReportPartialResults = true
+        req.addsPunctuation = false
+        req.contextualStrings = ["Hey \(AssistantName.current)", AssistantName.current]
+        if recognizer.supportsOnDeviceRecognition { req.requiresOnDeviceRecognition = true }
+        request = req
+        #if os(iOS)
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playAndRecord, mode: .measurement, options: [.mixWithOthers, .defaultToSpeaker, .allowBluetoothHFP])
+        try? session.setActive(true)
+        #endif
+        let input = engine.inputNode
+        input.removeTap(onBus: 0)
+        let format = input.outputFormat(forBus: 0)
+        guard format.sampleRate > 0 else { error = "No microphone found."; return }
+        input.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in req.append(buffer) }
+        do {
+            engine.prepare()
+            try engine.start()
+        } catch {
+            self.error = "Couldn't use the microphone: \(error.localizedDescription)"
+            input.removeTap(onBus: 0)
+            return
+        }
+        transcript = ""
+        heard = ""
+        awake = followUp
+        followUp = false
+        startedAt = .now
+        lastChange = .now
+        listening = true
+        recognition = recognizer.recognitionTask(with: req) { [weak self] result, err in
+            let text = result?.bestTranscription.formattedString
+            let ended = err != nil || result?.isFinal == true
+            Task { @MainActor in
+                guard let self else { return }
+                if let text, text != self.transcript { self.transcript = text; self.lastChange = .now; self.update() }
+                if ended, self.listening, !self.awake { self.restart() }
+            }
+        }
+    }
+
+    /// Looks for the wake word; once heard, everything after it is the question.
+    private func update() {
+        if let r = Self.wakeRange(in: transcript) {
+            awake = true
+            heard = String(transcript[r.upperBound...]).trimmingCharacters(in: CharacterSet(charactersIn: " ,.!?"))
+        } else if awake {
+            heard = transcript.trimmingCharacters(in: .whitespaces)
+        }
+    }
+
+    private func fire(_ text: String) {
+        let question = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        stop()
+        awake = false
+        guard !question.isEmpty else { return }
+        followUp = true
+        AssistantStore.shared.speakNextReply = true
+        AppState.current?.openAssistant(with: question)
+    }
+
+    private func restart() {
+        stop()
+        start()
+    }
+
+    func stop() {
+        guard listening || request != nil else { return }
+        listening = false
+        engine.stop()
+        engine.inputNode.removeTap(onBus: 0)
+        request?.endAudio()
+        recognition?.cancel()
+        recognition = nil
+        request = nil
+        #if os(iOS)
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        #endif
+    }
+
+    @discardableResult
+    private func permissions() async -> Bool {
+        let speech = await withCheckedContinuation { (c: CheckedContinuation<SFSpeechRecognizerAuthorizationStatus, Never>) in
+            SFSpeechRecognizer.requestAuthorization { c.resume(returning: $0) }
+        }
+        guard speech == .authorized else { error = "Allow Speech Recognition for Orbit in Settings › Privacy & Security."; enabledOff(); return false }
+        guard await AVCaptureDevice.requestAccess(for: .audio) else { error = "Allow the microphone for Orbit in Settings › Privacy & Security."; enabledOff(); return false }
+        allowed = true
+        return true
+    }
+
+    private func enabledOff() {
+        UserDefaults.standard.set(false, forKey: "wake.enabled")
+        enabled = false
+    }
+
+    // MARK: Matching
+
+    /// Where "hey <name>" ends in what was heard, allowing for how the recogniser spells names ("Yuki", "you key").
+    static func wakeRange(in text: String, name: String = AssistantName.current) -> Range<String.Index>? {
+        let want = letters(name)
+        guard want.count >= 2 else { return nil }
+        let lower = text
+        let pattern = #"\b(hey|hi|hay|okay|ok)\b[\s,]+"#
+        var search = lower.startIndex..<lower.endIndex
+        while let greet = lower.range(of: pattern, options: [.regularExpression, .caseInsensitive], range: search) {
+            // Compare the next one or two words, squashed together, with the name.
+            let rest = lower[greet.upperBound...]
+            let words = rest.split(whereSeparator: { $0 == " " || $0 == "," }).prefix(2)
+            var end = greet.upperBound
+            var joined = ""
+            for w in words {
+                joined += letters(String(w))
+                if let r = rest.range(of: w) { end = r.upperBound }
+                if close(joined, want) { return greet.lowerBound..<end }
+                if joined.count >= want.count + 2 { break }
+            }
+            search = greet.upperBound..<lower.endIndex
+        }
+        return nil
+    }
+
+    /// Letters only, spelled the way they sound, so "you key", "Yuuki" and "Yuki" compare alike.
+    private static func letters(_ s: String) -> String {
+        var t = s.lowercased().folding(options: .diacriticInsensitive, locale: nil).filter(\.isLetter)
+        for (a, b) in [("ou", "u"), ("oo", "u"), ("uu", "u"), ("ee", "i"), ("ey", "i"), ("ie", "i"), ("ck", "k"), ("ph", "f")] {
+            t = t.replacingOccurrences(of: a, with: b)
+        }
+        if t.count > 2, t.hasSuffix("y") { t = String(t.dropLast()) + "i" }
+        return t
+    }
+
+    private static func close(_ a: String, _ b: String) -> Bool {
+        if a == b { return true }
+        let allowed = b.count <= 4 ? 1 : 2
+        guard abs(a.count - b.count) <= allowed else { return false }
+        let x = Array(a), y = Array(b)
+        var row = Array(0...y.count)
+        for i in 1...x.count {
+            var prev = row[0]
+            row[0] = i
+            for j in 1...y.count {
+                let cur = row[j]
+                row[j] = x[i - 1] == y[j - 1] ? prev : min(prev, row[j], row[j - 1]) + 1
+                prev = cur
+            }
+        }
+        return row[y.count] <= allowed
+    }
+}

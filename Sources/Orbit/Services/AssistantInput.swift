@@ -215,8 +215,12 @@ final class Speaker: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
 
     private var pending = 0
 
-    func speak(_ text: String, then: (() -> Void)? = nil) {
+    /// Set for speech you didn't ask for (the welcome): on iPhone it stays silent when the ring/silent switch is on silent.
+    private(set) var quiet = false
+
+    func speak(_ text: String, quiet: Bool = false, then: (() -> Void)? = nil) {
         stop()
+        self.quiet = quiet
         if NaturalVoice.isOn {
             onDone = then
             speaking = true
@@ -266,7 +270,7 @@ final class Speaker: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
         onDone = then
         speaking = true
         #if os(iOS)
-        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+        try? AVAudioSession.sharedInstance().setCategory(Speaker.shared.quiet ? .ambient : .playback, mode: .spokenAudio, options: [.duckOthers])
         try? AVAudioSession.sharedInstance().setActive(true)
         #endif
         // One utterance per sentence, with a breath in between and a little variation, so it sounds like someone talking
@@ -288,9 +292,125 @@ final class Speaker: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
         onDone = nil
         pending = 0
         natural = nil
+        liveToken = UUID()
+        liveQueue = []
+        appleWaiter?.resume()
+        appleWaiter = nil
         NaturalVoice.shared.stop()
         if synth.isSpeaking { synth.stopSpeaking(at: .immediate) }
         speaking = false
+    }
+
+    /// Runs `then` once nothing is being read aloud (right away if it's quiet).
+    func whenDone(_ then: @escaping () -> Void) {
+        if speaking { onDone = then } else { then() }
+    }
+
+    // MARK: Speaking while the reply is written
+
+    /// Sentences waiting to be read, in order; the reader works through them as the reply streams in.
+    private var liveQueue: [String] = []
+    private var liveEnded = true
+    private var liveToken = UUID()
+    /// How much of the current part of the reply has been queued already.
+    private var liveQueued = 0
+    private var appleWaiter: CheckedContinuation<Void, Never>?
+
+    /// Starts reading a reply that's still being written: feed it with `liveFeed` and close with `liveEnd`.
+    func liveBegin() {
+        stop()
+        quiet = false
+        let token = UUID()
+        liveToken = token
+        liveQueue = []
+        liveQueued = 0
+        liveEnded = false
+        speaking = true
+        #if os(iOS)
+        try? AVAudioSession.sharedInstance().setCategory(Speaker.shared.quiet ? .ambient : .playback, mode: .spokenAudio, options: [.duckOthers])
+        try? AVAudioSession.sharedInstance().setActive(true)
+        #endif
+        Task { await readLive(token) }
+    }
+
+    /// The reply so far (of the current part). Whole sentences are queued as soon as they're complete;
+    /// `final` queues the rest and makes the next call start a new part.
+    func liveFeed(_ text: String, final: Bool = false) {
+        guard !liveEnded else { return }
+        let chars = Array(text)
+        guard liveQueued <= chars.count else { liveQueued = 0; return }
+        var cut = liveQueued
+        if final {
+            cut = chars.count
+        } else {
+            // The end of the last finished sentence: . ! ? or a line break, followed by a space.
+            var i = chars.count - 2
+            while i >= liveQueued {
+                if ".!?\n".contains(chars[i]) && (chars[i + 1] == " " || chars[i + 1] == "\n") { cut = i + 1; break }
+                if chars[i] == "\n" { cut = i + 1; break }
+                i -= 1
+            }
+        }
+        if cut > liveQueued {
+            let piece = String(chars[liveQueued..<cut])
+            liveQueue += Self.sentences(Self.plain(piece))
+            liveQueued = cut
+        }
+        if final { liveQueued = 0 }
+    }
+
+    /// No more text is coming; reading finishes with what's queued.
+    func liveEnd() { liveEnded = true }
+
+    private func readLive(_ token: UUID) async {
+        var index = 0
+        var useNatural = NaturalVoice.isOn
+        let key = Keychain.read("openai-key") ?? ""
+        var clips: [Int: Task<Data?, Never>] = [:]
+        while liveToken == token {
+            if index < liveQueue.count {
+                let sentence = liveQueue[index]
+                if useNatural && !key.isEmpty {
+                    // Ask for the next few sentences' audio ahead, so there are no gaps between them.
+                    for k in index..<min(index + 3, liveQueue.count) where clips[k] == nil {
+                        let s = liveQueue[k]
+                        clips[k] = Task { try? await NaturalVoice.audio(s, key: key) }
+                    }
+                    if let data = await clips[index]?.value {
+                        guard liveToken == token else { break }
+                        await NaturalVoice.shared.playClip(data)
+                    } else {
+                        useNatural = false
+                        await sayApple(sentence)
+                    }
+                } else {
+                    await sayApple(sentence)
+                }
+                clips[index] = nil
+                index += 1
+            } else if liveEnded {
+                break
+            } else {
+                try? await Task.sleep(for: .milliseconds(60))
+            }
+        }
+        clips.values.forEach { $0.cancel() }
+        guard liveToken == token else { return }
+        liveEnded = true
+        finished()
+    }
+
+    /// One sentence with the Apple voice, returning when it's been said.
+    private func sayApple(_ sentence: String) async {
+        let u = AVSpeechUtterance(string: sentence)
+        u.voice = Self.voice(for: sentence)
+        u.rate = AVSpeechUtteranceDefaultSpeechRate * (sentence.count < 40 ? 0.98 : 1.03)
+        u.pitchMultiplier = sentence.hasSuffix("?") ? 1.04 : 1.0
+        u.postUtteranceDelay = sentence.hasSuffix(",") || sentence.hasSuffix(":") ? 0.08 : 0.2
+        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+            appleWaiter = c
+            synth.speak(u)
+        }
     }
 
     /// Splits text into sentences (and list lines), keeping the punctuation.
@@ -339,6 +459,7 @@ final class Speaker: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
 
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         Task { @MainActor in
+            if let w = self.appleWaiter { self.appleWaiter = nil; w.resume(); return }
             self.pending -= 1
             guard self.pending <= 0 else { return }
             self.speaking = false
@@ -407,7 +528,7 @@ final class NaturalVoice: NSObject, AVAudioPlayerDelegate {
         if !rest.isEmpty { chunks.append(rest) }
         let jobs = chunks.map { chunk in Task { try await Self.audio(chunk, key: key) } }
         #if os(iOS)
-        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+        try? AVAudioSession.sharedInstance().setCategory(Speaker.shared.quiet ? .ambient : .playback, mode: .spokenAudio, options: [.duckOthers])
         try? AVAudioSession.sharedInstance().setActive(true)
         #endif
         for (i, job) in jobs.enumerated() {
@@ -428,6 +549,9 @@ final class NaturalVoice: NSObject, AVAudioPlayerDelegate {
         finished?.resume()
         finished = nil
     }
+
+    /// Plays one clip made by `audio` (used when reading a reply as it's written).
+    func playClip(_ data: Data) async { await play(data) }
 
     private func play(_ data: Data) async {
         guard let p = try? AVAudioPlayer(data: data) else { return }

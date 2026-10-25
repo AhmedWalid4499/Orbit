@@ -458,6 +458,7 @@ struct VoiceSection: View {
     @AppStorage("assistantSpeaks") private var speaks = false
     @AppStorage("assistantVoice") private var voiceID = ""
     @AppStorage("welcome.speak") private var welcome = true
+    @ObservedObject private var wake = WakeListener.shared
     @ObservedObject private var speaker = Speaker.shared
     @AppStorage("voice.natural") private var natural = true
     @AppStorage("voice.openai") private var openAIVoice = "coral"
@@ -475,6 +476,12 @@ struct VoiceSection: View {
         Section {
             Toggle("Read replies aloud", isOn: $speaks)
             Toggle("Welcome me with the brief out loud when I open Orbit", isOn: $welcome)
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle("Hands-free: answer when I say “Hey \(AssistantName.current)”", isOn: $wake.enabled)
+                Text("While Orbit is open it listens for “Hey \(AssistantName.current)”, then answers out loud. Listening happens on this device; only your question goes to \(AssistantName.current). Right after an answer you can just keep talking.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                if let e = wake.error { Text(e).font(.caption).foregroundStyle(Theme.orange) }
+            }
             if hasOpenAI {
                 Toggle("Natural voice (OpenAI)", isOn: $natural)
                 if natural {

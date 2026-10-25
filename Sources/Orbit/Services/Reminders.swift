@@ -178,7 +178,8 @@ final class Reminders: NSObject, ObservableObject, UNUserNotificationCenterDeleg
             }
         }
 
-        if documents {
+        // The Documents tab is retired, so it doesn't remind you about documents you can no longer open.
+        if documents, Tab.allCases.contains(.documents) {
             for d in (try? context.fetch(FetchDescriptor<DocItem>())) ?? [] {
                 guard let exp = d.expires else { continue }
                 let early = at(exp.adding(days: -d.remindDays), 10)
@@ -314,7 +315,7 @@ struct NotificationSettingsView: View {
                 Toggle("Journal check-in at night", isOn: $r.journal)
                 Toggle("Weekly review on Sunday evening", isOn: $r.review)
                 Toggle("Free trials ending and yearly renewals", isOn: $r.subscriptions)
-                Toggle("Documents and warranties about to expire", isOn: $r.documents)
+                if Tab.allCases.contains(.documents) { Toggle("Documents and warranties about to expire", isOn: $r.documents) }
                 Toggle("Evening nudge to plan tomorrow", isOn: $r.evening)
                 Toggle("Trips: packing and flights", isOn: $r.trips)
                 Toggle("Spending reaching a budget (80% and 100%)", isOn: Binding(

@@ -157,7 +157,7 @@ struct OrbitApp: App {
                     .keyboardShortcut("n", modifiers: [.command, .shift])
                 Button("Search") { state.searchOpen = true }
                     .keyboardShortcut("k", modifiers: .command)
-                Button("Ask Claude") { state.assistantOpen.toggle() }
+                Button("Ask Claude") { state.toggleAssistant() }
                     .keyboardShortcut("j", modifiers: .command)
             }
             CommandMenu("Go") {

@@ -85,9 +85,11 @@ final class EmailLinkHandler: NSObject, WKNavigationDelegate {
     func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
         // The email itself loads; any link you click opens in the browser.
         if action.navigationType == .linkActivated, let url = action.request.url {
-            Platform.open(url)
+            if ["http", "https", "mailto", "tel"].contains(url.scheme?.lowercased() ?? "") { Platform.open(url) }
             return .cancel
         }
+        // Only the email itself (loaded from a string); refreshes, frames and forms can't swap in another page.
+        guard action.targetFrame?.isMainFrame == true, action.request.url?.absoluteString == "about:blank" else { return .cancel }
         return .allow
     }
 }

@@ -120,6 +120,11 @@ final class AppState: ObservableObject {
     /// A message to send as soon as the assistant opens (e.g. from "Discuss with Claude").
     @Published var assistantSeed: String?
 
+    /// ⌘J and the ✦ button: open or close the chat (on the Mac's AI tab it's already there).
+    func toggleAssistant() {
+        if tab == .assistant && !Platform.isPhone { assistantOpen = false } else { assistantOpen.toggle() }
+    }
+
     func openAssistant(with message: String? = nil) {
         assistantSeed = message
         // On the Mac's AI tab the chat is already on screen.

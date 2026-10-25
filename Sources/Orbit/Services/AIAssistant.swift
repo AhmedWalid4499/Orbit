@@ -9,8 +9,10 @@ struct MorningBrief: Codable, Equatable {
     var heads_up: String
     var day: String = ""
     var generatedAt: Date = .now
+    /// The money picture it was written from (budget month, budget, spending), so a changed one rewrites it.
+    var money: String = ""
 
-    enum CodingKeys: String, CodingKey { case headline, summary, focus, heads_up, day, generatedAt }
+    enum CodingKeys: String, CodingKey { case headline, summary, focus, heads_up, day, generatedAt, money }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -20,6 +22,7 @@ struct MorningBrief: Codable, Equatable {
         heads_up = try c.decode(String.self, forKey: .heads_up)
         day = try c.decodeIfPresent(String.self, forKey: .day) ?? ""
         generatedAt = try c.decodeIfPresent(Date.self, forKey: .generatedAt) ?? .now
+        money = try c.decodeIfPresent(String.self, forKey: .money) ?? ""
     }
 }
 
@@ -49,6 +52,11 @@ final class AIAssistant: ObservableObject {
     var smartCaptureActive: Bool { hasKey && smartCaptureEnabled }
 
     /// Debug snapshots only: shows a canned brief without calling the API.
+    /// Drops today's brief so the next look writes a fresh one (after starting a new budget month).
+    func forgetBrief() {
+        brief?.money = "stale"
+    }
+
     func previewBrief(_ b: MorningBrief) {
         hasKey = true
         brief = b
@@ -89,7 +97,10 @@ final class AIAssistant: ObservableObject {
     /// Generates today's brief once per day unless `force` is set.
     func refreshBrief(context: ModelContext, apple: AppleSync, force: Bool = false) async {
         guard hasKey, morningBriefEnabled, briefState != .loading, !Snapshot.isActive else { return }
-        guard force || !hasTodaysBrief else { return }
+        let money = Self.moneyStamp(context: context)
+        // Rewritten when it's a new day, or when your money moved on (a new budget month, a changed budget,
+        // or spending that changed by a noticeable amount), so it never quotes old numbers.
+        guard force || !hasTodaysBrief || brief?.money != money else { return }
         guard let client = ClaudeClient() else { return }
 
         briefState = .loading
@@ -120,12 +131,23 @@ final class AIAssistant: ObservableObject {
                                                      schema: schema, effort: "medium")
             result.day = DayKey.key(.now)
             result.generatedAt = .now
+            result.money = money
             brief = result
             if let data = try? JSONEncoder().encode(result) { UserDefaults.standard.set(data, forKey: briefKey) }
             briefState = .idle
         } catch {
             briefState = .failed(error.localizedDescription)
         }
+    }
+
+    /// A short fingerprint of the money numbers the brief talks about.
+    static func moneyStamp(context: ModelContext) -> String {
+        let txns = (try? context.fetch(FetchDescriptor<Transaction>())) ?? []
+        let budget = UserDefaults.standard.object(forKey: "monthlyBudget") as? Double ?? 2000
+        let spent = BudgetPeriod.spent(txns)
+        // Spending is rounded to steps of 5% of the budget, so a coffee doesn't rewrite the brief.
+        let step = max(budget * 0.05, 1)
+        return "\(Int(BudgetPeriod.current.start.timeIntervalSince1970))|\(Int(budget))|\(Int(spent / step))"
     }
 
     /// Plain-text summary of the user's day for the brief prompt.
@@ -169,9 +191,20 @@ final class AIAssistant: ObservableObject {
             "- \($0.name): streak \($0.currentStreak) days, \($0.doneThisWeek)/\($0.targetPerWeek) this week, done today: \($0.isDone(on: today) ? "yes" : "no")"
         }
 
+        // The same numbers as the Money tab: the current budget month (which may start on payday or the day you
+        // started a new month), with bills you've paid counted as spending.
+        let period = BudgetPeriod.current
         let spent = BudgetPeriod.spent(txns)
         let (dayOfMonth, daysInMonth) = BudgetPeriod.day(now: now)
-        lines.append("\nMoney this month: spent \(Fmt.money(spent)) of \(Fmt.money(budget)) budget; day \(dayOfMonth) of \(daysInMonth).")
+        lines.append("\nMoney (budget month \(BudgetPeriod.title(period)), started \(period.start.formatted(date: .abbreviated, time: .omitted))): "
+                     + "spent \(Fmt.money(spent)) of \(Fmt.money(budget)), \(Fmt.money(max(budget - spent, 0))) left to spend; day \(dayOfMonth) of \(daysInMonth). "
+                     + "Only use these money numbers; spending from before this budget month doesn't count.")
+        let bills = (try? context.fetch(FetchDescriptor<Bill>())) ?? []
+        let unpaid = bills.map { ($0, BillTracker.current($0, transactions: txns, now: now)) }
+            .filter { !$0.1.isPaid && $0.1.due < today.adding(days: 8) }
+        if !unpaid.isEmpty {
+            lines.append("Bills still to pay soon: " + unpaid.map { "\($0.0.name) \(Fmt.money($0.0.amount)) (\(BillTracker.describe($0.1.status).lowercased()))" }.joined(separator: "; "))
+        }
 
         lines += DayPlanner.briefLines(context: context)
         let health = HealthStore.shared.summary()

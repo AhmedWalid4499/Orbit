@@ -61,7 +61,8 @@ final class HealthStore: ObservableObject {
     func disconnect() {
         connected = false
         days = [:]
-        UserDefaults.standard.removeObject(forKey: Self.key)
+        // Emptied rather than removed, so other devices stop showing it too.
+        UserDefaults.standard.set("", forKey: Self.key)
     }
 
     #if os(iOS)
@@ -130,10 +131,14 @@ final class HealthStore: ObservableObject {
         guard let samples = try? await q.result(for: store) else { return [:] }
         let asleep: Set<Int> = [HKCategoryValueSleepAnalysis.asleepCore.rawValue, HKCategoryValueSleepAnalysis.asleepDeep.rawValue,
                                 HKCategoryValueSleepAnalysis.asleepREM.rawValue, HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue]
-        var out: [String: Int] = [:]
-        for s in samples where asleep.contains(s.value) {
-            out[DayKey.key(s.endDate), default: 0] += Int(s.endDate.timeIntervalSince(s.startDate) / 60)
+        // Several apps (Watch, AutoSleep, Oura…) record the same night: merge overlapping stretches before adding up.
+        let spans = samples.filter { asleep.contains($0.value) }.map { ($0.startDate, $0.endDate) }.sorted { $0.0 < $1.0 }
+        var merged: [(Date, Date)] = []
+        for s in spans {
+            if let last = merged.last, s.0 <= last.1 { merged[merged.count - 1].1 = max(last.1, s.1) } else { merged.append(s) }
         }
+        var out: [String: Int] = [:]
+        for (start, end) in merged { out[DayKey.key(end), default: 0] += Int(end.timeIntervalSince(start) / 60) }
         return out
     }
 
@@ -155,15 +160,24 @@ final class HealthStore: ObservableObject {
         let habits = (try? context.fetch(FetchDescriptor<Habit>())) ?? []
         let workoutWords = ["workout", "gym", "exercise", "train", "run", "swim", "yoga", "cycle", "sport", "تمرين", "جيم"]
         let walkWords = ["walk", "steps", "مشي"]
+        var ticked = Set(UserDefaults.standard.stringArray(forKey: "health.ticked") ?? [])
+        func has(_ words: [String], _ name: String) -> Bool {
+            let parts = Set(name.lowercased().split(whereSeparator: { !$0.isLetter }).map(String.init))
+            return words.contains { parts.contains($0) || parts.contains($0 + "s") || parts.contains($0 + "ing") }
+        }
         for day in (0..<7).map({ Date.now.startOfDay.adding(days: -$0) }) {
             guard let d = days[DayKey.key(day)] else { continue }
-            for h in habits where !h.isDone(on: day) {
-                let n = h.name.lowercased()
-                if (d.workouts > 0 && workoutWords.contains { n.contains($0) }) || (d.steps >= 8000 && walkWords.contains { n.contains($0) }) {
+            for h in habits where !h.isDone(on: day) && day >= h.createdAt.startOfDay {
+                // Ticked once already: you unticked it, so leave it.
+                let mark = "\(h.uuid.isEmpty ? h.name : h.uuid)-\(DayKey.key(day))"
+                guard !ticked.contains(mark) else { continue }
+                if (d.workouts > 0 && has(workoutWords, h.name)) || (d.steps >= 8000 && has(walkWords, h.name)) {
                     h.toggle(day)
+                    ticked.insert(mark)
                 }
             }
         }
+        UserDefaults.standard.set(Array(ticked.suffix(200)), forKey: "health.ticked")
         try? context.save()
     }
 

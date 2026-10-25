@@ -32,7 +32,9 @@ enum Accounts {
     static func find(bank: String, last4: String, kind: String, context: ModelContext) -> BankAccount {
         let all = (try? context.fetch(FetchDescriptor<BankAccount>(sortBy: [SortDescriptor(\.createdAt)]))) ?? []
         let b = bank.lowercased()
-        if !last4.isEmpty, let hit = all.first(where: { $0.last4 == last4 && (b.isEmpty || $0.name.lowercased() == b || $0.name == "Card") }) {
+        // The last 4 digits identify the card even after you rename it; the bank name only breaks ties.
+        let sameDigits = last4.isEmpty ? [] : all.filter { $0.last4 == last4 }
+        if let hit = sameDigits.first(where: { b.isEmpty || $0.name.lowercased() == b || $0.name == "Card" }) ?? sameDigits.first {
             if hit.name == "Card", !bank.isEmpty, bank != "Card" { hit.name = bank }
             return hit
         }

@@ -15,7 +15,8 @@ enum BudgetPeriod {
         }
         set {
             if let newValue { UserDefaults.standard.set(newValue.timeIntervalSince1970, forKey: key) }
-            else { UserDefaults.standard.removeObject(forKey: key) }
+            // 0 (not removed) means calendar months, so going back to them syncs too.
+            else { UserDefaults.standard.set(0.0, forKey: key) }
         }
     }
 
@@ -49,6 +50,7 @@ enum BudgetPeriod {
     @MainActor static func startNew(_ moment: Date = .now) {
         anchor = moment
         MoneyCoach.shared.forget()
+        AIAssistant.shared.forgetBrief()
     }
 
     /// "October 2026", or "25 Oct – 24 Nov" for a month that starts on payday.

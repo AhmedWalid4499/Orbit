@@ -96,7 +96,7 @@ enum BankMessages {
         let signed = p.kind == .expense ? -value : value
         // A Wallet tap and the bank's SMS (or the email receipt) for the same purchase: keep one.
         let twin = existing.first {
-            $0.date.isSameDay(as: .now) && $0.isExpense == (signed < 0) && abs(abs($0.amount) - value) <= max(1, value * 0.01)
+            $0.source != source && $0.date.isSameDay(as: .now) && $0.isExpense == (signed < 0) && abs(abs($0.amount) - value) <= max(1, value * 0.01)
                 && Date.now.timeIntervalSince($0.date) < 6 * 3600
         }
         if let twin {

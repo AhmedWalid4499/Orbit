@@ -85,6 +85,7 @@ struct RootView: View {
         }
         .task { focus.restore(context: context) }
         .task { await WelcomeVoice.greetIfDue(context: context, apple: apple) }
+        .task { _ = WakeListener.shared }   // starts hands-free listening when it's switched on
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             Task { await WelcomeVoice.greetIfDue(context: context, apple: apple) }
         }
@@ -151,7 +152,7 @@ struct TopBar: View {
                 FocusPill()
                 ReadingTimerPill()
                 UpdatePill()
-                Button { state.assistantOpen.toggle() } label: {
+                Button { state.toggleAssistant() } label: {
                     HStack(spacing: 7) {
                         AssistantAvatar(size: 26)
                         Text(assistantName)

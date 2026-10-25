@@ -103,6 +103,26 @@ enum BookLibrary {
         return outcome
     }
 
+    /// One-time cleanup of Kindle imports: scrambled (encrypted) authors are cleared so covers and authors can be
+    /// looked up again, and the dictionaries Kindle comes with are removed.
+    static func cleanUpKindleIfNeeded(context: ModelContext) {
+        let key = "booksKindleCleaned.v1"
+        guard !UserDefaults.standard.bool(forKey: key), !Snapshot.isActive else { return }
+        for book in (try? context.fetch(FetchDescriptor<Book>())) ?? [] {
+            let clean = Book.cleanAuthor(book.author)
+            if clean != book.author {
+                book.author = clean
+                if BookCovers.isSearchResultURL(book.coverURL) { book.coverURL = "" }
+            }
+            let onlyKindle = (book.sources.isEmpty ? [book.source] : book.sources) == ["kindle"]
+            if onlyKindle, book.title.range(of: "dictionary|woordenboek|shabdabhandar", options: [.regularExpression, .caseInsensitive]) != nil {
+                context.delete(book)
+            }
+        }
+        try? context.save()
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
     /// One-time cleanup: imported books lose the categories imports gave them, and categories nobody uses any more are removed.
     static func migrateLibrariesIfNeeded(context: ModelContext) {
         let key = "booksLibrariesMigrated"
@@ -443,11 +463,14 @@ enum KindleMac {
                 let a = authorCols.first(where: cols.contains) ?? cols.first { $0.contains("AUTHOR") }
                 let idCol = ["ZBOOKID", "ZASIN", "ZRAWBOOKID", "ZIDENTIFIER"].first(where: cols.contains)
                 let pctCol = cols.first { $0.contains("PERCENT") || $0 == "ZRAWREADINGPROGRESS" }
-                let select = [t, a, idCol, pctCol].compactMap { $0 }.joined(separator: ",")
+                let dictCol = cols.contains("ZRAWISDICTIONARY") ? "ZRAWISDICTIONARY" : nil
+                let select = [t, a, idCol, pctCol, dictCol].compactMap { $0 }.joined(separator: ",")
                 let rows = db.rows("SELECT \(select) FROM \"\(table)\"")
                 let books: [ImportedBook] = rows.compactMap { r in
                     guard let title = r[t], !title.isEmpty else { return nil }
-                    var b = ImportedBook(title: title, author: a.flatMap { r[$0] } ?? "")
+                    // The dictionaries Kindle comes with aren't books you read.
+                    if let dictCol, r[dictCol] == "1" { return nil }
+                    var b = ImportedBook(title: title, author: Book.cleanAuthor(a.flatMap { r[$0] } ?? ""))
                     if let p = pctCol.flatMap({ r[$0] }).flatMap(Double.init) {
                         let frac = p > 1 ? p / 100 : p
                         b.progress = min(max(frac, 0), 1)

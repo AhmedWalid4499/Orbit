@@ -15,6 +15,8 @@ struct MailMessage: Identifiable, Equatable {
     let messageIDHeader: String
     let references: String
     var unread: Bool
+    /// The email's own HTML (how it looks in Gmail), or "" for plain-text mail.
+    var html = ""
 
     var sender: String { InboxStore.displayName(from) }
 }
@@ -49,7 +51,18 @@ enum MailReader {
         return MailMessage(id: id, threadID: json["threadId"] as? String ?? "", account: account, from: from, fromAddress: address,
                            to: h("To"), subject: h("Subject"), date: Self.date(json["internalDate"]), body: text(of: payload),
                            messageIDHeader: h("Message-ID").isEmpty ? h("Message-Id") : h("Message-ID"), references: h("References"),
-                           unread: labels.contains("UNREAD"))
+                           unread: labels.contains("UNREAD"), html: htmlPart(of: payload))
+    }
+
+    /// The text/html part of a message, if it has one.
+    static func htmlPart(of payload: [String: Any]) -> String {
+        func walk(_ p: [String: Any]) -> String? {
+            if (p["mimeType"] as? String ?? "").lowercased() == "text/html",
+               let data = (p["body"] as? [String: Any])?["data"] as? String, let s = decode(data) { return s }
+            for part in p["parts"] as? [[String: Any]] ?? [] { if let s = walk(part) { return s } }
+            return nil
+        }
+        return walk(payload) ?? ""
     }
 
     /// Recent inbox mail across your accounts, newest first.

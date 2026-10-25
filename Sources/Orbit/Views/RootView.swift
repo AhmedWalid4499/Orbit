@@ -24,6 +24,7 @@ struct RootView: View {
             Group {
                 switch state.tab {
                 case .today: TodayView()
+                case .assistant: AssistantTabView()
                 case .insights: InsightsDashboard()
                 case .calendar: CalendarWeekView()
                 case .tasks: TasksView()
@@ -83,6 +84,10 @@ struct RootView: View {
             }
         }
         .task { focus.restore(context: context) }
+        .task { await WelcomeVoice.greetIfDue(context: context, apple: apple) }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await WelcomeVoice.greetIfDue(context: context, apple: apple) }
+        }
         .task {
             // Keep the next two days of notifications current.
             while !Task.isCancelled {
@@ -113,6 +118,7 @@ struct RootView: View {
                 await ReadingSync.shared.syncIfDue(context: context)
                 await InboxStore.shared.refreshIfDue(context: context)
                 await LinkedInStore.shared.refreshIfDue()
+                await YouTubeStore.shared.refreshIfDue()
                 await EmailExpenses.shared.syncIfDue(context: context)
                 await GoogleCalendarStore.shared.refreshIfDue()
                 SubscriptionTracker.detect(context: context)

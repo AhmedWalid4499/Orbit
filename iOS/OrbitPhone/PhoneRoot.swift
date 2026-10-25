@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 /// The iPhone's sections. The Mac's other tabs live under More.
-enum PhoneTab: Hashable { case today, calendar, tasks, money, more }
+enum PhoneTab: Hashable { case today, tasks, money, assistant, more }
 
 struct PhoneRoot: View {
     @EnvironmentObject private var state: AppState
@@ -84,6 +84,7 @@ struct PhoneRoot: View {
         .task(id: phase) {
             // While Orbit is open: sync every two minutes, keep reminders current, refresh email and reading now and then.
             guard phase == .active, !Snapshot.isActive else { return }
+            Task { await WelcomeVoice.greetIfDue(context: context, apple: apple) }
             var rounds = 0
             while !Task.isCancelled {
                 await cloud.syncIfSignedIn(context: context)
@@ -96,6 +97,7 @@ struct PhoneRoot: View {
                     await HealthStore.shared.refresh(context: context)
                     await AIAssistant.shared.refreshBrief(context: context, apple: apple)
                     await LinkedInStore.shared.refreshIfDue()
+                    await YouTubeStore.shared.refreshIfDue()
                     await ReadingSync.shared.syncIfDue(context: context)
                     await InboxStore.shared.refreshIfDue(context: context)
                     await EmailExpenses.shared.syncIfDue(context: context)
@@ -113,14 +115,14 @@ struct PhoneRoot: View {
             SwiftUI.Tab("Today", systemImage: "sun.max.fill", value: PhoneTab.today) {
                 NavigationStack { PhoneToday() }
             }
-            SwiftUI.Tab("Calendar", systemImage: "calendar", value: PhoneTab.calendar) {
-                NavigationStack { PhoneCalendar() }
-            }
             SwiftUI.Tab("Tasks", systemImage: "checklist", value: PhoneTab.tasks) {
                 NavigationStack { PhoneTasks() }
             }
             SwiftUI.Tab("Money", systemImage: "creditcard.fill", value: PhoneTab.money) {
                 NavigationStack { PhoneMoney() }
+            }
+            SwiftUI.Tab(AssistantName.current, systemImage: "sparkles", value: PhoneTab.assistant) {
+                AssistantTabView()
             }
             SwiftUI.Tab("More", systemImage: "square.grid.2x2.fill", value: PhoneTab.more) {
                 NavigationStack(path: $morePath) {
@@ -135,8 +137,8 @@ struct PhoneRoot: View {
     private func show(_ t: Tab) {
         switch t {
         case .today: tab = .today
-        case .calendar: tab = .calendar
         case .tasks: tab = .tasks
+        case .assistant: tab = .assistant
         case .money: tab = .money
         default:
             tab = .more
@@ -151,6 +153,7 @@ struct PhoneSection: View {
 
     var body: some View {
         switch tab {
+        case .calendar: PhoneCalendar()
         case .insights: InsightsDashboard().phoneChrome("Insights")
         case .habits: PhoneHabits()
         case .notes: PhoneNotes()

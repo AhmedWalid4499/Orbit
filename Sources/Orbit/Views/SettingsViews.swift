@@ -457,6 +457,7 @@ struct KeySyncSection: View {
 struct VoiceSection: View {
     @AppStorage("assistantSpeaks") private var speaks = false
     @AppStorage("assistantVoice") private var voiceID = ""
+    @AppStorage("welcome.speak") private var welcome = true
     @ObservedObject private var speaker = Speaker.shared
     @AppStorage("voice.natural") private var natural = true
     @AppStorage("voice.openai") private var openAIVoice = "coral"
@@ -473,6 +474,7 @@ struct VoiceSection: View {
     var body: some View {
         Section {
             Toggle("Read replies aloud", isOn: $speaks)
+            Toggle("Welcome me with the brief out loud when I open Orbit", isOn: $welcome)
             if hasOpenAI {
                 Toggle("Natural voice (OpenAI)", isOn: $natural)
                 if natural {

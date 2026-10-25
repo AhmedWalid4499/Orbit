@@ -43,9 +43,17 @@ final class AssistantStore: ObservableObject {
     private var messages: [[String: Any]] = []
     private var received = ""
     private var streamDone = true
-    private let fileURL = URL.applicationSupportDirectory.appending(path: "Orbit/assistant.json")
+    /// Past conversations, newest first (each kept in its own file), and the one you're in.
+    struct ChatInfo: Codable, Identifiable, Equatable { var id: UUID; var title: String; var updated: Date }
+    @Published private(set) var chats: [ChatInfo] = []
+    @Published private(set) var currentID = UUID()
 
-    private init() { load() }
+    private static let folder = URL.applicationSupportDirectory.appending(path: "Orbit/chats", directoryHint: .isDirectory)
+    private static let indexURL = folder.appending(path: "index.json")
+    private static let oldURL = URL.applicationSupportDirectory.appending(path: "Orbit/assistant.json")
+    private var fileURL: URL { Self.folder.appending(path: "\(currentID.uuidString).json") }
+
+    private init() { loadIndex() }
 
     // MARK: Conversation
 
@@ -54,12 +62,32 @@ final class AssistantStore: ObservableObject {
         messages.flatMap { m in (m["content"] as? [[String: Any]] ?? []).map { "\(m["role"] ?? "")/\($0["type"] ?? "")" } }
     }
 
+    /// Starts a fresh conversation; the current one stays in your past chats.
     func newChat() {
+        guard !busy else { return }
+        save()
+        currentID = UUID()
         items = []
         messages = []
         system = ""
         error = nil
+    }
+
+    /// Opens a past conversation.
+    func open(_ id: UUID) {
+        guard !busy, id != currentID else { return }
         save()
+        currentID = id
+        error = nil
+        load()
+    }
+
+    func delete(_ id: UUID) {
+        guard !Snapshot.isActive else { return }
+        try? FileManager.default.removeItem(at: Self.folder.appending(path: "\(id.uuidString).json"))
+        chats.removeAll { $0.id == id }
+        saveIndex()
+        if id == currentID { currentID = UUID(); items = []; messages = []; system = ""; error = nil }
     }
 
     func send(_ text: String, attachments: [ChatAttachment] = [], context: ModelContext, apple: AppleSync) async {
@@ -174,10 +202,50 @@ final class AssistantStore: ObservableObject {
     }
 
     private func save() {
-        guard !Snapshot.isActive else { return }   // screenshots and tests never touch your real chat
+        guard !Snapshot.isActive, !items.isEmpty else { return }   // screenshots and tests never touch your real chat
         let saved = Saved(system: system, messages: (try? JSONSerialization.data(withJSONObject: messages)) ?? Data(), items: items)
-        try? FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
         try? JSONEncoder().encode(saved).write(to: fileURL)
+        let first = items.first { $0.role == .user }?.text ?? "New chat"
+        let title = first.count > 60 ? String(first.prefix(57)).trimmingCharacters(in: .whitespaces) + "…" : first
+        let info = ChatInfo(id: currentID, title: title, updated: .now)
+        if let i = chats.firstIndex(where: { $0.id == currentID }) {
+            // Only reorder when something changed, so opening an old chat doesn't bump it to the top.
+            if chats[i].title != title || saved.items.count != lastSavedCount { chats.remove(at: i); chats.insert(info, at: 0) }
+        } else {
+            chats.insert(info, at: 0)
+        }
+        lastSavedCount = items.count
+        saveIndex()
+    }
+    private var lastSavedCount = 0
+
+    private func saveIndex() {
+        try? FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
+        try? JSONEncoder().encode(chats).write(to: Self.indexURL)
+    }
+
+    /// Reads the list of chats and reopens the latest; a chat from before past chats existed becomes the first one.
+    private func loadIndex() {
+        if Snapshot.isDemo {
+            chats = [ChatInfo(id: currentID, title: "I'm hungry, anything good near me?", updated: .now),
+                     ChatInfo(id: UUID(), title: "Plan my week around my calendar", updated: .now.addingTimeInterval(-86_400)),
+                     ChatInfo(id: UUID(), title: "How can I spend less on food this month?", updated: .now.addingTimeInterval(-3 * 86_400))]
+        } else {
+            let fm = FileManager.default
+            if !fm.fileExists(atPath: Self.indexURL.path), fm.fileExists(atPath: Self.oldURL.path) {
+                try? fm.createDirectory(at: Self.folder, withIntermediateDirectories: true)
+                let id = UUID()
+                try? fm.moveItem(at: Self.oldURL, to: Self.folder.appending(path: "\(id.uuidString).json"))
+                currentID = id
+                load()
+                save()
+                return
+            }
+            chats = (try? Data(contentsOf: Self.indexURL)).flatMap { try? JSONDecoder().decode([ChatInfo].self, from: $0) } ?? []
+            if let latest = chats.first { currentID = latest.id }
+        }
+        load()
     }
 
     private func load() {
@@ -192,7 +260,10 @@ final class AssistantStore: ObservableObject {
             ]
             return
         }
-        guard let data = try? Data(contentsOf: fileURL), let saved = try? JSONDecoder().decode(Saved.self, from: data) else { return }
+        guard let data = try? Data(contentsOf: fileURL), let saved = try? JSONDecoder().decode(Saved.self, from: data) else {
+            items = []; messages = []; system = ""; return
+        }
+        lastSavedCount = saved.items.count
         system = saved.system
         messages = (try? JSONSerialization.jsonObject(with: saved.messages) as? [[String: Any]]) ?? []
         items = saved.items
@@ -646,6 +717,8 @@ enum AssistantTools {
 
     private static func overview(context: ModelContext, apple: AppleSync) -> String {
         var text = AIAssistant.snapshot(context: context, apple: apple)
+        let youtube = YouTubeStore.shared.summary()
+        if !youtube.isEmpty { text += "\n\n" + youtube }
         let books = (try? context.fetch(FetchDescriptor<Book>())) ?? []
         let cats = ((try? context.fetch(FetchDescriptor<BookCategory>())) ?? []).map(\.name)
         let reading = BookLibrary.currentlyReading(books, sessions: (try? context.fetch(FetchDescriptor<ReadingSession>())) ?? []).map { "\($0.title) (\(Int($0.progress * 100))%)" }

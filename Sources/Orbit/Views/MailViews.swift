@@ -16,45 +16,75 @@ struct MailSheet: View {
     @State private var sent = false
     @State private var needsPermission = false
 
+    @State private var replying = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text(message?.subject.isEmpty == false ? message!.subject : "Email").font(Theme.display(22)).lineLimit(2)
+            // Gmail-style: actions on top, then the subject, the sender and the email itself.
+            HStack(spacing: 14) {
+                Button("Done") { dismiss() }.buttonStyle(SoftButtonStyle())
                 Spacer()
                 if let message, let u = InboxStore.link(.init(account: account, from: "", subject: "", note: "", messageID: message.id)) {
-                    Button { Platform.open(u) } label: { Image(systemName: "arrow.up.right.square") }
-                        .buttonStyle(.plain).foregroundStyle(Theme.inkSecondary).help("Open in Gmail")
+                    Button { Platform.open(u) } label: { Label("Open in Gmail", systemImage: "arrow.up.right.square") }
+                        .buttonStyle(.plain).foregroundStyle(Theme.inkSecondary)
                 }
-                Button("Done") { dismiss() }.buttonStyle(SoftButtonStyle())
+                if message != nil && !replying {
+                    Button { withAnimation(.snappy) { replying = true } } label: { Label("Reply", systemImage: "arrowshape.turn.up.left.fill") }
+                        .buttonStyle(PrimaryButtonStyle()).fixedSize()
+                }
             }
-            .padding(20)
-            Divider().overlay(Theme.line)
-            ScrollView {
+            .font(Theme.ui(13, weight: .semibold))
+            .padding(.horizontal, 20).padding(.vertical, 14)
+            if let m = message {
                 VStack(alignment: .leading, spacing: 14) {
-                    if let m = message {
-                        HStack(spacing: 10) {
-                            Text(String(m.sender.prefix(1)).uppercased()).font(Theme.ui(15, weight: .bold)).foregroundStyle(Theme.stickerInk)
-                                .frame(width: 38, height: 38).background(Circle().fill(Theme.pink))
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(m.sender).font(Theme.ui(14, weight: .semibold))
-                                Text("\(m.fromAddress)\(m.date.map { " · " + $0.formatted(date: .abbreviated, time: .shortened) } ?? "")")
-                                    .font(Theme.ui(11)).foregroundStyle(Theme.inkMuted).lineLimit(1)
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Text(m.subject.isEmpty ? "(no subject)" : m.subject).font(Theme.ui(22, weight: .regular)).fixedSize(horizontal: false, vertical: true)
+                        Text("Inbox").font(Theme.ui(11, weight: .medium)).foregroundStyle(Theme.inkSecondary)
+                            .padding(.horizontal, 6).padding(.vertical, 2).background(RoundedRectangle(cornerRadius: 4).fill(Theme.card))
+                    }
+                    HStack(alignment: .top, spacing: 12) {
+                        Text(String(m.sender.prefix(1)).uppercased()).font(Theme.ui(17, weight: .semibold)).foregroundStyle(.white)
+                            .frame(width: 40, height: 40).background(Circle().fill(Self.color(for: m.fromAddress)))
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 6) {
+                                Text(m.sender).font(Theme.ui(14, weight: .bold)).lineLimit(1)
+                                if m.sender != m.fromAddress {
+                                    Text("<\(m.fromAddress)>").font(Theme.ui(12)).foregroundStyle(Theme.inkMuted).lineLimit(1).truncationMode(.middle)
+                                }
                             }
+                            Text("to \(m.to.lowercased().contains(account.lowercased()) || m.to.isEmpty ? "me" : InboxStore.displayName(m.to))")
+                                .font(Theme.ui(12)).foregroundStyle(Theme.inkMuted).lineLimit(1)
                         }
-                        Text(m.body.isEmpty ? "(This email has no text. Open it in Gmail to see it.)" : m.body)
-                            .font(Theme.ui(14)).lineSpacing(3).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
-                    } else if let error {
-                        Label(error, systemImage: "exclamationmark.triangle.fill").font(Theme.ui(13)).foregroundStyle(Theme.orange)
-                    } else {
-                        ProgressView().frame(maxWidth: .infinity).padding(40)
+                        Spacer(minLength: 8)
+                        if let d = m.date {
+                            Text(d.formatted(d.isToday ? .dateTime.hour().minute() : .dateTime.day().month(.abbreviated).hour().minute()))
+                                .font(Theme.ui(12)).foregroundStyle(Theme.inkMuted)
+                        }
                     }
                 }
-                .padding(20)
+                .padding(.horizontal, 20).padding(.bottom, 12)
+                EmailBodyView(html: m.html, text: m.body.isEmpty ? "(This email has no text. Open it in Gmail to see it.)" : m.body)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.line))
+                    .padding(.horizontal, 14).padding(.bottom, 12)
+                    .frame(maxHeight: .infinity)
+                if replying { composer }
+            } else if let error {
+                Label(error, systemImage: "exclamationmark.triangle.fill").font(Theme.ui(13)).foregroundStyle(Theme.orange).padding(20)
+                Spacer()
+            } else {
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            if message != nil { composer }
         }
-        .sheetFrame(width: 620, height: 720)
+        .sheetFrame(width: 760, height: 820)
         .task { await load() }
+    }
+
+    /// A steady colour per sender, like Gmail's letter avatars.
+    static func color(for address: String) -> Color {
+        let palette: [UInt32] = [0x1A73E8, 0xD93025, 0x188038, 0xE37400, 0x9334E6, 0x007B83, 0xC5221F, 0x3367D6]
+        let n = address.lowercased().unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0xFFFF }
+        return Color(hex: palette[n % palette.count])
     }
 
     private var composer: some View {

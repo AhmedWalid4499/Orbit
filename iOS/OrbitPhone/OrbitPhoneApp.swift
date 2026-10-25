@@ -33,6 +33,7 @@ struct OrbitPhoneApp: App {
             }
         }
         OrbitStore.container = container
+        BookLibrary.cleanUpKindleIfNeeded(context: container.mainContext)
         WatchBridge.shared.activate()
     }
 

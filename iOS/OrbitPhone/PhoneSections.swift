@@ -9,7 +9,7 @@ struct PhoneMore: View {
     @AppStorage("hiddenTabs") private var hiddenTabs = ""
     private var sections: [Tab] {
         // Everything that isn't in the tab bar, so new sections (YouTube, LinkedIn…) show up here by themselves.
-        Tab.allCases.filter { ![.today, .calendar, .tasks, .money].contains($0) && !hiddenTabs.split(separator: ",").contains(Substring($0.rawValue)) }
+        Tab.allCases.filter { ![.today, .assistant, .tasks, .money].contains($0) && !hiddenTabs.split(separator: ",").contains(Substring($0.rawValue)) }
     }
 
     var body: some View {
@@ -56,6 +56,7 @@ struct PhoneMore: View {
         case .bucket: Theme.cyan
         case .documents: Theme.mint
         case .insights: Theme.lime
+        case .calendar: Theme.cyan
         case .github: Theme.lavender
         case .youtube: Theme.peach
         case .linkedin: Theme.cyan

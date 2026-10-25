@@ -56,7 +56,13 @@ final class LinkedInStore: ObservableObject {
         if Date.now.timeIntervalSince1970 - lastSync > 3600 { await refresh() }
     }
 
-    /// Reads LinkedIn's emails from the last 60 days in every connected inbox.
+    /// LinkedIn's job-alert emails (the only LinkedIn emails Orbit shows: the rest isn't accurate enough by email).
+    nonisolated static let jobQuery = "newer_than:60d {from:jobalerts-noreply@linkedin.com from:jobs-noreply@linkedin.com from:jobs-listings@linkedin.com subject:\"job alert\"} from:linkedin.com"
+
+    /// Job alerts, newest first, each with the jobs it listed.
+    var alerts: [Item] { items.filter { $0.kind == "job" }.sorted { $0.date > $1.date } }
+
+    /// Reads LinkedIn's job-alert emails from the last 60 days in every connected inbox.
     func refresh() async {
         guard !loading, enabled, !Snapshot.isActive else { return }
         let accounts = InboxStore.shared.accounts
@@ -68,7 +74,7 @@ final class LinkedInStore: ObservableObject {
             status = "Looking for LinkedIn emails in \(account)…"
             guard let token = try? await GoogleAuth.accessToken(for: account) else { continue }
             var comps = URLComponents(string: "https://gmail.googleapis.com/gmail/v1/users/me/messages")!
-            comps.queryItems = [.init(name: "q", value: "from:linkedin.com newer_than:60d"), .init(name: "maxResults", value: "120")]
+            comps.queryItems = [.init(name: "q", value: Self.jobQuery), .init(name: "maxResults", value: "120")]
             guard let list = try? await gmailJSON(comps.url!, token: token) else { continue }
             let ids = (list["messages"] as? [[String: Any]] ?? []).compactMap { $0["id"] as? String }.filter { !seen.contains($0) }
             for chunk in stride(from: 0, to: ids.count, by: 5).map({ Array(ids[$0..<min($0 + 5, ids.count)]) }) {
@@ -260,7 +266,8 @@ struct LinkedInView: View {
     @ObservedObject private var store = LinkedInStore.shared
     @ObservedObject private var inbox = InboxStore.shared
     @AppStorage("profileCard") private var cardJSON = ""
-    @State private var showDone = false
+    /// The alert email being looked at (nil: every job from every alert).
+    @State private var selected: String?
     @State private var savedJob: String?
 
     var body: some View {
@@ -273,11 +280,8 @@ struct LinkedInView: View {
                 } else {
                     tiles
                     if let s = store.status, store.loading { Label(s, systemImage: "arrow.triangle.2.circlepath").font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary) }
-                    needsYou
-                    views
-                    jobs
-                    section("Your applications", "briefcase.fill", store.of("application").filter { showDone || !$0.done })
-                    section("Updates", "bell.fill", store.items.filter { ($0.kind == "update" || ($0.kind == "invite" && $0.title.lowercased().contains("accepted"))) && (showDone || !$0.done) }.prefix(15).map { $0 })
+                    alertTabs
+                    jobsList
                 }
             }
             .padding(.horizontal, Theme.pagePadding).padding(.top, 10).padding(.bottom, 32)
@@ -290,13 +294,13 @@ struct LinkedInView: View {
         HStack(spacing: 12) {
             if !Platform.isPhone {
                 BrandLogo(brand: .linkedin, size: 34)
-                Text("LinkedIn").font(Theme.display(38))
+                Text("LinkedIn jobs").font(Theme.display(38))
             }
             Spacer()
             if store.loading { ProgressView().controlSize(.small) }
             Button { Task { await store.refresh() } } label: { Image(systemName: "arrow.clockwise") }
-                .buttonStyle(SoftButtonStyle()).disabled(store.loading).help("Check for new LinkedIn emails")
-            Button { Platform.open(URL(string: "https://www.linkedin.com/feed/")!) } label: { Label("Open LinkedIn", systemImage: "arrow.up.right") }
+                .buttonStyle(SoftButtonStyle()).disabled(store.loading).help("Check for new job alert emails")
+            Button { Platform.open(URL(string: "https://www.linkedin.com/jobs/")!) } label: { Label("LinkedIn Jobs", systemImage: "arrow.up.right") }
                 .buttonStyle(SoftButtonStyle())
         }
     }
@@ -304,10 +308,10 @@ struct LinkedInView: View {
     private var empty: some View {
         VStack(alignment: .leading, spacing: 12) {
             BrandLogo(brand: .linkedin, size: 56)
-            Text("LinkedIn, in one place").font(Theme.display(26))
-            Text("Orbit gathers the emails LinkedIn sends you (connection requests, messages, who viewed your profile, job alerts and application updates) into this tab. Connect the Gmail account LinkedIn emails in Settings › Connections.")
+            Text("Your job alerts, in one place").font(Theme.display(26))
+            Text("Orbit reads the job alert emails LinkedIn sends you and lists every job, by the day the email came. Connect the Gmail account LinkedIn emails in Settings › Connections.")
                 .font(Theme.ui(14)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
-            Text("LinkedIn doesn't let apps read your account directly, so turn on email notifications in LinkedIn › Settings › Communications for anything you want to see here.")
+            Text("No alerts yet? On LinkedIn, search for a job and turn on “Set alert”.")
                 .font(Theme.ui(12)).foregroundStyle(Theme.inkMuted).fixedSize(horizontal: false, vertical: true)
         }
         .padding(28).frame(maxWidth: 600, alignment: .leading)
@@ -315,20 +319,21 @@ struct LinkedInView: View {
     }
 
     private var tiles: some View {
+        let alerts = store.alerts
         let week = Date.now.adding(days: -7)
-        let latestViews = store.of("views").first { $0.views > 0 }?.views
+        let companies = Set(alerts.flatMap(\.jobs).map(\.company).filter { !$0.isEmpty })
         return LazyVGrid(columns: [GridItem(.adaptive(minimum: Platform.isPhone ? 150 : 200), spacing: 12)], spacing: 12) {
-            tile("\(store.of("invite").filter { !$0.done && $0.title.lowercased().contains("connect") }.count)", "Invitations", "person.badge.plus", Theme.cyan)
-            tile("\(store.of("message").filter { !$0.done }.count)", "Messages", "bubble.left.and.bubble.right.fill", Theme.lime)
-            tile(latestViews.map { "\($0)" } ?? "\(store.of("views").count)", latestViews == nil ? "Profile view alerts" : "Profile views lately", "eye.fill", Theme.pink)
-            tile("\(store.of("job").filter { $0.date > week }.reduce(0) { $0 + max(1, $1.jobs.count) })", "New jobs this week", "briefcase.fill", Theme.orange)
+            tile("\(alerts.filter { $0.date > week }.reduce(0) { $0 + max(1, $1.jobs.count) })", "New jobs this week", "briefcase.fill", Theme.orange)
+            tile("\(alerts.count)", "Alert emails (60 days)", "envelope.fill", Theme.cyan)
+            tile("\(companies.count)", "Companies hiring", "building.2.fill", Theme.lime)
+            tile(alerts.first.map { $0.date.formatted(.relative(presentation: .named)) } ?? "—", "Latest alert", "clock.fill", Theme.pink)
         }
     }
 
     private func tile(_ value: String, _ label: String, _ symbol: String, _ color: Color) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(value).font(Theme.display(28))
+                Text(value).font(Theme.display(26)).lineLimit(1).minimumScaleFactor(0.6)
                 Text(label).font(Theme.ui(12, weight: .semibold)).opacity(0.8)
             }
             Spacer()
@@ -339,128 +344,87 @@ struct LinkedInView: View {
         .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(color))
     }
 
-    /// Invitations and messages you haven't dealt with.
-    private var needsYou: some View {
-        // Accepted invitations are good news, not something to do: they go under Updates.
-        let accepted: (LinkedInStore.Item) -> Bool = { $0.kind == "invite" && $0.title.lowercased().contains("accepted") }
-        let list = store.items.filter { ($0.kind == "invite" || $0.kind == "message") && !accepted($0) && (showDone || !$0.done) }
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Needs you").font(Theme.display(22))
-                Spacer()
-                Toggle("Show done", isOn: $showDone).toggleStyle(.switch).controlSize(.small).font(Theme.ui(12))
+    /// One tab per alert email: what it was about and the day it came.
+    private var alertTabs: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 8) {
+                chip(title: "All jobs", date: nil, count: store.alerts.reduce(0) { $0 + $1.jobs.count }, id: nil)
+                ForEach(store.alerts) { a in chip(title: a.title, date: a.date, count: a.jobs.count, id: a.id) }
             }
-            if list.isEmpty {
-                Text("No new invitations or messages.").font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
-            }
-            ForEach(list.prefix(12)) { row($0) }
         }
+        .scrollIndicators(.never)
     }
 
-    private func row(_ item: LinkedInStore.Item) -> some View {
-        let person = item.people.first
-        return HStack(alignment: .top, spacing: 12) {
-            Text(initials(person?.name ?? item.title)).font(Theme.ui(14, weight: .bold)).foregroundStyle(.white)
-                .frame(width: 42, height: 42).background(Circle().fill(Color(hex: 0x0A66C2)))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(item.title).font(Theme.ui(14, weight: .semibold)).lineLimit(2)
-                if let h = person?.headline, !h.isEmpty { Text(h).font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary).lineLimit(1) }
-                if !item.detail.isEmpty { Text(item.detail).font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary).lineLimit(3) }
-                Text(item.date.formatted(.relative(presentation: .named))).font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
+    private func chip(title: String, date: Date?, count: Int, id: String?) -> some View {
+        let on = selected == id
+        return Button { withAnimation(.snappy) { selected = id } } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(Theme.ui(13, weight: .semibold)).lineLimit(1)
+                Text([date.map { $0.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)) }, count > 0 ? "\(count) job\(count == 1 ? "" : "s")" : nil]
+                    .compactMap { $0 }.joined(separator: " · "))
+                    .font(Theme.ui(11)).opacity(0.7)
             }
-            Spacer(minLength: 6)
-            VStack(alignment: .trailing, spacing: 6) {
-                Button(item.kind == "invite" ? "Respond" : item.kind == "message" ? "Reply" : "Open") { openItem(item) }
-                    .buttonStyle(PrimaryButtonStyle()).fixedSize()
-                Button(item.done ? "Undo" : "Done") { store.setDone(item, !item.done) }
-                    .buttonStyle(.plain).font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
-            }
+            .frame(maxWidth: 240, alignment: .leading)
+            .padding(.horizontal, 14).padding(.vertical, 9)
+            .foregroundStyle(on ? Theme.canvas : Theme.ink)
+            .background(Capsule().fill(on ? Theme.inverse : Theme.card))
         }
-        .padding(14)
-        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.card))
-        .opacity(item.done ? 0.55 : 1)
-    }
-
-    private var views: some View {
-        let list = store.of("views")
-        return Group {
-            if !list.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Who viewed your profile").font(Theme.display(22))
-                    ForEach(list.prefix(6)) { item in
-                        Button { openItem(item, fallback: "https://www.linkedin.com/me/profile-views/") } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: "eye.fill").foregroundStyle(Theme.stickerInk).frame(width: 36, height: 36).background(Circle().fill(Theme.pink))
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(item.title).font(Theme.ui(14, weight: .semibold)).lineLimit(1)
-                                    Text([item.detail, item.people.map(\.name).joined(separator: ", ")].filter { !$0.isEmpty }.joined(separator: " · "))
-                                        .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary).lineLimit(2)
-                                }
-                                Spacer()
-                                Text(item.date.formatted(.dateTime.day().month(.abbreviated))).font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
-                            }
-                            .padding(12).background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
-    }
-
-    private var jobs: some View {
-        let alerts = store.of("job").filter { showDone || !$0.done }
-        let all = alerts.flatMap { a in a.jobs.map { (a, $0) } }
-        return Group {
-            if !alerts.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Job alerts").font(Theme.display(22))
-                    if let s = savedJob { Label(s, systemImage: "checkmark.circle.fill").font(Theme.ui(12)).foregroundStyle(Theme.good) }
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 12, alignment: .top)], spacing: 12) {
-                        ForEach(Array(all.prefix(24).enumerated()), id: \.offset) { _, pair in
-                            let (alert, job) = pair
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack(alignment: .top) {
-                                    Text(initials(job.company)).font(Theme.ui(12, weight: .bold)).foregroundStyle(Theme.stickerInk)
-                                        .frame(width: 34, height: 34).background(RoundedRectangle(cornerRadius: 9).fill(Theme.orange))
-                                    Spacer()
-                                    Text(alert.date.formatted(.relative(presentation: .named))).font(Theme.ui(10)).foregroundStyle(Theme.inkMuted)
-                                }
-                                Text(job.title).font(Theme.ui(14, weight: .semibold)).lineLimit(2)
-                                Text([job.company, job.location].filter { !$0.isEmpty }.joined(separator: " · ")).font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary).lineLimit(1)
-                                HStack {
-                                    Button("View job") { Platform.open(URL(string: job.url.isEmpty ? (alert.url.isEmpty ? "https://www.linkedin.com/jobs/" : alert.url) : job.url)!) }
-                                        .buttonStyle(SoftButtonStyle())
-                                    Button { saveJob(job) } label: { Label("Save as task", systemImage: "plus") }
-                                        .buttonStyle(.plain).font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
-                                }
-                            }
-                            .padding(14).frame(maxWidth: .infinity, alignment: .leading)
-                            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.card))
-                        }
-                    }
-                    // Alerts whose jobs couldn't be listed (no API key): show the alert itself.
-                    ForEach(alerts.filter(\.jobs.isEmpty).prefix(5)) { row($0) }
-                }
-            }
-        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
-    private func section(_ title: String, _ symbol: String, _ list: [LinkedInStore.Item]) -> some View {
-        if !list.isEmpty {
+    private var jobsList: some View {
+        let alerts = selected.map { id in store.alerts.filter { $0.id == id } } ?? store.alerts
+        if store.alerts.isEmpty {
+            Text(store.loading ? "Looking for job alerts…" : "No LinkedIn job alerts in the last 60 days.")
+                .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
+        }
+        if let s = savedJob { Label(s, systemImage: "checkmark.circle.fill").font(Theme.ui(12)).foregroundStyle(Theme.good) }
+        ForEach(alerts) { alert in
             VStack(alignment: .leading, spacing: 10) {
-                Label(title, systemImage: symbol).font(Theme.display(22))
-                ForEach(list) { row($0) }
+                HStack(alignment: .firstTextBaseline) {
+                    Text(alert.title).font(Theme.display(20)).lineLimit(2)
+                    Spacer()
+                    Label(alert.date.formatted(.dateTime.weekday(.wide).day().month(.wide).hour().minute()), systemImage: "envelope")
+                        .font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
+                }
+                if alert.jobs.isEmpty {
+                    Button { open(alert.url, fallback: "https://www.linkedin.com/jobs/") } label: { Label("Open this alert on LinkedIn", systemImage: "arrow.up.right") }
+                        .buttonStyle(SoftButtonStyle())
+                } else {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 12, alignment: .top)], spacing: 12) {
+                        ForEach(Array(alert.jobs.enumerated()), id: \.offset) { _, job in jobCard(job, alert: alert) }
+                    }
+                }
             }
         }
     }
 
-    private func openItem(_ item: LinkedInStore.Item, fallback: String = "https://www.linkedin.com/notifications/") {
-        let fallbacks = ["invite": "https://www.linkedin.com/mynetwork/invitation-manager/", "message": "https://www.linkedin.com/messaging/",
-                         "views": "https://www.linkedin.com/me/profile-views/", "job": "https://www.linkedin.com/jobs/",
-                         "application": "https://www.linkedin.com/my-items/saved-jobs/?cardType=APPLIED"]
-        Platform.open(URL(string: item.url.isEmpty ? (fallbacks[item.kind] ?? fallback) : item.url)!)
+    private func jobCard(_ job: LinkedInStore.Job, alert: LinkedInStore.Item) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 10) {
+                Text(initials(job.company.isEmpty ? job.title : job.company)).font(Theme.ui(12, weight: .bold)).foregroundStyle(.white)
+                    .frame(width: 38, height: 38).background(RoundedRectangle(cornerRadius: 10).fill(Color(hex: 0x0A66C2)))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(job.title).font(Theme.ui(14, weight: .semibold)).lineLimit(2)
+                    if !job.company.isEmpty { Text(job.company).font(Theme.ui(12, weight: .medium)).foregroundStyle(Theme.inkSecondary).lineLimit(1) }
+                    if !job.location.isEmpty { Label(job.location, systemImage: "mappin").font(Theme.ui(11)).foregroundStyle(Theme.inkMuted).lineLimit(1) }
+                }
+            }
+            HStack {
+                Button("View job") { open(job.url, fallback: alert.url.isEmpty ? "https://www.linkedin.com/jobs/" : alert.url) }
+                    .buttonStyle(SoftButtonStyle())
+                Button { saveJob(job) } label: { Label("Save as task", systemImage: "plus") }
+                    .buttonStyle(.plain).font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
+            }
+            .padding(.top, 2)
+        }
+        .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.card))
+    }
+
+    private func open(_ url: String, fallback: String) {
+        Platform.open(URL(string: url.isEmpty ? fallback : url) ?? URL(string: fallback)!)
     }
 
     private func saveJob(_ job: LinkedInStore.Job) {

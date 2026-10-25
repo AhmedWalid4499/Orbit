@@ -49,6 +49,25 @@ final class YouTubeStore: ObservableObject {
         history = d.dictionary(forKey: "youtube.history") as? [String: Int] ?? [:]
     }
 
+    /// The channel in a few lines for the assistant ("how is my channel doing?"): totals, growth and recent videos.
+    func summary() -> String {
+        guard isConnected, let c = channel else { return "" }
+        var lines = ["YouTube channel \(c.title)\(c.handle.isEmpty ? "" : " (\(c.handle))"): \(c.hiddenSubscribers ? "subscriber count hidden" : "\(c.subscribers) subscribers"), \(c.views) total views, \(c.videos) videos."]
+        let days = history.keys.sorted()
+        if let last = days.last, let now = history[last] {
+            for (label, back) in [("7 days", 7), ("30 days", 30)] {
+                let cutoff = DayKey.key(Date.now.adding(days: -back))
+                if let past = days.last(where: { $0 <= cutoff }).flatMap({ history[$0] }) {
+                    lines.append("Subscribers over the last \(label): \(now - past >= 0 ? "+" : "")\(now - past).")
+                }
+            }
+        }
+        for v in videos.prefix(8) {
+            lines.append("- “\(v.title)” (\(v.published.formatted(date: .abbreviated, time: .omitted))): \(v.views) views, \(v.likes) likes, \(v.comments) comments")
+        }
+        return lines.joined(separator: "\n")
+    }
+
     func connect() async {
         error = nil
         do {

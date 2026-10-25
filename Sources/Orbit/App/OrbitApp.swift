@@ -126,6 +126,7 @@ struct OrbitApp: App {
         CapturePanel.shared.container = container
         OrbitStore.container = container
         BookLibrary.migrateLibrariesIfNeeded(context: container.mainContext)
+        BookLibrary.cleanUpKindleIfNeeded(context: container.mainContext)
     }
 
     var body: some Scene {

@@ -95,27 +95,25 @@ struct TodayView: View {
             header
             statRow
             HStack(alignment: .top, spacing: 14) {
+                // The brief gets the room; the agenda and plans only take what they need.
                 VStack(spacing: 14) {
+                    BriefCard(fills: true)
                     DaySummaryCard()
                     CheckInCard()
-                    BriefCard()
-                    agendaCard.frame(minHeight: 150, maxHeight: .infinity)
                 }
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 VStack(spacing: 14) {
                     tasksCard
+                    agendaCard
                     habitsStrip
-                    lookingForwardCard.frame(maxHeight: .infinity)
+                    lookingForwardCard
+                    Spacer(minLength: 0)
                 }
                 .frame(maxWidth: .infinity)
                 VStack(spacing: 14) {
                     inboxCard.frame(maxHeight: .infinity)
                     readingCard
-                    HStack(spacing: 14) {
-                        moneyMini
-                        journalMini
-                    }
-                    .fixedSize(horizontal: false, vertical: true)
+                    journalMini.fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(width: 390)
             }
@@ -230,6 +228,7 @@ struct TodayView: View {
             StatTile(value: "\(habits.filter { $0.isDone(on: today) }.count)/\(habits.count)", label: "Habits today",
                      symbol: "flame.fill", color: Theme.lime) { state.tab = .habits }
             StatTile(value: Fmt.money(spentThisMonth), label: "Spent this month", symbol: "creditcard.fill", color: Theme.cyan) { state.tab = .money }
+            StatTile(value: Fmt.money(max(monthlyBudget - spentThisMonth, 0)), label: "Left of \(Fmt.money(monthlyBudget))", symbol: "banknote.fill", color: Theme.lime) { state.tab = .money }
             StatTile(value: inbox.isConnected ? "\(inbox.digest?.needsReply.count ?? 0)" : "—", label: "Emails to answer",
                      symbol: "envelope.fill", color: Theme.pink) {}
             StatTile(value: "\(readThisYear)/\(readingGoal)", label: "Books this year", symbol: "books.vertical.fill", color: Theme.purple) { state.tab = .reading }
@@ -248,19 +247,20 @@ struct TodayView: View {
         Card(padding: 16) {
             VStack(alignment: .leading, spacing: 10) {
                 SectionHeader(title: "Agenda", trailing: "Calendar") { state.tab = .calendar }
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 8) {
-                        if todayEntries.isEmpty {
-                            EmptyHint(symbol: "sun.max", text: apple.calendarEnabled ? "Nothing scheduled today." : "Nothing scheduled. Connect Apple Calendar in Settings.")
-                        }
-                        ForEach(todayEntries) { AgendaRow(entry: $0) }
-                        if !tomorrowEntries.isEmpty {
-                            Text("Tomorrow").font(Theme.ui(11, weight: .semibold)).foregroundStyle(Theme.inkMuted).padding(.top, 6)
-                            ForEach(tomorrowEntries.prefix(4)) { AgendaRow(entry: $0, dim: true) }
-                        }
+                VStack(alignment: .leading, spacing: 8) {
+                    if todayEntries.isEmpty {
+                        Text(apple.calendarEnabled ? "Nothing scheduled today." : "Nothing scheduled. Connect Apple Calendar in Settings.")
+                            .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
+                    }
+                    ForEach(todayEntries.prefix(5)) { AgendaRow(entry: $0) }
+                    if todayEntries.count > 5 {
+                        Text("+\(todayEntries.count - 5) more today").font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
+                    }
+                    if !tomorrowEntries.isEmpty {
+                        Text("Tomorrow").font(Theme.ui(11, weight: .semibold)).foregroundStyle(Theme.inkMuted).padding(.top, 4)
+                        ForEach(tomorrowEntries.prefix(2)) { AgendaRow(entry: $0, dim: true) }
                     }
                 }
-                .scrollIndicators(.never)
             }
         }
     }
@@ -311,11 +311,10 @@ struct TodayView: View {
             VStack(alignment: .leading, spacing: 10) {
                 SectionHeader(title: "Looking forward to", trailing: "Bucket list") { state.tab = .bucket }
                 if dreams.isEmpty {
-                    EmptyHint(symbol: "mountain.2", text: "Add things you want to do in life to your bucket list.")
+                    Text("Add things you want to do in life to your bucket list.").font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
                 }
-                ScrollView {
-                    VStack(spacing: 8) {
-                        ForEach(upcoming.prefix(4)) { item in
+                VStack(spacing: 8) {
+                        ForEach(upcoming.prefix(3)) { item in
                             let days = Calendar.current.dateComponents([.day], from: today, to: item.targetDate!.startOfDay).day ?? 0
                             HStack(spacing: 12) {
                                 Text(days == 0 ? "🎉" : "\(days)d").font(Theme.display(17)).frame(width: 46)
@@ -339,9 +338,7 @@ struct TodayView: View {
                                 Spacer()
                             }
                         }
-                    }
                 }
-                .scrollIndicators(.never)
             }
         }
     }
@@ -454,29 +451,6 @@ struct TodayView: View {
             .padding(12)
             .background(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous).fill(Theme.card))
             .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var moneyMini: some View {
-        let ratio = monthlyBudget > 0 ? min(spentThisMonth / monthlyBudget, 1) : 0
-        return Button { state.tab = .money } label: {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Left to spend").font(Theme.ui(11, weight: .semibold))
-                Text(Fmt.money(max(monthlyBudget - spentThisMonth, 0))).font(Theme.display(22)).lineLimit(1).minimumScaleFactor(0.6)
-                GeometryReader { g in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Color.black.opacity(0.12))
-                        Capsule().fill(Color(hex: 0x111111)).frame(width: g.size.width * ratio)
-                    }
-                }
-                .frame(height: 6)
-                Text("of \(Fmt.money(monthlyBudget))").font(Theme.ui(10)).opacity(0.7)
-            }
-            .foregroundStyle(Theme.stickerInk)
-            .padding(14)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous).fill(Theme.lime))
         }
         .buttonStyle(.plain)
     }
@@ -797,6 +771,8 @@ struct ReminderRow: View {
 // MARK: - Claude morning brief
 
 struct BriefCard: View {
+    /// On the Mac's Today the brief is the main card: larger type, nothing cut short.
+    var fills = false
     @Environment(\.modelContext) private var context
     @EnvironmentObject private var apple: AppleSync
     @ObservedObject private var ai = AIAssistant.shared
@@ -871,22 +847,22 @@ struct BriefCard: View {
         }
         .foregroundStyle(ink)
         .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(bg))
         .animation(.easeOut(duration: 0.2), value: ai.brief)
     }
 
     private func content(_ b: MorningBrief) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(b.headline).font(Theme.display(21)).lineLimit(2).fixedSize(horizontal: false, vertical: true)
-            Text(b.summary).font(Theme.ui(13)).lineSpacing(2).opacity(0.85).lineLimit(3).help(b.summary)
+            Text(b.headline).font(Theme.display(fills ? 24 : 21)).fixedSize(horizontal: false, vertical: true)
+            Text(b.summary).font(Theme.ui(fills ? 14 : 13)).lineSpacing(3).opacity(0.85).fixedSize(horizontal: false, vertical: true)
             if !b.focus.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(Array(b.focus.prefix(3).enumerated()), id: \.offset) { i, item in
                         HStack(alignment: .firstTextBaseline, spacing: 10) {
                             Text("\(i + 1)").font(Theme.display(14)).foregroundStyle(Theme.stickerInk)
                                 .frame(width: 22, height: 22).background(Circle().fill([Theme.lime, Theme.pink, Theme.cyan][i % 3]))
-                            Text(item).font(Theme.ui(13, weight: .medium)).lineLimit(2)
+                            Text(item).font(Theme.ui(13, weight: .medium)).fixedSize(horizontal: false, vertical: true)
                         }
                     }
                 }
@@ -894,7 +870,7 @@ struct BriefCard: View {
             if !b.heads_up.isEmpty {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Image(systemName: "exclamationmark.circle.fill").foregroundStyle(Theme.orange)
-                    Text(b.heads_up).font(Theme.ui(13)).opacity(0.85)
+                    Text(b.heads_up).font(Theme.ui(13)).opacity(0.85).fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)

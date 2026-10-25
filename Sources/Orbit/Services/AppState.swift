@@ -11,8 +11,11 @@ enum OrbitSchema {
 }
 
 enum Tab: String, CaseIterable, Identifiable {
-    case today, insights, calendar, tasks, habits, bucket, money, notes, reading, documents, github, youtube, linkedin
+    case today, assistant, insights, calendar, tasks, habits, bucket, money, notes, reading, documents, github, youtube, linkedin
     var id: String { rawValue }
+
+    /// Documents and YouTube were retired as tabs (YouTube stays connected for the assistant); old links to them still open.
+    static var allCases: [Tab] { [.today, .assistant, .insights, .calendar, .tasks, .habits, .bucket, .money, .notes, .reading, .github, .linkedin] }
 
     var title: String {
         switch self {
@@ -34,6 +37,8 @@ enum Tab: String, CaseIterable, Identifiable {
             return "Documents"
         case .insights:
             return "Insights"
+        case .assistant:
+            return AssistantName.current
         default:
             return rawValue.capitalized
         }
@@ -42,6 +47,7 @@ enum Tab: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .today: "sun.max.fill"
+        case .assistant: "sparkles"
         case .insights: "chart.xyaxis.line"
         case .calendar: "calendar"
         case .tasks: "checklist"
@@ -58,7 +64,7 @@ enum Tab: String, CaseIterable, Identifiable {
     }
 
     /// Nav groups: day, plan, life.
-    static let groups: [[Tab]] = [[.today, .insights], [.calendar, .tasks, .habits, .bucket], [.money, .notes, .reading, .documents, .github, .youtube, .linkedin]]
+    static let groups: [[Tab]] = [[.today, .assistant, .insights], [.calendar, .tasks, .habits, .bucket], [.money, .notes, .reading, .github, .linkedin]]
 
     /// Tabs you turned off in Settings › General › Tabs (synced). Today is always there.
     static var hidden: Set<Tab> {
@@ -71,6 +77,7 @@ enum Tab: String, CaseIterable, Identifiable {
     var blurb: String {
         switch self {
         case .today: "Your day at a glance"
+        case .assistant: "Chat with your AI and see past chats"
         case .insights: "Charts of your week and month"
         case .calendar: "Apple and Google calendars"
         case .tasks: "To-dos and reminders"
@@ -82,7 +89,7 @@ enum Tab: String, CaseIterable, Identifiable {
         case .documents: "Passports, IDs and warranties"
         case .github: "Your GitHub repos and pull requests"
         case .youtube: "Your channel's subscribers, views and videos"
-        case .linkedin: "Invitations, messages, profile views and job alerts"
+        case .linkedin: "Your LinkedIn job alerts"
         }
     }
 
@@ -115,6 +122,8 @@ final class AppState: ObservableObject {
 
     func openAssistant(with message: String? = nil) {
         assistantSeed = message
+        // On the Mac's AI tab the chat is already on screen.
+        if tab == .assistant && !Platform.isPhone { return }
         assistantOpen = true
     }
 }

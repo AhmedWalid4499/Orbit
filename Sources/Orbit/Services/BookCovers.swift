@@ -13,8 +13,8 @@ enum BookCovers {
     private static var broken: Set<String> = []
     /// Books whose found cover was re-checked once with the better search (so old wrong or blurry ones get replaced).
     private static var rechecked: Set<String> {
-        get { Set(UserDefaults.standard.stringArray(forKey: "covers.rechecked.v2") ?? []) }
-        set { UserDefaults.standard.set(Array(newValue), forKey: "covers.rechecked.v2") }
+        get { Set(UserDefaults.standard.stringArray(forKey: "covers.rechecked.v3") ?? []) }
+        set { UserDefaults.standard.set(Array(newValue), forKey: "covers.rechecked.v3") }
     }
 
     static var folder: URL {
@@ -39,12 +39,14 @@ enum BookCovers {
         guard !Snapshot.isActive, !looking.contains(key) else { return current }
         looking.insert(key)
         defer { looking.remove(key); rechecked.insert(key) }
-        for candidate in await find(title: book.title, author: book.author, isbn: book.isbn).prefix(4) {
-            guard let img = await image(at: candidate) else { continue }
+        for candidate in await candidates(title: book.title, author: book.author, isbn: book.isbn).prefix(4) {
+            guard let img = await image(at: candidate.url) else { continue }
             // A cover that came with the book (Kindle, Goodreads…) is only swapped for a clearly sharper one; an older
             // search result is replaced by the best match, since it may have been the wrong book.
             if let current, !searched, (img.cg?.height ?? 0) < max(400, (current.cg?.height ?? 0) + 100) { return current }
-            book.coverURL = candidate
+            book.coverURL = candidate.url
+            // Books that came without an author (Kindle keeps them unreadable) get the one the match lists.
+            if book.author.isEmpty, candidate.score >= 2.5, !candidate.author.isEmpty { book.author = candidate.author }
             return img
         }
         return current
@@ -89,17 +91,31 @@ enum BookCovers {
         return u
     }
 
-    private static func isSearchResult(_ url: String) -> Bool {
+    nonisolated static func isSearchResultURL(_ url: String) -> Bool { !url.isEmpty && isSearchResult(url) }
+
+    nonisolated private static func isSearchResult(_ url: String) -> Bool {
         url.isEmpty || url.contains("books.google") || url.contains("covers.openlibrary.org") || url.contains("mzstatic.com")
     }
 
     // MARK: Finding
 
-    private struct Candidate { let url: String; let score: Double }
+    private struct Candidate { let url: String; let score: Double; var author = "" }
 
     /// Cover links to try, best match first.
     static func find(title: String, author: String, isbn: String) async -> [String] {
+        await candidates(title: title, author: author, isbn: isbn).map(\.url)
+    }
+
+    /// The title without subtitles, series and store blurbs ("Katabasis: A Fantastical… from Author of…" → "Katabasis").
+    private static func shortTitle(_ title: String) -> String {
+        let main = title.split(whereSeparator: { ":(".contains($0) }).first.map(String.init) ?? title
+        let cut = main.components(separatedBy: " from ").first ?? main
+        return cut.trimmingCharacters(in: .whitespaces).isEmpty ? title : cut.trimmingCharacters(in: .whitespaces)
+    }
+
+    private static func candidates(title: String, author: String, isbn: String) async -> [Candidate] {
         let wantTitle = norm(title), wantAuthor = norm(author)
+        let title = shortTitle(title)
         var found: [Candidate] = []
 
         func score(_ t: String, _ a: String, bonus: Double = 0) -> Double? {
@@ -110,7 +126,8 @@ enum BookCovers {
             let titleScore: Double = gotTitle == wantTitle ? 3
                 : (gotTitle.hasPrefix(wantTitle) || wantTitle.hasPrefix(gotTitle)) && min(gotTitle.count, wantTitle.count) >= 4 ? 2
                 : overlap(gotTitle, wantTitle) >= 0.7 ? 1 : 0
-            guard titleScore > 0 else { return nil }
+            // Without an author to check, only a clear title match counts (so "We" doesn't pass for "Before We Say Goodbye").
+            guard titleScore >= (wantAuthor.isEmpty ? 2 : 1) else { return nil }
             let authorScore: Double = wantAuthor.isEmpty ? 0.5 : (overlap(gotAuthor, wantAuthor) >= 0.5 || gotAuthor.contains(wantAuthor.split(separator: " ").last.map(String.init) ?? "~") ? 2 : -2)
             return titleScore + authorScore + bonus
         }
@@ -123,7 +140,7 @@ enum BookCovers {
             for r in results {
                 guard let art = r["artworkUrl100"] as? String,
                       let s = score(r["trackName"] as? String ?? "", r["artistName"] as? String ?? "", bonus: 0.6) else { continue }
-                found.append(Candidate(url: upgrade(art), score: s))
+                found.append(Candidate(url: upgrade(art), score: s, author: r["artistName"] as? String ?? ""))
             }
         }
 
@@ -140,7 +157,8 @@ enum BookCovers {
                 let authors = (info["authors"] as? [String] ?? []).joined(separator: " ")
                 let popular = min(0.5, Double(info["ratingsCount"] as? Int ?? 0) / 200)
                 guard let s = score(info["title"] as? String ?? "", authors, bonus: popular + (isbn.isEmpty ? 0 : 1)) else { continue }
-                found.append(Candidate(url: upgrade(t.replacingOccurrences(of: "&edge=curl", with: "")), score: s))
+                found.append(Candidate(url: upgrade(t.replacingOccurrences(of: "&edge=curl", with: "")), score: s,
+                                       author: (info["authors"] as? [String] ?? []).joined(separator: ", ")))
             }
         }
 
@@ -148,12 +166,14 @@ enum BookCovers {
         if !isbn.isEmpty { found.append(Candidate(url: "https://covers.openlibrary.org/b/isbn/\(isbn)-L.jpg?default=false", score: 3.5)) }
         if let hits = try? await OpenLibrary.search("\(title) \(author)") {
             for h in hits.prefix(5) where !h.coverURL.isEmpty {
-                if let s = score(h.title, h.author, bonus: -0.2) { found.append(Candidate(url: upgrade(h.coverURL), score: s)) }
+                if let s = score(h.title, h.author, bonus: -0.2) { found.append(Candidate(url: upgrade(h.coverURL), score: s, author: h.author)) }
             }
         }
 
         var seen = Set<String>()
-        return found.sorted { $0.score > $1.score }.map(\.url).filter { seen.insert($0).inserted }
+        // Ties keep the order the stores ranked them in (their best-known edition first).
+        return found.enumerated().sorted { $0.element.score != $1.element.score ? $0.element.score > $1.element.score : $0.offset < $1.offset }
+            .map(\.element).filter { seen.insert($0.url).inserted }
     }
 
     private static func norm(_ s: String) -> String {
@@ -168,6 +188,6 @@ enum BookCovers {
     private static func overlap(_ a: String, _ b: String) -> Double {
         let x = Set(a.split(separator: " ")), y = Set(b.split(separator: " "))
         guard !x.isEmpty, !y.isEmpty else { return 0 }
-        return Double(x.intersection(y).count) / Double(min(x.count, y.count))
+        return Double(x.intersection(y).count) / Double(max(x.count, y.count))
     }
 }

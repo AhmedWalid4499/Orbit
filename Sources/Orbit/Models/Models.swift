@@ -336,6 +336,17 @@ final class Book {
     /// Lowercased "title|author" used to match books across sources.
     var matchKey: String { Book.matchKey(title: title, author: author) }
 
+    /// An author name as stored, or "" when it's unreadable. Kindle for Mac keeps authors encrypted, which used to show
+    /// up as scrambled symbols.
+    static func cleanAuthor(_ raw: String) -> String {
+        let s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !s.isEmpty else { return "" }
+        let scalars = s.unicodeScalars
+        if scalars.contains(where: { $0 == "\u{FFFD}" || ($0.properties.generalCategory == .control) || $0.properties.generalCategory == .privateUse }) { return "" }
+        let readable = scalars.filter { $0.properties.isAlphabetic || " .,'’-&()".unicodeScalars.contains($0) }.count
+        return Double(readable) / Double(scalars.count) < 0.85 ? "" : s
+    }
+
     static func matchKey(title: String, author: String) -> String {
         let t = title.lowercased().components(separatedBy: CharacterSet(charactersIn: ":(")).first ?? ""
         let a = author.lowercased().split(separator: " ").last.map(String.init) ?? ""

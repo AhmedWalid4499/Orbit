@@ -4,6 +4,8 @@ import MapKit
 
 /// Slide-over chat with Claude that can create things in Orbit. Opens from the ✦ button or ⌘J.
 struct AssistantPanel: View {
+    /// Shown as its own tab (the AI tab) instead of sliding over the window.
+    var embedded = false
     @Environment(\.modelContext) private var context
     @EnvironmentObject private var apple: AppleSync
     @EnvironmentObject private var state: AppState
@@ -58,11 +60,7 @@ struct AssistantPanel: View {
                 composer
             }
         }
-        .sheetFrame(width: 440)
-        .frame(maxHeight: .infinity)
-        .background(Theme.canvas)
-        .overlay(alignment: .leading) { Rectangle().fill(Theme.line).frame(width: 1) }
-        .shadow(color: .black.opacity(0.12), radius: 24, x: -8)
+        .modifier(PanelChrome(embedded: embedded))
         .onAppear { focused = true; sendSeed() }
         .onChange(of: state.assistantSeed) { sendSeed() }
         .onChange(of: store.busy) { _, busy in if !busy { replyFinished() } }
@@ -99,7 +97,7 @@ struct AssistantPanel: View {
     private func replyFinished() {
         guard speaks, store.error == nil, let last = store.items.last(where: { $0.role == .assistant }) else { voiceTurn = false; return }
         speaker.speak(last.text) {
-            guard voiceTurn, state.assistantOpen else { return }
+            guard voiceTurn, state.assistantOpen || embedded else { return }
             Task { await dictation.start { heard in sendVoice(heard) } }
         }
     }
@@ -127,10 +125,13 @@ struct AssistantPanel: View {
             } label: { Image(systemName: speaks ? "speaker.wave.2.fill" : "speaker.slash") }
                 .buttonStyle(.plain).foregroundStyle(speaks ? Theme.ink : Theme.inkMuted)
                 .help(speaks ? "Reading replies aloud. Click to turn off." : "Read replies aloud")
+            if !embedded || Platform.isPhone { PastChatsMenu() }
             Button { store.newChat() } label: { Image(systemName: "square.and.pencil") }
                 .buttonStyle(.plain).help("New chat").disabled(store.busy)
-            Button { withAnimation(.spring(response: 0.35)) { state.assistantOpen = false } } label: { Image(systemName: "xmark") }
-                .buttonStyle(.plain).help("Close (Esc)").keyboardShortcut(.cancelAction)
+            if !embedded {
+                Button { withAnimation(.spring(response: 0.35)) { state.assistantOpen = false } } label: { Image(systemName: "xmark") }
+                    .buttonStyle(.plain).help("Close (Esc)").keyboardShortcut(.cancelAction)
+            }
         }
         .font(.system(size: 14, weight: .semibold))
         .padding(16)
@@ -359,22 +360,125 @@ struct Thinking: View {
 }
 
 /// The assistant's face: a soft, slowly turning gradient orb with a sparkle.
+/// The slide-over look (fixed width, shadow) when the chat isn't its own tab.
+private struct PanelChrome: ViewModifier {
+    let embedded: Bool
+    func body(content: Content) -> some View {
+        if embedded {
+            content.frame(maxWidth: .infinity, maxHeight: .infinity).background(Theme.canvas)
+        } else {
+            content
+                .sheetFrame(width: 440)
+                .frame(maxHeight: .infinity)
+                .background(Theme.canvas)
+                .overlay(alignment: .leading) { Rectangle().fill(Theme.line).frame(width: 1) }
+                .shadow(color: .black.opacity(0.12), radius: 24, x: -8)
+        }
+    }
+}
+
+/// Past conversations, to pick up where you left off.
+struct PastChatsMenu: View {
+    @ObservedObject private var store = AssistantStore.shared
+
+    var body: some View {
+        Menu {
+            if store.chats.isEmpty { Text("No past chats yet") }
+            ForEach(store.chats.prefix(25)) { c in
+                Button { store.open(c.id) } label: {
+                    if c.id == store.currentID { Label(c.title, systemImage: "checkmark") } else { Text(c.title) }
+                }
+            }
+        } label: { Image(systemName: "clock.arrow.circlepath") }
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
+        .fixedSize()
+        .help("Past chats")
+        .disabled(store.busy)
+    }
+}
+
+/// The AI tab: your past chats on the side and the conversation in the middle.
+struct AssistantTabView: View {
+    @ObservedObject private var store = AssistantStore.shared
+    @State private var hovered: UUID?
+
+    var body: some View {
+        if Platform.isPhone {
+            AssistantPanel(embedded: true)
+        } else {
+            HStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Button { store.newChat() } label: {
+                        Label("New chat", systemImage: "square.and.pencil").frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(SoftButtonStyle()).disabled(store.busy)
+                    Text("Past chats").font(Theme.ui(11, weight: .bold)).foregroundStyle(Theme.inkMuted).padding(.top, 6)
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 4) {
+                            if store.chats.isEmpty {
+                                Text("Your conversations will show up here.").font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
+                            }
+                            ForEach(store.chats) { c in chatRow(c) }
+                        }
+                    }
+                    .scrollIndicators(.never)
+                }
+                .padding(16)
+                .frame(width: 270)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .background(Theme.card.opacity(0.5))
+                Rectangle().fill(Theme.line).frame(width: 1)
+                AssistantPanel(embedded: true).frame(maxWidth: 900)
+                    .frame(maxWidth: .infinity)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    private func chatRow(_ c: AssistantStore.ChatInfo) -> some View {
+        let current = c.id == store.currentID
+        return Button { store.open(c.id) } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(c.title).font(Theme.ui(13, weight: current ? .semibold : .regular)).lineLimit(2).multilineTextAlignment(.leading)
+                Text(c.updated.formatted(.relative(presentation: .named))).font(Theme.ui(10)).foregroundStyle(Theme.inkMuted)
+            }
+            .padding(.horizontal, 10).padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 10).fill(current ? Theme.lime.opacity(0.35) : hovered == c.id ? Theme.cardHover : .clear))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 ? c.id : nil }
+        .contextMenu { Button("Delete chat", role: .destructive) { store.delete(c.id) } }
+        .disabled(store.busy)
+    }
+}
+
 struct AssistantAvatar: View {
     var size: CGFloat = 32
     var busy = false
-    @State private var turn = false
 
+    private static let colors: [Color] = [Color(hex: 0xC6F432), Color(hex: 0x3DDC97), Color(hex: 0x22D3EE), Color(hex: 0x8B7CF6), Color(hex: 0xF472B6), Color(hex: 0xC6F432)]
+
+    /// One crisp orb everywhere (Mac and iPhone): a colour wheel with a soft highlight and a white spark.
+    /// It only turns while the assistant is working, so it never wobbles inside toolbars.
     var body: some View {
-        ZStack {
-            Circle().fill(AngularGradient(colors: [Theme.lime, Theme.mint, Theme.cyan, Theme.purple, Theme.pink, Theme.lime], center: .center))
-                .rotationEffect(.degrees(turn ? 360 : 0))
-                .blur(radius: size * 0.04)
-            Circle().fill(.white.opacity(0.25)).padding(size * 0.18)
-            Image(systemName: "sparkles").font(.system(size: size * 0.42, weight: .bold)).foregroundStyle(Theme.stickerInk)
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: !busy)) { t in
+            let angle = busy ? (t.date.timeIntervalSinceReferenceDate * 120).truncatingRemainder(dividingBy: 360) : 30
+            ZStack {
+                Circle().fill(AngularGradient(colors: Self.colors, center: .center, angle: .degrees(angle)))
+                Circle().fill(RadialGradient(colors: [.white.opacity(0.65), .white.opacity(0)], center: UnitPoint(x: 0.32, y: 0.26),
+                                             startRadius: 0, endRadius: size * 0.62))
+                Image(systemName: "sparkle").font(.system(size: size * 0.46, weight: .bold)).foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.28), radius: size * 0.05, y: size * 0.02)
+            }
+            .frame(width: size, height: size)
+            .clipShape(Circle())
+            .overlay(Circle().strokeBorder(.white.opacity(0.45), lineWidth: max(0.5, size * 0.025)))
         }
         .frame(width: size, height: size)
-        .clipShape(Circle())
-        .onAppear { withAnimation(.linear(duration: busy ? 3 : 14).repeatForever(autoreverses: false)) { turn = true } }
+        .accessibilityHidden(true)
     }
 }
 

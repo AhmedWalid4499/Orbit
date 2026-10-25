@@ -44,19 +44,20 @@ build() {
 
 mkdir -p build
 if ! build; then
-  if grep -qiE "No Accounts" build/ios-build.log; then
+  if grep -qiE "healthkit" build/ios-build.log; then
+    # The signing profile can't include Apple Health (Xcode signed out, or the account can't use it): install everything else.
+    echo "Couldn't add Apple Health to Orbit's signing profile, so installing without it."
+    grep -qiE "No Accounts" build/ios-build.log && echo "(Xcode is signed out of your Apple ID: sign in under Xcode › Settings › Accounts to get Apple Health next time.)"
+    python3 scripts/gen-ios-project.py --no-health >/dev/null
+    trap 'python3 scripts/gen-ios-project.py >/dev/null' EXIT
+    build || { echo "Build failed. Details: build/ios-build.log"; exit 1; }
+  elif grep -qiE "No Accounts" build/ios-build.log; then
     echo "Xcode is signed out of your Apple ID. Open Xcode › Settings › Accounts, sign in again, then run this again."
     exit 1
   elif grep -qiE "watchkitapp" build/ios-build.log; then
     # The Apple Watch app couldn't be signed (watch not set up for development yet): update the iPhone app on its own.
     echo "Couldn't sign the Apple Watch app (is the watch in Developer Mode and shown in Xcode › Devices?). Installing the iPhone app without it."
     python3 scripts/gen-ios-project.py --no-watch >/dev/null
-    trap 'python3 scripts/gen-ios-project.py >/dev/null' EXIT
-    build || { echo "Build failed. Details: build/ios-build.log"; exit 1; }
-  elif grep -qiE "healthkit" build/ios-build.log; then
-    # The account can't sign Apple Health: install everything else.
-    echo "Your Apple account can't give Orbit access to Apple Health, so installing without it."
-    python3 scripts/gen-ios-project.py --no-health >/dev/null
     trap 'python3 scripts/gen-ios-project.py >/dev/null' EXIT
     build || { echo "Build failed. Details: build/ios-build.log"; exit 1; }
   elif grep -qiE "app group|personal development team" build/ios-build.log; then

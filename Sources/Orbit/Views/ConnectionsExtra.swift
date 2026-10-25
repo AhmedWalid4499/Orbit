@@ -11,7 +11,6 @@ struct OtherConnections: View {
     var body: some View {
         Section("YouTube") { YouTubeConnectionRow() }
         Section("LinkedIn") { LinkedInConnectionRow() }
-        Section("Maps") { GoogleMapsConnectionRow() }
         Section("Health") { HealthConnectionRow() }
         Section {
             row("Goodreads", .goodreads, reading.goodreadsUser.isEmpty ? nil : "Shelves sync from your profile") {

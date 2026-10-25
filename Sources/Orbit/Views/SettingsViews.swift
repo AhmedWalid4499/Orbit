@@ -154,7 +154,6 @@ struct ConnectionsSettings: View {
         OtherConnections()
         Section("Coming next — need something from you") {
             PlannedRow(name: "Bank accounts", detail: "Each bank and card gets its own page in Money, filled from bank texts, Apple Pay and statements. Live bank links aren't available for Egyptian banks yet.", symbol: "building.columns")
-            PlannedRow(name: "Apple Health", detail: "Sleep, steps, workouts. Needs an iPhone companion app.", symbol: "heart")
         }
     }
         .sheet(isPresented: $readingSources) { ReadingSourcesSheet() }

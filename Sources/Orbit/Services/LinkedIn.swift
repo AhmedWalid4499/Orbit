@@ -263,15 +263,11 @@ struct LinkedInView: View {
     @State private var showDone = false
     @State private var savedJob: String?
 
-    private var profileURL: URL? {
-        let card = ProfileCard.load()
-        return card.filledLinks.first { $0.kind == .linkedin }.flatMap { URL(string: $0.url) }
-    }
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
+                LinkedInAccountCard()
                 if !inbox.isConnected && !Snapshot.isDemo {
                     empty
                 } else {
@@ -300,10 +296,8 @@ struct LinkedInView: View {
             if store.loading { ProgressView().controlSize(.small) }
             Button { Task { await store.refresh() } } label: { Image(systemName: "arrow.clockwise") }
                 .buttonStyle(SoftButtonStyle()).disabled(store.loading).help("Check for new LinkedIn emails")
-            Button { Platform.open(profileURL ?? URL(string: "https://www.linkedin.com/feed/")!) } label: {
-                Label(profileURL == nil ? "Open LinkedIn" : "My profile", systemImage: "arrow.up.right")
-            }
-            .buttonStyle(SoftButtonStyle())
+            Button { Platform.open(URL(string: "https://www.linkedin.com/feed/")!) } label: { Label("Open LinkedIn", systemImage: "arrow.up.right") }
+                .buttonStyle(SoftButtonStyle())
         }
     }
 
@@ -482,25 +476,185 @@ struct LinkedInView: View {
     }
 }
 
-/// Connections row for LinkedIn (read from LinkedIn's emails in Gmail).
-struct LinkedInConnectionRow: View {
-    @ObservedObject private var store = LinkedInStore.shared
-    @ObservedObject private var inbox = InboxStore.shared
+/// Your LinkedIn account, through LinkedIn's official "Sign in with LinkedIn". LinkedIn only shares your name, photo and
+/// email with apps this way; invitations, messages, job alerts and profile views come from LinkedIn's emails (above).
+/// It needs your own LinkedIn developer app (client ID and secret); the secret and token live in the Keychain.
+@MainActor
+final class LinkedInAccount: ObservableObject {
+    static let shared = LinkedInAccount()
+
+    struct Profile: Codable, Equatable { var name: String; var email: String; var picture: String }
+
+    @Published private(set) var profile: Profile?
+    @Published private(set) var busy = false
+    @Published var error: String?
+    @AppStorage("linkedin.clientID") var clientID = ""
+
+    static let redirect = "https://ahmedwalid4499.github.io/Orbit/linkedin/"
+    private let tokenKey = "linkedin-token", secretKey = "linkedin-client-secret"
+
+    var hasSecret: Bool { !(Keychain.read(secretKey) ?? "").isEmpty }
+    var isSignedIn: Bool { profile != nil && Keychain.read(tokenKey) != nil }
+    var isSetUp: Bool { !clientID.isEmpty && hasSecret }
+
+    private init() {
+        profile = UserDefaults.standard.data(forKey: "linkedin.profile").flatMap { try? JSONDecoder().decode(Profile.self, from: $0) }
+    }
+
+    func saveApp(clientID id: String, secret: String) {
+        clientID = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !secret.isEmpty { Keychain.write(secret.trimmingCharacters(in: .whitespacesAndNewlines), account: secretKey) }
+        objectWillChange.send()
+    }
+
+    func signIn() async {
+        guard isSetUp, let secret = Keychain.read(secretKey) else { error = "Add your LinkedIn app's client ID and secret first."; return }
+        busy = true
+        error = nil
+        defer { busy = false }
+        let state = UUID().uuidString
+        var c = URLComponents(string: "https://www.linkedin.com/oauth/v2/authorization")!
+        c.queryItems = [.init(name: "response_type", value: "code"), .init(name: "client_id", value: clientID),
+                        .init(name: "redirect_uri", value: Self.redirect), .init(name: "scope", value: "openid profile email"),
+                        .init(name: "state", value: state)]
+        // LinkedIn → Orbit's sign-in page on GitHub Pages → back into the app as com.personal.orbit://linkedin?code=…
+        guard let back = await Platform.webAuth(c.url!, callbackScheme: "com.personal.orbit"),
+              let items = URLComponents(url: back, resolvingAgainstBaseURL: false)?.queryItems else { error = "Sign-in was cancelled."; return }
+        func q(_ k: String) -> String? { items.first { $0.name == k }?.value }
+        if let e = q("error_description") ?? q("error") { error = "LinkedIn said: \(e)"; return }
+        guard q("state") == state, let code = q("code") else { error = "LinkedIn didn't send a sign-in code. Try again."; return }
+        do {
+            var req = URLRequest(url: URL(string: "https://www.linkedin.com/oauth/v2/accessToken")!)
+            req.httpMethod = "POST"
+            req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+            let form = ["grant_type": "authorization_code", "code": code, "redirect_uri": Self.redirect, "client_id": clientID, "client_secret": secret]
+            req.httpBody = form.map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? "")" }.joined(separator: "&").data(using: .utf8)
+            let (data, _) = try await URLSession.shared.data(for: req)
+            let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+            guard let token = json["access_token"] as? String else {
+                throw CloudError("LinkedIn refused the sign-in: \(json["error_description"] as? String ?? json["error"] as? String ?? "unknown error"). Check the client secret and the redirect URL.")
+            }
+            Keychain.write(token, account: tokenKey)
+            UserDefaults.standard.set(Date.now.addingTimeInterval(Double(json["expires_in"] as? Int ?? 5_184_000)).timeIntervalSince1970, forKey: "linkedin.tokenExpires")
+            try await loadProfile(token: token)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func loadProfile(token: String) async throws {
+        var req = URLRequest(url: URL(string: "https://api.linkedin.com/v2/userinfo")!)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        guard let j = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any], let name = j["name"] as? String else {
+            throw CloudError("Couldn't read your LinkedIn profile. In your LinkedIn app, add the product “Sign In with LinkedIn using OpenID Connect”.")
+        }
+        let p = Profile(name: name, email: j["email"] as? String ?? "", picture: j["picture"] as? String ?? "")
+        profile = p
+        UserDefaults.standard.set(try? JSONEncoder().encode(p), forKey: "linkedin.profile")
+    }
+
+    func signOut() {
+        Keychain.delete(tokenKey)
+        profile = nil
+        UserDefaults.standard.removeObject(forKey: "linkedin.profile")
+    }
+}
+
+/// Who you're signed in to LinkedIn as, with a button to open your profile (top of the LinkedIn tab).
+struct LinkedInAccountCard: View {
+    @ObservedObject private var account = LinkedInAccount.shared
 
     var body: some View {
         HStack(spacing: 12) {
-            BrandLogo(brand: .linkedin, size: 28)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("LinkedIn").font(.headline)
-                Text(!inbox.isConnected ? "Connect Gmail above: Orbit reads the emails LinkedIn sends you." :
-                        store.enabled ? "Invitations, messages, profile views and job alerts from your LinkedIn emails." : "Turned off")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-            if store.enabled {
-                Button("Disconnect", role: .destructive) { store.disconnect() }
+            if let p = account.profile {
+                AsyncImage(url: URL(string: p.picture)) { $0.resizable().scaledToFill() } placeholder: { Color(hex: 0x0A66C2) }
+                    .frame(width: 48, height: 48).clipShape(Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(p.name).font(Theme.ui(16, weight: .semibold))
+                    Label("Connected to LinkedIn", systemImage: "checkmark.seal.fill").font(Theme.ui(12)).foregroundStyle(Theme.good)
+                }
+                Spacer()
+                Button { Platform.open(URL(string: "https://www.linkedin.com/in/me/")!) } label: { Label("My profile", systemImage: "arrow.up.right") }
+                    .buttonStyle(SoftButtonStyle())
             } else {
-                Button("Connect") { store.enabled = true; Task { await store.refresh() } }.buttonStyle(.borderedProminent)
+                BrandLogo(brand: .linkedin, size: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Connect your LinkedIn account").font(Theme.ui(15, weight: .semibold))
+                    Text(account.isSetUp ? "Sign in so Orbit shows your account here." : "Set it up in Settings › Connections › LinkedIn.")
+                        .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
+                    if let e = account.error { Text(e).font(Theme.ui(11)).foregroundStyle(Theme.orange) }
+                }
+                Spacer()
+                if account.isSetUp {
+                    Button { Task { await account.signIn() } } label: { Text(account.busy ? "Signing in…" : "Sign in with LinkedIn") }
+                        .buttonStyle(PrimaryButtonStyle()).fixedSize().disabled(account.busy)
+                }
+            }
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Theme.card))
+    }
+}
+
+/// Settings › Connections › LinkedIn: your LinkedIn account (sign-in) and the LinkedIn emails Orbit reads.
+struct LinkedInConnectionRow: View {
+    @ObservedObject private var store = LinkedInStore.shared
+    @ObservedObject private var inbox = InboxStore.shared
+    @ObservedObject private var account = LinkedInAccount.shared
+    @State private var clientID = LinkedInAccount.shared.clientID
+    @State private var secret = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                BrandLogo(brand: .linkedin, size: 28)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(account.profile.map { "LinkedIn · \($0.name)" } ?? "LinkedIn account").font(.headline)
+                    Text(account.isSignedIn ? "Signed in with LinkedIn." : "Sign in with your LinkedIn account.").font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                if account.isSignedIn {
+                    Button("Disconnect", role: .destructive) { account.signOut() }
+                } else if account.isSetUp {
+                    Button(account.busy ? "Signing in…" : "Sign in with LinkedIn") { Task { await account.signIn() } }
+                        .buttonStyle(.borderedProminent).disabled(account.busy)
+                }
+            }
+            if let e = account.error { Text(e).font(.caption).foregroundStyle(Theme.orange).fixedSize(horizontal: false, vertical: true) }
+            if !account.isSignedIn {
+                DisclosureGroup(account.isSetUp ? "LinkedIn app settings" : "Set up (one time)") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("""
+                        1. Go to linkedin.com/developers/apps › Create app (LinkedIn asks for a company page; your own page is fine).
+                        2. Products tab: add “Sign In with LinkedIn using OpenID Connect”.
+                        3. Auth tab: under Authorized redirect URLs, add \(LinkedInAccount.redirect)
+                        4. Copy the Client ID and Primary Client Secret here, then Sign in with LinkedIn.
+                        """).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
+                        TextField("Client ID", text: $clientID).textFieldStyle(.roundedBorder)
+                        SecureField(account.hasSecret ? "Client secret (saved)" : "Client secret", text: $secret).textFieldStyle(.roundedBorder)
+                        Button("Save") { account.saveApp(clientID: clientID, secret: secret); secret = "" }
+                            .disabled(clientID.trimmingCharacters(in: .whitespaces).isEmpty || (!account.hasSecret && secret.isEmpty))
+                    }
+                    .padding(.top, 6)
+                }
+                .font(.caption)
+            }
+            Divider()
+            HStack(spacing: 12) {
+                Image(systemName: "envelope.fill").frame(width: 28).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("LinkedIn activity").font(.subheadline.weight(.semibold))
+                    Text(!inbox.isConnected ? "Connect Gmail above: LinkedIn only shares invitations, messages, job alerts and profile views by email." :
+                            store.enabled ? "Invitations, messages, profile views and job alerts, from LinkedIn's emails." : "Turned off")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                if store.enabled {
+                    Button("Turn off", role: .destructive) { store.disconnect() }
+                } else {
+                    Button("Turn on") { store.enabled = true; Task { await store.refresh() } }
+                }
             }
         }
     }

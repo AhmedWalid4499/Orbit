@@ -102,8 +102,6 @@ final class NearbyFinder: NSObject, CLLocationManagerDelegate {
             r.resultTypes = .pointOfInterest
             items += (try? await MKLocalSearch(request: r).start().mapItems) ?? []
         }
-        // Google Maps knows many more places in Egypt: ask it too when there's a key.
-        items = GooglePlaces.merged(apple: items, google: await GooglePlaces.search(generic ? "restaurants" : query, near: loc.coordinate, radius: radius, limit: limit * 2))
         let saved = Set(((try? context.fetch(FetchDescriptor<BucketItem>())) ?? []).filter { $0.kind == .place }.map { $0.title.lowercased() })
         var seen = Set<String>()
         return items
@@ -116,11 +114,9 @@ final class NearbyFinder: NSObject, CLLocationManagerDelegate {
                 let p = item.placemark
                 let address = [p.thoroughfare.map { [p.subThoroughfare, $0].compactMap { $0 }.joined(separator: " ") }, p.subLocality]
                     .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
-                let googleAddress = GooglePlaces.address(of: item)
-                return Place(name: name, kind: Self.describe(item.pointOfInterestCategory), meters: meters, address: googleAddress ?? address,
-                             phone: item.phoneNumber ?? "", website: googleAddress == nil ? (item.url?.absoluteString ?? "") : "",
-                             mapsURL: googleAddress == nil ? PlaceLookup.appleMapsURL(name: name, coordinate: p.coordinate) : (item.url?.absoluteString ?? ""),
-                             saved: saved.contains(name.lowercased()))
+                return Place(name: name, kind: Self.describe(item.pointOfInterestCategory), meters: meters, address: address,
+                             phone: item.phoneNumber ?? "", website: item.url?.absoluteString ?? "",
+                             mapsURL: PlaceLookup.appleMapsURL(name: name, coordinate: p.coordinate), saved: saved.contains(name.lowercased()))
             }
             .prefix(limit).map { $0 }
     }

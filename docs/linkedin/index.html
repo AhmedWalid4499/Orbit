@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Signing in · Orbit</title>
+<style>
+  :root { --bg: #ffffff; --ink: #111111; --muted: #5c5c63; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #111113; --ink: #f4f4f5; --muted: #a1a1aa; } }
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px;
+         background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, sans-serif; text-align: center; }
+  a { color: inherit; }
+  p { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title">Back to Orbit…</h1>
+  <p id="note">If Orbit doesn't open by itself, <a id="open" href="#">tap here</a>.</p>
+</main>
+<script>
+// LinkedIn sends you here after "Sign in with LinkedIn"; this hands the sign-in code straight back to the Orbit app.
+const q = new URLSearchParams(location.search);
+const back = new URL("com.personal.orbit://linkedin");
+for (const k of ["code", "state", "error", "error_description"]) if (q.get(k)) back.searchParams.set(k, q.get(k));
+document.getElementById("open").href = back.toString();
+if (q.get("error")) {
+  document.getElementById("title").textContent = "LinkedIn sign-in was cancelled";
+}
+location.replace(back.toString());
+</script>
+</body>
+</html>

@@ -13,7 +13,7 @@ struct MoneyRulesSheet: View {
     @State private var bigCharges = SpendingAlerts.bigChargeAlerts
 
     private var monthSpend: [String: Double] {
-        let start = Date.now.startOfMonth
+        let start = BudgetPeriod.current.start
         return Dictionary(grouping: all.filter { $0.isExpense && $0.date >= start }, by: \.category).mapValues { -$0.reduce(0) { $0 + $1.amount } }
     }
 

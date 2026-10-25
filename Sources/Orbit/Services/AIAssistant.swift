@@ -169,10 +169,8 @@ final class AIAssistant: ObservableObject {
             "- \($0.name): streak \($0.currentStreak) days, \($0.doneThisWeek)/\($0.targetPerWeek) this week, done today: \($0.isDone(on: today) ? "yes" : "no")"
         }
 
-        let monthStart = now.startOfMonth
-        let spent = -txns.filter { $0.isExpense && $0.date >= monthStart }.reduce(0) { $0 + $1.amount }
-        let dayOfMonth = Calendar.current.component(.day, from: now)
-        let daysInMonth = Calendar.current.range(of: .day, in: .month, for: now)!.count
+        let spent = BudgetPeriod.spent(txns)
+        let (dayOfMonth, daysInMonth) = BudgetPeriod.day(now: now)
         lines.append("\nMoney this month: spent \(Fmt.money(spent)) of \(Fmt.money(budget)) budget; day \(dayOfMonth) of \(daysInMonth).")
 
         lines += DayPlanner.briefLines(context: context)

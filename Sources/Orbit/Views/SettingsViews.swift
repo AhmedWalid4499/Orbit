@@ -449,6 +449,12 @@ struct VoiceSection: View {
     @AppStorage("assistantSpeaks") private var speaks = false
     @AppStorage("assistantVoice") private var voiceID = ""
     @ObservedObject private var speaker = Speaker.shared
+    @AppStorage("voice.natural") private var natural = true
+    @AppStorage("voice.openai") private var openAIVoice = "coral"
+    @State private var hasOpenAI = NaturalVoice.hasKey
+    @State private var openAIKey = ""
+    @State private var checking = false
+    @State private var voiceStatus: String?
 
     private var voices: [AVSpeechSynthesisVoice] {
         Speaker.naturalVoices(language: Locale.current.language.languageCode?.identifier ?? "en")
@@ -458,11 +464,39 @@ struct VoiceSection: View {
     var body: some View {
         Section {
             Toggle("Read replies aloud", isOn: $speaks)
+            if hasOpenAI {
+                Toggle("Natural voice (OpenAI)", isOn: $natural)
+                if natural {
+                    Picker("Natural voice", selection: $openAIVoice) {
+                        ForEach(NaturalVoice.voices, id: \.self) { Text($0.capitalized).tag($0) }
+                    }
+                }
+                Button("Remove OpenAI key", role: .destructive) { Keychain.delete("openai-key"); hasOpenAI = false }
+            } else {
+                SecureField("OpenAI API key for a natural voice", text: $openAIKey, prompt: Text("sk-…"))
+                HStack {
+                    Link("Get a key at platform.openai.com", destination: URL(string: "https://platform.openai.com/api-keys")!).font(.caption)
+                    Spacer()
+                    Button(checking ? "Checking…" : "Save") {
+                        let key = openAIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+                        checking = true
+                        Task {
+                            voiceStatus = await NaturalVoice.test(key: key)
+                            if voiceStatus == nil { Keychain.write(key, account: "openai-key"); hasOpenAI = true; openAIKey = "" }
+                            checking = false
+                        }
+                    }
+                    .disabled(openAIKey.trimmingCharacters(in: .whitespaces).isEmpty || checking)
+                }
+                if let voiceStatus { Text(voiceStatus).font(.caption).foregroundStyle(Theme.orange) }
+            }
+            if !(hasOpenAI && natural) {
             Picker("Voice", selection: $voiceID) {
                 Text("Most natural (\(Speaker.bestVoice(for: "Hi")?.name ?? "default"))").tag("")
                 ForEach(voices, id: \.identifier) { v in
                     Text("\(v.name)\(v.quality == .premium ? " · Premium" : v.quality == .enhanced ? " · Enhanced" : "") (\(v.language))").tag(v.identifier)
                 }
+            }
             }
             Button(speaker.speaking ? "Stop" : "Preview") {
                 if speaker.speaking { speaker.stop() }
@@ -471,7 +505,7 @@ struct VoiceSection: View {
         } header: {
             Text("Voice")
         } footer: {
-            Text(hasPremium
+            Text(hasOpenAI && natural ? "Replies are read by OpenAI's voice, the same kind ChatGPT talks with. Each reply costs a fraction of a cent on your OpenAI account; the Apple voice takes over when you're offline." : hasPremium
                  ? "Premium voices sound the most like a person."
                  : "For a much more human voice, download a Premium one (free): \(Platform.isPhone ? "Settings › Accessibility › Spoken Content › Voices › English" : "System Settings › Accessibility › Spoken Content › System voice › Manage Voices"), then pick e.g. Zoe, Ava or Evan (Premium). It shows up here.")
         }

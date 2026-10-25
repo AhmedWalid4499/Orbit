@@ -103,7 +103,7 @@ enum SpendingAlerts {
 
     /// What should be said about these transactions right now (pure, so it can be tested).
     static func alerts(_ all: [Transaction], now: Date) -> [Alert] {
-        let month = now.startOfMonth
+        let month = BudgetPeriod.period(containing: now).start
         let monthKey = DayKey.key(month).prefix(7)
         let spentThisMonth = all.filter { $0.isExpense && $0.date >= month && $0.date <= now.adding(days: 1) }
         var out: [Alert] = []

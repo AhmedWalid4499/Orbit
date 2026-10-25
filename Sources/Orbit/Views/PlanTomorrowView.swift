@@ -214,7 +214,7 @@ struct PlanTomorrowSheet: View {
                 Text("Plan tomorrow").font(Theme.display(30))
                 Text(tomorrow.formatted(.dateTime.weekday(.wide).day().month(.wide))).font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
             }
-            .padding([.horizontal, .top], 26).padding(.bottom, 14)
+            .padding([.horizontal, .top], Platform.isPhone ? 18 : 26).padding(.bottom, 14)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
@@ -223,15 +223,20 @@ struct PlanTomorrowSheet: View {
                             Text("All clear ✨").font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
                         }
                         ForEach(leftovers) { t in
-                            HStack(spacing: 8) {
-                                Text(t.title).font(Theme.ui(13, weight: .medium)).lineLimit(1)
-                                if t.isOverdue { Text("overdue").font(Theme.ui(10, weight: .semibold)).foregroundStyle(Theme.critical) }
-                                Spacer()
-                                small("Done", "checkmark") { t.complete(in: context); draft.handled.insert(t.persistentModelID) }
-                                small("Tomorrow", "arrow.right") { t.due = tomorrow; draft.handled.insert(t.persistentModelID) }
-                                small("No date", "calendar.badge.minus") { t.due = nil; draft.handled.insert(t.persistentModelID) }
+                            // Side by side when there's room; on a phone the title gets its own line, the actions below.
+                            ViewThatFits(in: .horizontal) {
+                                HStack(spacing: 8) {
+                                    leftoverTitle(t).lineLimit(1)
+                                    Spacer()
+                                    leftoverActions(t)
+                                }
+                                VStack(alignment: .leading, spacing: 8) {
+                                    leftoverTitle(t).lineLimit(2)
+                                    leftoverActions(t)
+                                }
                             }
-                            .padding(.horizontal, 12).padding(.vertical, 8)
+                            .padding(.horizontal, 12).padding(.vertical, 10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .background(RoundedRectangle(cornerRadius: 12).fill(Theme.card))
                         }
                     }
@@ -263,8 +268,8 @@ struct PlanTomorrowSheet: View {
                                         Spacer()
                                         Button { draft.picks.remove(at: i) } label: { Image(systemName: "xmark") }.buttonStyle(.plain).foregroundStyle(Theme.inkMuted)
                                     } else {
-                                        Text(i == draft.picks.count ? "Pick a task below, type one, or just tell \(AssistantName.current)" : "—")
-                                            .font(Theme.ui(13)).foregroundStyle(Theme.inkMuted)
+                                        Text(i == draft.picks.count ? (Platform.isPhone ? "Pick a task below or type one" : "Pick a task below, type one, or just tell \(AssistantName.current)") : "—")
+                                            .font(Theme.ui(13)).foregroundStyle(Theme.inkMuted).lineLimit(1)
                                         Spacer()
                                     }
                                 }
@@ -307,18 +312,28 @@ struct PlanTomorrowSheet: View {
                         TextField("e.g. Bring the charger, call the bank before 10", text: $draft.note).textFieldStyle(.roundedBorder).font(Theme.ui(13))
                     }
                 }
-                .padding(.horizontal, 26).padding(.bottom, 10)
+                .padding(.horizontal, Platform.isPhone ? 18 : 26).padding(.bottom, 10)
             }
             .scrollIndicators(.never)
 
-            HStack {
-                Text("Your top 3 shows on Today and in tomorrow's morning brief.").font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
-                Spacer()
-                Button("Cancel") { dismiss() }.buttonStyle(SoftButtonStyle())
-                Button("Save plan", action: save).buttonStyle(PrimaryButtonStyle()).frame(width: 120).keyboardShortcut(.defaultAction)
-                    .disabled(draft.picks.isEmpty && draft.note.trimmingCharacters(in: .whitespaces).isEmpty)
+            if Platform.isPhone {
+                VStack(spacing: 8) {
+                    HStack(spacing: 10) {
+                        Button { dismiss() } label: { Text("Cancel").frame(maxWidth: .infinity) }.buttonStyle(SoftButtonStyle())
+                        saveButton
+                    }
+                    Text("Your top 3 shows on Today and in tomorrow's morning brief.").font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
+                }
+                .padding(.horizontal, 18).padding(.vertical, 12)
+            } else {
+                HStack {
+                    Text("Your top 3 shows on Today and in tomorrow's morning brief.").font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
+                    Spacer()
+                    Button("Cancel") { dismiss() }.buttonStyle(SoftButtonStyle())
+                    saveButton.frame(width: 120)
+                }
+                .padding(.horizontal, 26).padding(.vertical, 16)
             }
-            .padding(.horizontal, 26).padding(.vertical, 16)
         }
         .frame(maxWidth: .infinity)
     }
@@ -330,10 +345,30 @@ struct PlanTomorrowSheet: View {
         }
     }
 
+    private var saveButton: some View {
+        Button("Save plan", action: save).buttonStyle(PrimaryButtonStyle()).keyboardShortcut(.defaultAction)
+            .disabled(draft.picks.isEmpty && draft.note.trimmingCharacters(in: .whitespaces).isEmpty)
+    }
+
+    private func leftoverTitle(_ t: TaskItem) -> some View {
+        HStack(spacing: 6) {
+            Text(t.title).font(Theme.ui(13, weight: .medium))
+            if t.isOverdue { Text("overdue").font(Theme.ui(10, weight: .semibold)).foregroundStyle(Theme.critical).fixedSize() }
+        }
+    }
+
+    private func leftoverActions(_ t: TaskItem) -> some View {
+        HStack(spacing: 6) {
+            small("Done", "checkmark") { t.complete(in: context); draft.handled.insert(t.persistentModelID) }
+            small("Tomorrow", "arrow.right") { t.due = tomorrow; draft.handled.insert(t.persistentModelID) }
+            small("No date", "calendar.badge.minus") { t.due = nil; draft.handled.insert(t.persistentModelID) }
+        }
+    }
+
     private func small(_ title: String, _ symbol: String, _ action: @escaping () -> Void) -> some View {
         Button { withAnimation(.snappy) { action() } } label: {
-            Label(title, systemImage: symbol).font(Theme.ui(11, weight: .semibold))
-                .padding(.horizontal, 8).padding(.vertical, 5)
+            Label(title, systemImage: symbol).font(Theme.ui(11, weight: .semibold)).lineLimit(1).fixedSize()
+                .padding(.horizontal, 9).padding(.vertical, 6)
                 .background(Capsule().fill(Theme.canvas))
         }
         .buttonStyle(.plain)

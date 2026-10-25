@@ -217,13 +217,51 @@ final class Speaker: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
 
     func speak(_ text: String, then: (() -> Void)? = nil) {
         stop()
+        if NaturalVoice.isOn {
+            onDone = then
+            speaking = true
+            let token = UUID()
+            natural = token
+            Task {
+                let ok = await NaturalVoice.shared.speak(Self.plain(text)) { [weak self] in self?.natural == token }
+                guard self.natural == token else { return }
+                self.natural = nil
+                if ok { self.finished() } else { self.speakWithApple(text) }
+            }
+            return
+        }
+        onDone = then
+        speakWithApple(text)
+    }
+
+    /// Set while a natural (online) reply is playing; cleared by stop().
+    private var natural: UUID?
+
+    private func finished() {
+        speaking = false
+        let done = onDone
+        onDone = nil
+        done?()
+    }
+
+    /// Text without links, markdown or bullets, for reading aloud.
+    static func plain(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: #"\[([^\]]+)\]\([^)]+\)"#, with: "$1", options: .regularExpression)
+            .replacingOccurrences(of: #"https?://\S+"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"[*_`#>]"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: "•", with: "\n")
+    }
+
+    private func speakWithApple(_ text: String) {
+        let then = onDone
         let clean = text
             .replacingOccurrences(of: #"\[([^\]]+)\]\([^)]+\)"#, with: "$1", options: .regularExpression) // links → their text
             .replacingOccurrences(of: #"https?://\S+"#, with: "", options: .regularExpression)
             .replacingOccurrences(of: #"[*_`#>]"#, with: "", options: .regularExpression)
             .replacingOccurrences(of: "•", with: "\n")
         let sentences = Self.sentences(clean)
-        guard !sentences.isEmpty else { then?(); return }
+        guard !sentences.isEmpty else { finished(); return }
         let voice = Self.voice(for: clean)
         onDone = then
         speaking = true
@@ -249,6 +287,8 @@ final class Speaker: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
     func stop() {
         onDone = nil
         pending = 0
+        natural = nil
+        NaturalVoice.shared.stop()
         if synth.isSpeaking { synth.stopSpeaking(at: .immediate) }
         speaking = false
     }
@@ -330,5 +370,103 @@ struct MicButton: View {
         }
         .buttonStyle(.plain)
         .help(dictation.listening ? "Stop listening" : "Talk instead of typing")
+    }
+}
+
+// MARK: - Natural voice (OpenAI)
+
+/// Replies read by OpenAI's text-to-speech, the same kind of voice ChatGPT talks with. Needs an OpenAI API key
+/// (Settings › AI › Voice, kept in the Keychain). Falls back to the Apple voice when there's no key or no connection.
+@MainActor
+final class NaturalVoice: NSObject, AVAudioPlayerDelegate {
+    static let shared = NaturalVoice()
+    static let voices = ["coral", "nova", "shimmer", "sage", "alloy", "ash", "ballad", "echo", "fable", "onyx", "verse"]
+
+    static var hasKey: Bool { !(Keychain.read("openai-key") ?? "").isEmpty }
+    /// On when there's a key, unless switched off in Settings.
+    static var isOn: Bool { hasKey && UserDefaults.standard.object(forKey: "voice.natural") as? Bool ?? true }
+    static var voice: String { UserDefaults.standard.string(forKey: "voice.openai") ?? "coral" }
+
+    private var player: AVAudioPlayer?
+    private var finished: CheckedContinuation<Void, Never>?
+
+    /// Plays `text`; returns false if it couldn't (so the caller can use the Apple voice). `still` says whether
+    /// the reply is still wanted (stop() was not pressed meanwhile).
+    func speak(_ text: String, still: @escaping () -> Bool) async -> Bool {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty, let key = Keychain.read("openai-key"), !key.isEmpty else { return false }
+        // The first sentence goes on its own so it starts talking quickly while the rest is made.
+        let sentences = Speaker.sentences(t)
+        var chunks: [String] = []
+        if let first = sentences.first { chunks.append(first) }
+        var rest = ""
+        for s in sentences.dropFirst() {
+            if rest.count + s.count > 3500 { chunks.append(rest); rest = "" }
+            rest += (rest.isEmpty ? "" : " ") + s
+        }
+        if !rest.isEmpty { chunks.append(rest) }
+        let jobs = chunks.map { chunk in Task { try await Self.audio(chunk, key: key) } }
+        #if os(iOS)
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+        try? AVAudioSession.sharedInstance().setActive(true)
+        #endif
+        for (i, job) in jobs.enumerated() {
+            guard let data = try? await job.value else {
+                jobs.forEach { $0.cancel() }
+                return i > 0 // part of it was read; don't start over with the other voice
+            }
+            guard still() else { jobs.forEach { $0.cancel() }; return true }
+            await play(data)
+            guard still() else { jobs.forEach { $0.cancel() }; return true }
+        }
+        return true
+    }
+
+    func stop() {
+        player?.stop()
+        player = nil
+        finished?.resume()
+        finished = nil
+    }
+
+    private func play(_ data: Data) async {
+        guard let p = try? AVAudioPlayer(data: data) else { return }
+        player = p
+        p.delegate = self
+        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+            finished = c
+            if !p.play() { finished = nil; c.resume() }
+        }
+    }
+
+    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        Task { @MainActor in
+            self.finished?.resume()
+            self.finished = nil
+        }
+    }
+
+    static func audio(_ text: String, key: String) async throws -> Data {
+        var req = URLRequest(url: URL(string: "https://api.openai.com/v1/audio/speech")!)
+        req.httpMethod = "POST"
+        req.timeoutInterval = 30
+        req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: [
+            "model": "gpt-4o-mini-tts", "voice": voice, "input": text, "response_format": "mp3",
+            "instructions": "Speak like a warm, relaxed friend having a real conversation: natural pace, light expression, small pauses, never like an announcer.",
+        ])
+        let (data, response) = try await URLSession.shared.data(for: req)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard status == 200, !data.isEmpty else {
+            let msg = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any]).flatMap { ($0["error"] as? [String: Any])?["message"] as? String }
+            throw CloudError("OpenAI voice error \(status)\(msg.map { ": \($0)" } ?? "")")
+        }
+        return data
+    }
+
+    /// For Settings: checks the key by making a short clip.
+    static func test(key: String) async -> String? {
+        do { _ = try await audio("Hi!", key: key); return nil } catch { return error.localizedDescription }
     }
 }

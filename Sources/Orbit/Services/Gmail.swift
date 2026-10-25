@@ -9,7 +9,7 @@ import CryptoKit
 /// Signs in to Google accounts once and keeps a refresh token per account in the Keychain,
 /// so Orbit never has to ask again. Requires your own OAuth client (Desktop app) from Google Cloud.
 enum GoogleAuth {
-    static let scope = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly email"
+    static let scope = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar.readonly email"
 
     /// Your own Google Cloud client if you set one up; otherwise the one built into this copy of Orbit
     /// (so people you share Orbit with can just click "Add Gmail account").
@@ -144,7 +144,7 @@ enum GoogleAuth {
     }
 }
 
-private extension Data {
+extension Data {
     var base64URL: String {
         base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")
@@ -428,7 +428,7 @@ final class InboxStore: ObservableObject {
         if let d = digest, let data = try? JSONEncoder().encode(d) { UserDefaults.standard.set(data, forKey: cacheKey) }
     }
 
-    static func displayName(_ from: String) -> String {
+    nonisolated static func displayName(_ from: String) -> String {
         if let lt = from.firstIndex(of: "<") {
             let name = from[..<lt].trimmingCharacters(in: CharacterSet(charactersIn: "\" "))
             if !name.isEmpty { return name }

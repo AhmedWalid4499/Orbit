@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import MapKit
 
 /// Slide-over chat with Claude that can create things in Orbit. Opens from the ✦ button or ⌘J.
 struct AssistantPanel: View {
@@ -22,12 +23,21 @@ struct AssistantPanel: View {
     @State private var voiceTurn = false
     @FocusState private var focused: Bool
 
-    private let suggestions = [
-        "I can't seem to read every day. Can you help?",
-        "Recommend books about Japanese culture",
-        "Plan my week around what's on my calendar",
-        "How can I spend less on food this month?",
+    private let suggestions: [(String, String, Color)] = [
+        ("I'm hungry, what's good near me?", "fork.knife", Theme.peach),
+        ("Plan my week around my calendar", "calendar", Theme.cyan),
+        ("How can I spend less on food this month?", "banknote.fill", Theme.mint),
+        ("Recommend books about Japanese culture", "books.vertical.fill", Theme.lavender),
+        ("What should I wear today?", "cloud.sun.fill", Theme.sand),
+        ("I can't seem to read every day. Help?", "heart.fill", Theme.pink),
     ]
+
+    private var firstName: String { Platform.userName.split(separator: " ").first.map(String.init) ?? "" }
+    private var greeting: String {
+        let h = Calendar.current.component(.hour, from: .now)
+        let part = h < 5 ? "Up late" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"
+        return firstName.isEmpty ? "\(part)!" : "\(part), \(firstName)!"
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -102,11 +112,13 @@ struct AssistantPanel: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            Image(systemName: "sparkles").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.stickerInk)
-                .frame(width: 32, height: 32).background(Circle().fill(Theme.lime))
+            AssistantAvatar(size: 36, busy: store.busy || speaker.speaking)
             VStack(alignment: .leading, spacing: 1) {
                 Text(assistantName).font(Theme.display(20))
-                Text("Talks things through and sets things up for you").font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
+                HStack(spacing: 5) {
+                    Circle().fill(store.busy ? Theme.orange : Theme.good).frame(width: 6, height: 6)
+                    Text(store.busy ? "Thinking…" : speaker.speaking ? "Speaking…" : "Here for anything").font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
+                }
             }
             Spacer()
             Button {
@@ -129,18 +141,31 @@ struct AssistantPanel: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     if store.items.isEmpty && !store.busy {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("What's on your mind?").font(Theme.display(22))
-                            Text("Ask for advice, or just say what you want: \(assistantName) can add habits, tasks, events, notes, expenses and books for you.")
-                                .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
-                            ForEach(suggestions, id: \.self) { s in
-                                Button { send(s) } label: {
-                                    Text(s).font(Theme.ui(13)).multilineTextAlignment(.leading)
-                                        .padding(.horizontal, 12).padding(.vertical, 9)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .background(RoundedRectangle(cornerRadius: 12).fill(Theme.card))
+                        VStack(alignment: .leading, spacing: 14) {
+                            AssistantAvatar(size: 56)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(greeting).font(Theme.display(28))
+                                Text("What's on your mind? Ask me anything, or tell me what to set up: tasks, plans, places, money, books.")
+                                    .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
+                            }
+                            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                                ForEach(suggestions, id: \.0) { text, symbol, tint in
+                                    Button { send(text) } label: {
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            Image(systemName: symbol).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.stickerInk)
+                                                .frame(width: 28, height: 28).background(Circle().fill(tint))
+                                            Text(text).font(Theme.ui(12, weight: .medium)).multilineTextAlignment(.leading)
+                                                .foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                                            Spacer(minLength: 0)
+                                        }
+                                        .padding(12)
+                                        .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
+                                        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(tint.opacity(0.18)))
+                                        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(tint.opacity(0.5)))
+                                        .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
                         .padding(.top, 8)
@@ -149,11 +174,17 @@ struct AssistantPanel: View {
                         row(item).id(item.id)
                     }
                     if store.busy {
-                        if store.revealed.isEmpty {
-                            HStack { Thinking(); Spacer() }.id("live")
-                        } else {
-                            AssistantText(text: store.revealed).id("live")
+                        HStack(alignment: .top, spacing: 8) {
+                            AssistantAvatar(size: 22, busy: true)
+                            Group {
+                                if store.revealed.isEmpty { Thinking() } else { AssistantText(text: store.revealed) }
+                            }
+                            .padding(.horizontal, 14).padding(.vertical, 10)
+                            .background(UnevenRoundedRectangle(topLeadingRadius: 6, bottomLeadingRadius: 18, bottomTrailingRadius: 18, topTrailingRadius: 18, style: .continuous)
+                                .fill(Theme.card))
+                            Spacer(minLength: 24)
                         }
+                        .id("live")
                     }
                     if let e = store.error {
                         Label(e, systemImage: "exclamationmark.triangle.fill").font(Theme.ui(12)).foregroundStyle(Theme.orange)
@@ -185,28 +216,45 @@ struct AssistantPanel: View {
                 HStack {
                     Spacer(minLength: 50)
                     Text(item.text).font(Theme.ui(14)).textSelection(.enabled)
-                        .foregroundStyle(Theme.onInverse)
+                        .foregroundStyle(Theme.stickerInk)
                         .padding(.horizontal, 14).padding(.vertical, 10)
-                        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Theme.inverse))
+                        .background(UnevenRoundedRectangle(topLeadingRadius: 18, bottomLeadingRadius: 18, bottomTrailingRadius: 6, topTrailingRadius: 18, style: .continuous)
+                            .fill(LinearGradient(colors: [Theme.lime, Theme.mint], startPoint: .topLeading, endPoint: .bottomTrailing)))
                 }
             }
         case .assistant:
-            AssistantText(text: item.text)
-        case .action:
-            HStack(spacing: 10) {
-                Image(systemName: item.undone ? "arrow.uturn.backward" : item.symbol)
-                    .font(.system(size: 11, weight: .bold)).foregroundStyle(Theme.stickerInk)
-                    .frame(width: 26, height: 26).background(Circle().fill(item.undone ? Theme.line : Theme.lime))
-                Text(item.text).font(Theme.ui(12, weight: .medium)).strikethrough(item.undone).lineLimit(3)
-                    .foregroundStyle(item.undone ? Theme.inkMuted : Theme.ink)
-                Spacer(minLength: 4)
-                if item.undo != nil && !item.undone {
-                    Button("Undo") { store.undo(item, context: context) }
-                        .buttonStyle(.plain).font(Theme.ui(11, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
-                }
+            HStack(alignment: .top, spacing: 8) {
+                AssistantAvatar(size: 22)
+                AssistantText(text: item.text)
+                    .padding(.horizontal, 14).padding(.vertical, 10)
+                    .background(UnevenRoundedRectangle(topLeadingRadius: 6, bottomLeadingRadius: 18, bottomTrailingRadius: 18, topTrailingRadius: 18, style: .continuous)
+                        .fill(Theme.card))
+                Spacer(minLength: 24)
             }
-            .padding(10)
-            .background(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.line))
+        case .action:
+            if let place = item.place, !item.undone {
+                PlaceChatCard(place: place, note: item.text) { store.undo(item, context: context) }
+                    .padding(.leading, 30)
+            } else {
+                let tint = ActionTint.color(for: item.symbol)
+                HStack(spacing: 10) {
+                    Image(systemName: item.undone ? "arrow.uturn.backward" : item.symbol)
+                        .font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.stickerInk)
+                        .frame(width: 30, height: 30).background(Circle().fill(item.undone ? Theme.line : tint))
+                    Text(item.text).font(Theme.ui(13, weight: .medium)).strikethrough(item.undone).lineLimit(3)
+                        .foregroundStyle(item.undone ? Theme.inkMuted : Theme.ink)
+                    Spacer(minLength: 4)
+                    if item.undo != nil && !item.undone {
+                        Button("Undo") { store.undo(item, context: context) }
+                            .buttonStyle(.plain).font(Theme.ui(11, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
+                            .padding(.horizontal, 10).padding(.vertical, 5).background(Capsule().fill(Theme.canvas))
+                    }
+                }
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(item.undone ? Theme.card : tint.opacity(0.16)))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(item.undone ? Theme.line : tint.opacity(0.55)))
+                .padding(.leading, 30)
+            }
         }
     }
 
@@ -257,7 +305,8 @@ struct AssistantPanel: View {
             }
         }
         .padding(10)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Theme.card))
+        .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Theme.card))
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(focused ? Theme.ink.opacity(0.25) : Theme.line))
         .padding(14)
     }
 
@@ -286,12 +335,10 @@ struct AssistantText: View {
     var body: some View {
         let attributed = (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
             ?? AttributedString(text)
-        HStack {
-            Text(attributed).font(Theme.ui(14)).lineSpacing(3).textSelection(.enabled)
-                .foregroundStyle(Theme.ink)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 30)
-        }
+        Text(attributed).font(Theme.ui(14)).lineSpacing(3).textSelection(.enabled)
+            .foregroundStyle(Theme.ink)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(alignment: .leading)
     }
 }
 
@@ -300,12 +347,94 @@ struct Thinking: View {
     var body: some View {
         HStack(spacing: 5) {
             ForEach(0..<3) { i in
-                Circle().fill(Theme.inkMuted).frame(width: 7, height: 7)
-                    .opacity(on ? 1 : 0.3)
+                Circle().fill([Theme.lime, Theme.pink, Theme.cyan][i]).frame(width: 8, height: 8)
+                    .scaleEffect(on ? 1 : 0.6)
+                    .opacity(on ? 1 : 0.4)
                     .animation(.easeInOut(duration: 0.6).repeatForever().delay(Double(i) * 0.2), value: on)
             }
         }
         .padding(.vertical, 8)
         .onAppear { on = true }
+    }
+}
+
+/// The assistant's face: a soft, slowly turning gradient orb with a sparkle.
+struct AssistantAvatar: View {
+    var size: CGFloat = 32
+    var busy = false
+    @State private var turn = false
+
+    var body: some View {
+        ZStack {
+            Circle().fill(AngularGradient(colors: [Theme.lime, Theme.mint, Theme.cyan, Theme.purple, Theme.pink, Theme.lime], center: .center))
+                .rotationEffect(.degrees(turn ? 360 : 0))
+                .blur(radius: size * 0.04)
+            Circle().fill(.white.opacity(0.25)).padding(size * 0.18)
+            Image(systemName: "sparkles").font(.system(size: size * 0.42, weight: .bold)).foregroundStyle(Theme.stickerInk)
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+        .onAppear { withAnimation(.linear(duration: busy ? 3 : 14).repeatForever(autoreverses: false)) { turn = true } }
+    }
+}
+
+/// Colours for the "done" cards in the chat, by what was made.
+enum ActionTint {
+    static func color(for symbol: String) -> Color {
+        switch symbol {
+        case let s where s.contains("mappin") || s.contains("location"): Theme.mint
+        case let s where s.contains("creditcard") || s.contains("banknote") || s.contains("target") || s.contains("doc.text"): Theme.peach
+        case let s where s.contains("calendar") || s.contains("clock"): Theme.cyan
+        case let s where s.contains("book"): Theme.lavender
+        case let s where s.contains("brain") || s.contains("heart"): Theme.pink
+        case let s where s.contains("flag") || s.contains("star"): Theme.sand
+        case let s where s.contains("person"): Theme.mint
+        default: Theme.lime
+        }
+    }
+}
+
+/// A place the assistant saved: a little map with the pin, the address and directions.
+struct PlaceChatCard: View {
+    let place: ChatPlace
+    let note: String
+    let undo: () -> Void
+
+    private var category: PlaceCategory { PlaceCategory(rawValue: place.category) ?? .other }
+    private var hasPin: Bool { place.lat != 0 || place.lon != 0 }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if hasPin {
+                let c = CLLocationCoordinate2D(latitude: place.lat, longitude: place.lon)
+                Map(initialPosition: .region(MKCoordinateRegion(center: c, latitudinalMeters: 700, longitudinalMeters: 700)), interactionModes: []) {
+                    Marker(place.name, systemImage: category.symbol, coordinate: c).tint(category.color)
+                }
+                .frame(height: 120)
+                .allowsHitTesting(false)
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.good)
+                    Text(note).font(Theme.ui(11, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
+                    Spacer()
+                    Button("Undo", action: undo).buttonStyle(.plain).font(Theme.ui(11, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
+                }
+                HStack(spacing: 10) {
+                    Image(systemName: category.symbol).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.stickerInk)
+                        .frame(width: 32, height: 32).background(Circle().fill(category.color))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(place.name).font(Theme.ui(15, weight: .semibold)).lineLimit(2)
+                        Text([category.title, place.address].filter { !$0.isEmpty }.joined(separator: " · "))
+                            .font(Theme.ui(11)).foregroundStyle(Theme.inkSecondary).lineLimit(2)
+                    }
+                }
+                DirectionsMenu(name: place.name, address: place.address, lat: hasPin ? place.lat : nil, lon: hasPin ? place.lon : nil, link: place.link)
+            }
+            .padding(12)
+        }
+        .background(Theme.card)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(category.color.opacity(0.6)))
     }
 }

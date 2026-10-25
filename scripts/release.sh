@@ -38,6 +38,8 @@ NOTES="${2:-$(git log --pretty='- %s' ${PREV_TAG:+$PREV_TAG..HEAD} | grep -v '^-
 if ! git rev-parse "$TAG" >/dev/null 2>&1; then
   # Stamp the version and commit everything that's going out.
   echo "$VERSION" > VERSION
+  # The website shows the version even when GitHub's API can't be reached.
+  sed -i '' -E "s/(data-version>Free · Version )[0-9.]+/\\1$VERSION/g; s/(data-version-short>v)[0-9.]+/\\1$VERSION/g" docs/index.html
   git add -A
   git commit -m "Release $TAG" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" >/dev/null || true
   git tag -a "$TAG" -m "Orbit $VERSION"

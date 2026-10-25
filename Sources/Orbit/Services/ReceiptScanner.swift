@@ -20,7 +20,7 @@ enum ReceiptScanner {
     static func read(_ image: PlatformImage) async throws -> Result {
         guard let cg = image.cg else { throw ClaudeClient.Failure.badResponse }
         let text = await recognize(cg)
-        if let client = ClaudeClient(), let jpeg = image.jpeg(maxSide: 1600) {
+        if let client = ClaudeClient(), let jpeg = image.jpeg(maxSide: 2400, quality: 0.88) {
             if var r = try? await ai(jpeg, ocr: text, client: client) {
                 r.usedAI = true
                 return r
@@ -93,14 +93,17 @@ enum ReceiptScanner {
     // MARK: Claude
 
     private struct Out: Decodable {
-        let merchant: String, total: Double, currency: String, date: String, category: String, items: [String]
+        let merchant: String, subtotal: Double, tax_and_service: Double, total: Double, currency: String, date: String, category: String, items: [String]
     }
 
     private static func ai(_ jpeg: Data, ocr: String, client: ClaudeClient) async throws -> Result {
         let system = """
         You read a photo of a shopping or restaurant receipt for the user's budget. Home currency: \(Fmt.currencyCode).
         - merchant: the shop or restaurant's short, clean name ("Carrefour", "Zooba"), not the address or legal entity.
-        - total: the final amount actually paid, including tax, service and tip, as a positive number. Not the subtotal.
+        - Read the whole receipt carefully, line by line, before answering. Numbers may use commas or dots for thousands, and Arabic-Indic digits (٠١٢٣٤٥٦٧٨٩).
+        - subtotal: the amount before tax and service (0 if not shown). tax_and_service: VAT, service charge and tip added on top (0 if none).
+        - total: the final amount actually paid, including tax, service and tip, as a positive number. Not the subtotal, not the amount tendered or the change. \
+        It should equal subtotal + tax_and_service when both are shown; if the printed total disagrees with the items, trust the printed TOTAL / الإجمالي line.
         - currency: ISO 4217 code (EGP for "LE", "EGP", "ج.م", "جنيه"); "" if the receipt doesn't say.
         - date: yyyy-MM-dd from the receipt, or "" if there is none.
         - category: one of \(MoneyCategory.all.filter { $0 != "Income" }.joined(separator: ", ")).
@@ -110,17 +113,17 @@ enum ReceiptScanner {
         let schema: [String: Any] = [
             "type": "object",
             "properties": [
-                "merchant": ["type": "string"], "total": ["type": "number"], "currency": ["type": "string"], "date": ["type": "string"],
+                "merchant": ["type": "string"], "subtotal": ["type": "number"], "tax_and_service": ["type": "number"], "total": ["type": "number"], "currency": ["type": "string"], "date": ["type": "string"],
                 "category": ["type": "string", "enum": MoneyCategory.all.filter { $0 != "Income" }],
                 "items": ["type": "array", "items": ["type": "string"]],
             ],
-            "required": ["merchant", "total", "currency", "date", "category", "items"], "additionalProperties": false,
+            "required": ["merchant", "subtotal", "tax_and_service", "total", "currency", "date", "category", "items"], "additionalProperties": false,
         ]
         let content: [[String: Any]] = [
             ["type": "image", "source": ["type": "base64", "media_type": "image/jpeg", "data": jpeg.base64EncodedString()]],
             ["type": "text", "text": ocr.isEmpty ? "Read this receipt." : "Read this receipt. Text recognised on the device, which may have mistakes:\n\(ocr.prefix(4000))"],
         ]
-        let reply = try await client.send(system: system, messages: [["role": "user", "content": content]], schema: schema, effort: "low", maxTokens: 2000)
+        let reply = try await client.send(system: system, messages: [["role": "user", "content": content]], schema: schema, effort: "medium", maxTokens: 6000)
         let o = try reply.decode(Out.self)
         let df = DateFormatter(); df.locale = Locale(identifier: "en_US_POSIX"); df.dateFormat = "yyyy-MM-dd"
         return Result(merchant: o.merchant, total: abs(o.total), currency: o.currency.uppercased().trimmingCharacters(in: .whitespaces),

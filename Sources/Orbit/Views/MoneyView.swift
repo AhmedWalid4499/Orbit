@@ -7,7 +7,10 @@ struct MoneyView: View {
     @Query(sort: \Transaction.date, order: .reverse) private var all: [Transaction]
     @AppStorage("monthlyBudget") private var monthlyBudget = 2000.0
 
-    @State private var month = Date.now.startOfMonth
+    /// The budget month on screen: a calendar month, or payday to payday after Start new month.
+    @State private var period = BudgetPeriod.current
+    @State private var confirmNewMonth = false
+    private var month: Date { period.start }
     @State private var adding = false
     @State private var hoveredDay: Date?
     /// overview, calendar or subscriptions
@@ -18,7 +21,7 @@ struct MoneyView: View {
     @State private var rulesOpen = false
     @State private var statement: StatementFile?
 
-    private var monthEnd: Date { Calendar.current.date(byAdding: .month, value: 1, to: month)! }
+    private var monthEnd: Date { period.end }
     private var txns: [Transaction] { all.filter { $0.date >= month && $0.date < monthEnd } }
     private var spent: Double { -txns.filter(\.isExpense).reduce(0) { $0 + $1.amount } }
     private var income: Double { txns.filter { !$0.isExpense }.reduce(0) { $0 + $1.amount } }
@@ -26,7 +29,7 @@ struct MoneyView: View {
     private struct DayTotal: Identifiable { let day: Date; let total: Double; var id: Date { day } }
 
     private var daily: [DayTotal] {
-        let days = Calendar.current.range(of: .day, in: .month, for: month)!.count
+        let days = Calendar.current.dateComponents([.day], from: period.start, to: period.end).day ?? 30
         let grouped = Dictionary(grouping: txns.filter(\.isExpense)) { $0.date.startOfDay }
         return (0..<days).map { i in
             let d = month.adding(days: i)
@@ -52,7 +55,7 @@ struct MoneyView: View {
                 header
                 HStack(spacing: 20) {
                     BalanceCard(title: "Left to spend", value: monthlyBudget - spent,
-                                caption: "of \(Fmt.money(monthlyBudget)) budget",
+                                caption: "of \(Fmt.money(monthlyBudget)) budget\(BudgetPeriod.isCustom ? " · since \(period.start.formatted(.dateTime.day().month(.abbreviated)))" : "")",
                                 fill: LinearGradient(colors: [Theme.lime, Theme.mint], startPoint: .topLeading, endPoint: .bottomTrailing),
                                 symbol: "target")
                     BalanceCard(title: "Spent", value: spent, caption: "\(txns.filter(\.isExpense).count) expenses",
@@ -63,7 +66,7 @@ struct MoneyView: View {
                                 symbol: "arrow.down.left")
                 }
                 if mode == "calendar" {
-                    MoneyCalendar(month: month, transactions: all)
+                    MoneyCalendar(month: period.start.adding(days: 14), transactions: all)
                 } else if mode == "subscriptions" {
                     SubscriptionsView()
                 } else if mode == "bills" {
@@ -97,7 +100,7 @@ struct MoneyView: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            Text(month.formatted(.dateTime.month(.wide).year())).font(Theme.display(38)).lineLimit(1).minimumScaleFactor(0.7)
+            Text(BudgetPeriod.title(period)).font(Theme.display(38)).lineLimit(1).fixedSize()
             HStack(spacing: 2) {
                 ForEach([("Overview", "overview"), ("Calendar", "calendar"), ("Bills", "bills"), ("Subscriptions", "subscriptions")], id: \.1) { label, key in
                     Button(label) { withAnimation(.snappy) { mode = key } }
@@ -111,27 +114,43 @@ struct MoneyView: View {
             .padding(3)
             .background(Capsule().fill(Theme.card))
             .padding(.leading, 8)
-            Spacer()
-            EmailExpensesChip()
-            Button { pickingReceipt = true } label: { Label("Receipt", systemImage: "doc.viewfinder") }
-                .buttonStyle(SoftButtonStyle()).help("Add an expense from a photo of a receipt")
-                .fileImporter(isPresented: $pickingReceipt, allowedContentTypes: [.image]) { result in
-                    guard case .success(let url) = result else { return }
-                    let scoped = url.startAccessingSecurityScopedResource()
-                    defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-                    if let img = PlatformImage.load(url) { receipt = ReceiptPhoto(image: img) }
-                }
-            Button { rulesOpen = true } label: { Label("Budgets", systemImage: "slider.horizontal.3") }
-                .buttonStyle(SoftButtonStyle()).help("Budgets per category, spending alerts and learned merchant categories")
-            Button { pickingStatement = true } label: { Label("Import", systemImage: "doc.text.magnifyingglass") }
-                .buttonStyle(SoftButtonStyle()).help("Add transactions from your bank's CSV or PDF statement")
-            Button { adding = true } label: { Label("Add transaction", systemImage: "plus") }.buttonStyle(SoftButtonStyle())
+            Spacer(minLength: 8)
+            // Labels when there's room, icons when the window is narrow, so the month name never gets cut.
+            ViewThatFits(in: .horizontal) {
+                actions(compact: false)
+                actions(compact: true)
+            }
+            .layoutPriority(-1)
+            .fileImporter(isPresented: $pickingReceipt, allowedContentTypes: [.image]) { result in
+                guard case .success(let url) = result else { return }
+                let scoped = url.startAccessingSecurityScopedResource()
+                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                if let img = PlatformImage.load(url) { receipt = ReceiptPhoto(image: img) }
+            }
+            .newBudgetMonthDialog($confirmNewMonth) { period = BudgetPeriod.current }
             CircleIconButton(symbol: "arrow.left", filled: true, size: 46) {
-                month = Calendar.current.date(byAdding: .month, value: -1, to: month)!
+                period = BudgetPeriod.shifted(period, by: -1)
             }
             CircleIconButton(symbol: "arrow.right", filled: true, size: 46) {
-                month = Calendar.current.date(byAdding: .month, value: 1, to: month)!
+                period = BudgetPeriod.shifted(period, by: 1)
             }
+        }
+    }
+
+    private func actions(compact: Bool) -> some View {
+        func item(_ title: String, _ symbol: String, _ help: String, _ action: @escaping () -> Void) -> some View {
+            Button(action: action) {
+                if compact { Image(systemName: symbol).frame(height: 16) } else { Label(title, systemImage: symbol).lineLimit(1).fixedSize() }
+            }
+            .buttonStyle(SoftButtonStyle()).help(help)
+        }
+        return HStack(spacing: 8) {
+            EmailExpensesChip()
+            item("Receipt", "doc.viewfinder", "Add an expense from a photo of a receipt") { pickingReceipt = true }
+            item("New month", "arrow.counterclockwise", "Payday? Start a new budget month today") { confirmNewMonth = true }
+            item("Budgets", "slider.horizontal.3", "Budgets per category, spending alerts and learned merchant categories") { rulesOpen = true }
+            item("Import", "doc.text.magnifyingglass", "Add transactions from your bank's CSV or PDF statement") { pickingStatement = true }
+            item("Add transaction", "plus", "Add a transaction") { adding = true }
         }
     }
 

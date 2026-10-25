@@ -15,6 +15,17 @@ struct ChatItem: Codable, Identifiable, Equatable {
     var undone = false
     /// Names of files sent with this message.
     var files: [String]? = nil
+    /// A place the assistant saved, shown as a little map card.
+    var place: ChatPlace? = nil
+}
+
+struct ChatPlace: Codable, Equatable {
+    var name: String
+    var address: String
+    var category: String
+    var lat: Double
+    var lon: Double
+    var link: String = ""
 }
 
 /// Claude as a general assistant that can act inside Orbit (create tasks, habits, events, notes,
@@ -547,9 +558,9 @@ enum AssistantTools {
             guard let p = await PlaceLookup.add(str("place"), notes: str("notes"), category: PlaceCategory(rawValue: str("category")), context: context)
             else { return Outcome(result: "Couldn't find that place.", isError: true) }
             let whereText = p.address.isEmpty ? (p.hasLocation ? "pinned on the map" : "not found on the map") : p.address
-            return Outcome(result: "Saved \(p.title) (\(p.placeCategory.title), \(whereText)) to Go to.",
-                           action: ChatItem(role: .action, text: "Go to: “\(p.title)” · \(p.placeCategory.title)", symbol: "mappin.and.ellipse",
-                                            undo: .models([p.persistentModelID])))
+            var item = ChatItem(role: .action, text: "Saved to Go to", symbol: "mappin.and.ellipse", undo: .models([p.persistentModelID]))
+            item.place = ChatPlace(name: p.title, address: p.address, category: p.placeCategoryRaw, lat: p.latitude, lon: p.longitude, link: p.mapURL)
+            return Outcome(result: "Saved \(p.title) (\(p.placeCategory.title), \(whereText)) to Go to.", action: item)
 
         case "add_transaction":
             let amount = abs(num("amount"))

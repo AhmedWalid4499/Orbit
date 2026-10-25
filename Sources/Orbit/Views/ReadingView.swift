@@ -403,16 +403,17 @@ struct ReadingFilterRow: View {
 
 struct BookCover: View {
     let book: Book
+    @State private var image: PlatformImage?
 
     var body: some View {
         ZStack {
             placeholder
-            if let url = URL(string: book.coverURL), !book.coverURL.isEmpty {
-                AsyncImage(url: url) { phase in
-                    if let image = phase.image { image.resizable().aspectRatio(contentMode: .fill) }
-                }
+            if let image {
+                image.swiftUI.resizable().aspectRatio(contentMode: .fill).transition(.opacity)
             }
         }
+        // Cached on disk; a missing or broken cover is looked up by title and author.
+        .task(id: book.coverURL + book.title) { image = await BookCovers.image(for: book) }
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .shadow(color: .black.opacity(0.15), radius: 6, y: 4)
     }

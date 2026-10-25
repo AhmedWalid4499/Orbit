@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import SwiftData
 import WidgetKit
+import CryptoKit
 
 /// Writes a small summary of today into the app-group folder that Orbit's desktop widgets read
 /// (Widgets/OrbitWidgets.swift has the matching WidgetSnapshot type; keep them in step).
@@ -18,6 +19,8 @@ enum WidgetBridge {
         struct Task: Codable { let title: String; let area: String; let overdue: Bool; let priority: Int }
         struct Habit: Codable { let name: String; let symbol: String; let done: Bool; let streak: Int; let color: String }
         struct Dream: Codable { let title: String; let date: Date }
+        /// cover: file name in the covers folder next to widget.json ("" while it downloads).
+        struct ShelfBook: Codable { let title: String; let author: String; let reading: Bool; let progress: Double; let cover: String }
         var generatedAt: Date
         var userName: String
         var events: [Event]
@@ -27,6 +30,7 @@ enum WidgetBridge {
         var budget: Double
         var currency: String
         var lookingForward: [Dream]
+        var books: [ShelfBook]?
     }
 
     private static var lastWritten: Data?
@@ -51,9 +55,20 @@ enum WidgetBridge {
         let habits = (try? context.fetch(FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.createdAt)]))) ?? []
         let txns = (try? context.fetch(FetchDescriptor<Transaction>())) ?? []
         let budget = UserDefaults.standard.object(forKey: "monthlyBudget") as? Double ?? 2000
-        let spent = -txns.filter { $0.isExpense && $0.date >= now.startOfMonth }.reduce(0) { $0 + $1.amount }
+        let spent = BudgetPeriod.spent(txns)
         let dreams = ((try? context.fetch(FetchDescriptor<BucketItem>())) ?? [])
             .filter { !$0.isDone && ($0.targetDate ?? .distantPast) >= today }.sorted { $0.targetDate! < $1.targetDate! }
+
+        // Bookshelf: what you're reading, then what's next (up to five of each).
+        let allBooks = (try? context.fetch(FetchDescriptor<Book>())) ?? []
+        let sessions = (try? context.fetch(FetchDescriptor<ReadingSession>())) ?? []
+        let reading = Array(BookLibrary.currentlyReading(allBooks, sessions: sessions).prefix(5))
+        let next = Array(allBooks.filter { $0.status == .toRead }.sorted { $0.addedAt > $1.addedAt }.prefix(5))
+        let shelf = (reading + next).map { b -> WidgetSnapshot.ShelfBook in
+            let name = coverName(b)
+            if let folder, !FileManager.default.fileExists(atPath: folder.appending(path: "covers/\(name)").path) { fetchCover(b, name: name) }
+            return .init(title: b.title, author: b.author, reading: b.status == .reading || reading.contains(b), progress: b.progress, cover: name)
+        }
 
         let snap = WidgetSnapshot(
             generatedAt: now,
@@ -62,7 +77,8 @@ enum WidgetBridge {
             tasks: tasks.prefix(8).map { .init(title: $0.title, area: $0.areaRaw, overdue: $0.isOverdue, priority: $0.priority) },
             habits: habits.map { .init(name: $0.name, symbol: $0.symbol, done: $0.isDone(on: today), streak: $0.currentStreak, color: hex($0.area.color)) },
             moneyLeft: max(budget - spent, 0), budget: budget, currency: Fmt.currencyCode,
-            lookingForward: dreams.prefix(3).map { .init(title: $0.title, date: $0.targetDate!) })
+            lookingForward: dreams.prefix(3).map { .init(title: $0.title, date: $0.targetDate!) },
+            books: shelf)
 
         let enc = JSONEncoder()
         enc.dateEncodingStrategy = .iso8601
@@ -77,4 +93,24 @@ enum WidgetBridge {
     }
 
     private static func hex(_ c: Color) -> String { c.hexString ?? "#F7C2EC" }
+
+    private static func coverName(_ b: Book) -> String {
+        SHA256.hash(data: Data(b.matchKey.utf8)).prefix(10).map { String(format: "%02x", $0) }.joined() + ".jpg"
+    }
+
+    private static var fetching: Set<String> = []
+
+    /// Saves a small copy of the book's cover where the widget can read it, then refreshes the widgets.
+    private static func fetchCover(_ book: Book, name: String) {
+        guard let folder, !fetching.contains(name) else { return }
+        fetching.insert(name)
+        Task {
+            defer { fetching.remove(name) }
+            guard let img = await BookCovers.image(for: book), let jpeg = img.jpeg(maxSide: 360, quality: 0.8) else { return }
+            let dir = folder.appending(path: "covers", directoryHint: .isDirectory)
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            try? jpeg.write(to: dir.appending(path: name), options: .atomic)
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+    }
 }

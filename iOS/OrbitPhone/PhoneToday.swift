@@ -46,7 +46,7 @@ struct PhoneToday: View {
     }
 
     private var spentThisMonth: Double {
-        -transactions.filter { $0.isExpense && $0.date >= Date.now.startOfMonth }.reduce(0) { $0 + $1.amount }
+        BudgetPeriod.spent(transactions)
     }
 
     private var readThisYear: Int {
@@ -73,6 +73,7 @@ struct PhoneToday: View {
                 captureField
                 stats
                 DaySummaryCard(compact: true)
+                CheckInCard()
                 BriefCard()
                 if let todaysPlan { TopThreeList(plan: todaysPlan) }
                 dueToday

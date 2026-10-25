@@ -30,7 +30,9 @@ enum BankMessages {
             }
             return "The message was empty."
         }
-        if !EgyptBanks.accepts(sender: sender) {
+        // Senders show up differently from phone to phone (a short code, a name, a number), so a message that clearly
+        // reads like a card or account payment is logged even when its sender isn't on your list.
+        if !EgyptBanks.accepts(sender: sender) && !looksLikeBank(text) {
             // Not one of your banks. Remember it, so Orbit can offer to add it if it looks like a payment.
             if let p = offline(text), p.kind != .notPayment, p.amount > 0 { EgyptBanks.noteIgnored(sender: sender, text: text) }
             return "Not from one of your banks, nothing logged."
@@ -47,6 +49,14 @@ enum BankMessages {
 
         guard let p = await read(text), p.kind != .notPayment, p.amount > 0 else { return "Not a payment, nothing logged." }
         return await save(p, source: "sms", sourceID: id, existing: existing, context: context)
+    }
+
+    /// Wording only banks use about a card or account, plus an amount.
+    static func looksLikeBank(_ text: String) -> Bool {
+        let t = text.lowercased()
+        let words = ["card", "account", "acct", "a/c", "debited", "credited", "charged", "purchase", "instapay", "transaction", "ending",
+                     "بطاقة", "بطاقتكم", "خصم", "حساب", "حسابكم", "إيداع", "ايداع", "عملية شراء"]
+        return words.contains { t.contains($0) } && amountAndCurrency(in: text) != nil
     }
 
     /// What a message means, without saving it: Claude when there's a key, else the offline reader.

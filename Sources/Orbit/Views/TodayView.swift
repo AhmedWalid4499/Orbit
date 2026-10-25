@@ -55,7 +55,7 @@ struct TodayView: View {
     }
 
     private var spentThisMonth: Double {
-        -transactions.filter { $0.isExpense && $0.date >= Date.now.startOfMonth }.reduce(0) { $0 + $1.amount }
+        BudgetPeriod.spent(transactions)
     }
 
     private var readThisYear: Int {
@@ -97,6 +97,7 @@ struct TodayView: View {
             HStack(alignment: .top, spacing: 14) {
                 VStack(spacing: 14) {
                     DaySummaryCard()
+                    CheckInCard()
                     BriefCard()
                     agendaCard.frame(minHeight: 150, maxHeight: .infinity)
                 }
@@ -552,6 +553,7 @@ struct AgendaRow: View {
 struct InboxSummary: View {
     let digest: InboxDigest
     let multi: Bool
+    @State private var mailbox = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -582,8 +584,14 @@ struct InboxSummary: View {
                 section("Worth knowing")
                 ForEach(digest.important) { MailRow(item: $0, tint: Theme.cyan, multi: multi) }
             }
-            Text("\(digest.scanned) emails from the last two days · updated \(digest.generatedAt.formatted(.relative(presentation: .named)))")
-                .font(Theme.ui(10)).foregroundStyle(Theme.inkMuted)
+            HStack {
+                Text("\(digest.scanned) emails from the last two days · updated \(digest.generatedAt.formatted(.relative(presentation: .named)))")
+                    .font(Theme.ui(10)).foregroundStyle(Theme.inkMuted)
+                Spacer()
+                Button { mailbox = true } label: { Label("All mail", systemImage: "tray.full") }
+                    .buttonStyle(.plain).font(Theme.ui(11, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
+            }
+            .sheet(isPresented: $mailbox) { MailboxSheet() }
         }
     }
 
@@ -601,11 +609,11 @@ struct MailRow: View {
     let item: InboxDigest.Item
     let tint: Color
     let multi: Bool
-    @Environment(\.openURL) private var openURL
     @State private var hovering = false
+    @State private var reading = false
 
     var body: some View {
-        Button { if let u = InboxStore.link(item) { openURL(u) } } label: {
+        Button { reading = true } label: {
             HStack(alignment: .top, spacing: 10) {
                 Circle().fill(tint).frame(width: 8, height: 8).padding(.top, 5)
                 VStack(alignment: .leading, spacing: 2) {
@@ -631,6 +639,7 @@ struct MailRow: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .help(item.subject)
+        .sheet(isPresented: $reading) { MailSheet(id: item.messageID, account: item.account) }
     }
 }
 

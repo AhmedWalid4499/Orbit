@@ -139,7 +139,7 @@ final class DaySummaryStore: ObservableObject {
         lines.append("\nSpent today: \(Fmt.money(-spent.reduce(0) { $0 + $1.amount })) in \(spent.count) payments")
         lines += spent.sorted { $0.amount < $1.amount }.prefix(6).map { "- \($0.title): \(Fmt.money(-$0.amount)) [\($0.category)]" }
         if let budgets = Optional(SpendingAlerts.budgets), !budgets.isEmpty {
-            let month = ((try? context.fetch(FetchDescriptor<Transaction>())) ?? []).filter { $0.isExpense && $0.date >= Date.now.startOfMonth }
+            let month = ((try? context.fetch(FetchDescriptor<Transaction>())) ?? []).filter { $0.isExpense && $0.date >= BudgetPeriod.current.start }
             lines.append("Category budgets this month: " + budgets.map { c, limit in
                 "\(c) \(Fmt.money(-month.filter { $0.category == c }.reduce(0) { $0 + $1.amount })) of \(Fmt.money(limit))"
             }.joined(separator: "; "))

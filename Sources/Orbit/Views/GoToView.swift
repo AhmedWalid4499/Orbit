@@ -154,9 +154,10 @@ struct PlaceCard: View {
                     .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary).lineLimit(2)
                 if !place.notes.isEmpty { Text(place.notes).font(Theme.ui(13)).lineLimit(3).padding(.top, 2) }
                 HStack(spacing: 8) {
-                    if let url = mapsURL {
-                        Button { Platform.open(url) } label: { Label("Directions", systemImage: "arrow.triangle.turn.up.right.diamond.fill") }
-                            .buttonStyle(SoftButtonStyle())
+                    if place.hasLocation || URL(string: place.mapURL)?.scheme != nil {
+                        DirectionsMenu(name: place.title, address: place.address,
+                                       lat: place.hasLocation ? place.latitude : nil, lon: place.hasLocation ? place.longitude : nil,
+                                       link: place.mapURL)
                     }
                     Button {
                         withAnimation { place.isDone.toggle(); place.doneAt = place.isDone ? .now : nil }
@@ -176,14 +177,51 @@ struct PlaceCard: View {
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Theme.ink, lineWidth: highlighted ? 2 : 0))
         .contentShape(Rectangle())
     }
+}
 
-    private var mapsURL: URL? {
-        if place.hasLocation {
-            var c = URLComponents(string: "https://maps.apple.com/")!
-            c.queryItems = [.init(name: "daddr", value: "\(place.latitude),\(place.longitude)"), .init(name: "q", value: place.title)]
-            return c.url
+/// Directions in Apple Maps or Google Maps (the app if it's installed, otherwise the website).
+struct DirectionsMenu: View {
+    let name: String
+    var address = ""
+    var lat: Double? = nil
+    var lon: Double? = nil
+    /// The link the place came from, used when there are no coordinates.
+    var link = ""
+    var label = "Directions"
+
+    var body: some View {
+        Menu {
+            Button { Platform.open(MapsLink.apple(name: name, address: address, lat: lat, lon: lon, link: link)) } label: {
+                Label("Apple Maps", systemImage: "map.fill")
+            }
+            Button { Platform.open(MapsLink.google(name: name, address: address, lat: lat, lon: lon, link: link)) } label: {
+                Label("Google Maps", systemImage: "globe")
+            }
+        } label: {
+            Label(label, systemImage: "arrow.triangle.turn.up.right.diamond.fill")
+                .font(Theme.ui(12, weight: .medium)).foregroundStyle(Theme.ink)
+                .padding(.horizontal, 14).padding(.vertical, 8)
+                .background(Capsule().fill(Theme.canvas))
         }
-        return URL(string: place.mapURL).flatMap { $0.scheme == nil ? nil : $0 }
+        .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+    }
+}
+
+enum MapsLink {
+    static func apple(name: String, address: String = "", lat: Double?, lon: Double?, link: String = "") -> URL {
+        if lat == nil, link.contains("maps.apple"), let u = URL(string: link) { return u }
+        var c = URLComponents(string: "https://maps.apple.com/")!
+        if let lat, let lon { c.queryItems = [.init(name: "daddr", value: "\(lat),\(lon)"), .init(name: "q", value: name)] }
+        else { c.queryItems = [.init(name: "daddr", value: [name, address].filter { !$0.isEmpty }.joined(separator: ", "))] }
+        return c.url!
+    }
+
+    static func google(name: String, address: String = "", lat: Double?, lon: Double?, link: String = "") -> URL {
+        if lat == nil, link.contains("google."), let u = URL(string: link) { return u }
+        var c = URLComponents(string: "https://www.google.com/maps/dir/")!
+        let destination = lat.flatMap { la in lon.map { "\(la),\($0)" } } ?? [name, address].filter { !$0.isEmpty }.joined(separator: ", ")
+        c.queryItems = [.init(name: "api", value: "1"), .init(name: "destination", value: destination)]
+        return c.url!
     }
 }
 

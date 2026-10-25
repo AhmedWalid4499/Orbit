@@ -10,7 +10,9 @@ struct PhoneMoney: View {
     @AppStorage("monthlyBudget") private var monthlyBudget = 2000.0
     @AppStorage("moneyTab") private var mode = "overview"
 
-    @State private var month = Date.now.startOfMonth
+    @State private var period = BudgetPeriod.current
+    @State private var confirmNewMonth = false
+    private var month: Date { period.start }
     @State private var adding = false
     @State private var pickingStatement = false
     @State private var statement: StatementFile?
@@ -22,7 +24,7 @@ struct PhoneMoney: View {
     @State private var receipt: ReceiptPhoto?
     @State private var rulesOpen = false
 
-    private var monthEnd: Date { Calendar.current.date(byAdding: .month, value: 1, to: month)! }
+    private var monthEnd: Date { period.end }
     private var txns: [Transaction] { all.filter { $0.date >= month && $0.date < monthEnd } }
     private var spent: Double { -txns.filter(\.isExpense).reduce(0) { $0 + $1.amount } }
     private var income: Double { txns.filter { !$0.isExpense }.reduce(0) { $0 + $1.amount } }
@@ -33,13 +35,13 @@ struct PhoneMoney: View {
                 HStack {
                     Button { shift(-1) } label: { Image(systemName: "chevron.left") }
                     Spacer()
-                    Text(month.formatted(.dateTime.month(.wide).year())).font(Theme.display(22))
+                    Text(BudgetPeriod.title(period)).font(Theme.display(22))
                     Spacer()
                     Button { shift(1) } label: { Image(systemName: "chevron.right") }
                 }
                 .buttonStyle(.plain).font(.system(size: 16, weight: .semibold))
 
-                BalanceCard(title: "Left to spend", value: monthlyBudget - spent, caption: "of \(Fmt.money(monthlyBudget)) budget",
+                BalanceCard(title: "Left to spend", value: monthlyBudget - spent, caption: "of \(Fmt.money(monthlyBudget)) budget\(BudgetPeriod.isCustom ? " · since \(period.start.formatted(.dateTime.day().month(.abbreviated)))" : "")",
                             fill: LinearGradient(colors: [Theme.lime, Theme.mint], startPoint: .topLeading, endPoint: .bottomTrailing), symbol: "target")
                 HStack(spacing: 12) {
                     mini("Spent", Fmt.money(spent), "\(txns.filter(\.isExpense).count) expenses", Theme.peach)
@@ -52,7 +54,7 @@ struct PhoneMoney: View {
                 .pickerStyle(.segmented)
 
                 if mode == "calendar" {
-                    MoneyCalendar(month: month, transactions: all)
+                    MoneyCalendar(month: period.start.adding(days: 14), transactions: all)
                 } else if mode == "subscriptions" {
                     SubscriptionsView()
                 } else if mode == "bills" {
@@ -63,6 +65,7 @@ struct PhoneMoney: View {
                             Button { adding = true } label: { Label("Add", systemImage: "plus") }.buttonStyle(SoftButtonStyle())
                             Button { receiptMenu = true } label: { Label("Receipt", systemImage: "doc.viewfinder") }.buttonStyle(SoftButtonStyle())
                             Button { rulesOpen = true } label: { Label("Budgets", systemImage: "slider.horizontal.3") }.buttonStyle(SoftButtonStyle())
+                            Button { confirmNewMonth = true } label: { Label("New month", systemImage: "arrow.counterclockwise") }.buttonStyle(SoftButtonStyle())
                             Button { pickingStatement = true } label: { Label("Statement", systemImage: "doc.text.magnifyingglass") }
                                 .buttonStyle(SoftButtonStyle())
                         }
@@ -99,6 +102,7 @@ struct PhoneMoney: View {
                 libraryItem = nil
             }
         }
+        .newBudgetMonthDialog($confirmNewMonth) { period = BudgetPeriod.current }
         .phoneChrome("Money")
     }
 
@@ -124,7 +128,7 @@ struct PhoneMoney: View {
     }
 
     private func shift(_ n: Int) {
-        withAnimation(.snappy) { month = Calendar.current.date(byAdding: .month, value: n, to: month)! }
+        withAnimation(.snappy) { period = BudgetPeriod.shifted(period, by: n) }
     }
 
     private func mini(_ title: String, _ value: String, _ caption: String, _ color: Color) -> some View {
@@ -139,7 +143,7 @@ struct PhoneMoney: View {
     }
 
     private var chart: some View {
-        let days = Calendar.current.range(of: .day, in: .month, for: month)!.count
+        let days = Calendar.current.dateComponents([.day], from: period.start, to: period.end).day ?? 30
         let grouped = Dictionary(grouping: txns.filter(\.isExpense)) { $0.date.startOfDay }
         let points = (0..<days).map { i -> (Date, Double) in
             let d = month.adding(days: i)

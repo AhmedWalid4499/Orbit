@@ -120,14 +120,20 @@ enum JournalCompanion {
             .map { "\($0.role == "user" ? "Me" : "Companion"): \($0.text)" }
             .joined(separator: "\n")
         let system = """
-        Write today's journal entry in the first person, as the user ("Me").
-        You get what they've already written in their journal (may be empty) and a conversation with their companion.
-        Produce ONE cohesive entry that includes everything from both without repeating anything: keep their own sentences where you can, fix only obvious typos, and fold in what they said in the chat.
-        Use only what the user actually wrote or said; don't add events or feelings they didn't express.
-        2-4 short paragraphs of plain text, no headings, no markdown, no date line.
+        You turn a journaling chat into a real journal entry, written in the first person as the user ("Me"). Don't transcribe the chat or paste their messages back: write it up the way a thoughtful person would in their own diary.
+        You get what they've already written (may be empty), the conversation with their companion, and what the app knows about their day (calendar, tasks done, habits, spending).
+        - Open with a short, vivid paragraph about the day: what happened and how it felt, in flowing sentences, connecting what they said with what the day's data shows (the meeting they had, the workout they did, tasks they finished). Keep their own good phrases.
+        - Then a paragraph that reflects: what stood out, what it meant to them, anything they learned or are wrestling with, based on what they said.
+        - Then short notes, each on its own line starting with "• ", under these plain labels on their own line (skip any that would be empty):
+          Highlights
+          On my mind
+          Tomorrow
+        - Facts and feelings must come from their words or the day's data; never invent events, people or emotions. Don't mention the app or the companion.
+        - Plain text: no markdown symbols, no date line. Fix typos.
         mood: 1 (rough) to 5 (great) from what they said, or 0 if unclear.
         """
-        let input = "ALREADY WRITTEN:\n\(note.body.isEmpty ? "(nothing yet)" : note.body)\n\nCONVERSATION:\n\(transcript)"
+        let day = chat.system.components(separatedBy: "Today's data from the app:").dropFirst().first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let input = "ALREADY WRITTEN:\n\(note.body.isEmpty ? "(nothing yet)" : note.body)\n\nCONVERSATION:\n\(transcript)\n\nTHE DAY IN THE APP:\n\(day.isEmpty ? "(none)" : day)"
         let result = try await client.structured(WriteUp.self, system: system, user: input, schema: [
             "type": "object",
             "properties": ["entry": ["type": "string"], "mood": ["type": "integer"]],

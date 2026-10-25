@@ -107,6 +107,8 @@ extension Snapshot {
             renderAlone("tabs", width: 520, height: 720, Form { TabsSection() }.formStyle(.grouped))
             renderAlone("inbox-window", width: 520, height: 360, Form { InboxWindowControls() }.formStyle(.grouped))
             renderAlone("memory", width: 520, height: 420, Form { MemorySection() }.formStyle(.grouped))
+            renderAlone("mail", width: 620, height: 720, wait: 1, MailSheet(id: "demo1", account: "alex@example.com"))
+            renderAlone("place-chat", width: 420, height: 320, wait: 2.5, PlaceChatCard(place: ChatPlace(name: "Zooba", address: "26 Taha Hussein, Zamalek", category: "food", lat: 30.0612, lon: 31.2195), note: "Saved to Go to") {}.padding(20))
             renderAlone("shared-lists", width: 760, height: 640, wait: 1, ScrollView { SharedListsView().padding(28) }.background(Theme.canvas))
             renderAlone("bill-editor", width: 460, height: 540, BillEditor(bill: nil))
             renderAlone("goal-editor", width: 500, height: 600, GoalEditor(goal: nil))

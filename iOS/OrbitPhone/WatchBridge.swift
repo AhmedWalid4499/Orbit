@@ -53,7 +53,7 @@ final class WatchBridge: NSObject, WCSessionDelegate {
 
         let txns = (try? context.fetch(FetchDescriptor<Transaction>(sortBy: [SortDescriptor(\.date, order: .reverse)]))) ?? []
         let spentToday = -txns.filter { $0.isExpense && $0.date >= today && $0.date < tomorrow }.reduce(0) { $0 + $1.amount }
-        let month = -txns.filter { $0.isExpense && $0.date >= now.startOfMonth }.reduce(0) { $0 + $1.amount }
+        let month = BudgetPeriod.spent(txns)
         let budget = UserDefaults.standard.object(forKey: "monthlyBudget") as? Double ?? 2000
         s.spentToday = Fmt.money(spentToday)
         s.spentMonth = Fmt.money(month)

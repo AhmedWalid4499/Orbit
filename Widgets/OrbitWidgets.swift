@@ -15,6 +15,7 @@ struct WidgetSnapshot: Codable {
     struct Task: Codable { let title: String; let area: String; let overdue: Bool; let priority: Int }
     struct Habit: Codable { let name: String; let symbol: String; let done: Bool; let streak: Int; let color: String }
     struct Dream: Codable { let title: String; let date: Date }
+    struct ShelfBook: Codable { let title: String; let author: String; let reading: Bool; let progress: Double; let cover: String }
     var generatedAt: Date
     var userName: String
     var events: [Event]
@@ -24,6 +25,7 @@ struct WidgetSnapshot: Codable {
     var budget: Double
     var currency: String
     var lookingForward: [Dream]
+    var books: [ShelfBook]?
 
     static func load() -> WidgetSnapshot? {
         guard let dir = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup),
@@ -249,6 +251,119 @@ struct CountdownWidgetView: View {
     }
 }
 
+// MARK: - Bookshelf widget
+
+/// A cover image saved by the app next to widget.json.
+func coverImage(_ name: String) -> Image? {
+    guard !name.isEmpty, let dir = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) else { return nil }
+    let url = dir.appending(path: "covers/\(name)")
+    #if os(iOS)
+    return UIImage(contentsOfFile: url.path).map { Image(uiImage: $0) }
+    #else
+    return NSImage(contentsOf: url).map { Image(nsImage: $0) }
+    #endif
+}
+
+/// One book standing on the shelf: its cover (or a coloured spine with the title), and progress if you're reading it.
+struct ShelfBookView: View {
+    let book: WidgetSnapshot.ShelfBook
+    var height: CGFloat
+
+    private var spine: Color {
+        let palette: [Color] = [W.pink, W.lime, Color(red: 0.71, green: 0.55, blue: 0.97), Color(red: 0.15, green: 0.83, blue: 0.96),
+                                Color(red: 0.56, green: 0.93, blue: 0.75), Color(red: 1, green: 0.78, blue: 0.64)]
+        return palette[abs(book.title.unicodeScalars.reduce(0) { $0 + Int($1.value) }) % palette.count]
+    }
+
+    var body: some View {
+        VStack(spacing: 3) {
+            ZStack {
+                if let img = coverImage(book.cover) {
+                    img.resizable().aspectRatio(contentMode: .fill)
+                } else {
+                    spine
+                    Text(book.title).font(.system(size: 8, weight: .bold, design: .serif)).foregroundStyle(W.ink)
+                        .multilineTextAlignment(.center).lineLimit(4).padding(3)
+                }
+            }
+            .frame(width: height * 0.66, height: height)
+            .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+            .shadow(color: .black.opacity(0.35), radius: 2, x: 1, y: 2)
+            if book.reading {
+                GeometryReader { g in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(.white.opacity(0.25))
+                        Capsule().fill(W.lime).frame(width: max(3, g.size.width * book.progress))
+                    }
+                }
+                .frame(width: height * 0.66, height: 3)
+            }
+        }
+    }
+}
+
+/// A wooden shelf with up to five books standing on it.
+struct Shelf: View {
+    let title: String
+    let books: [WidgetSnapshot.ShelfBook]
+    var height: CGFloat
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title.uppercased()).font(.system(size: 9, weight: .bold)).tracking(0.6).foregroundStyle(.white.opacity(0.7))
+            VStack(spacing: 0) {
+                HStack(alignment: .bottom, spacing: 8) {
+                    ForEach(Array(books.prefix(5).enumerated()), id: \.offset) { _, b in ShelfBookView(book: b, height: height) }
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 6)
+                // The plank.
+                LinearGradient(colors: [Color(red: 0.62, green: 0.42, blue: 0.26), Color(red: 0.42, green: 0.27, blue: 0.16)],
+                               startPoint: .top, endPoint: .bottom)
+                    .frame(height: 7)
+                    .clipShape(RoundedRectangle(cornerRadius: 2))
+                    .shadow(color: .black.opacity(0.4), radius: 3, y: 3)
+            }
+        }
+    }
+}
+
+struct BookshelfWidgetView: View {
+    @Environment(\.widgetFamily) private var family
+    let entry: Entry
+
+    var body: some View {
+        let books = entry.snapshot?.books ?? []
+        let reading = books.filter(\.reading), next = books.filter { !$0.reading }
+        if books.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Bookshelf").font(.system(size: 13, weight: .bold, design: .serif))
+                Text("Add books in Orbit › Reading and they'll stand here.").font(.caption).opacity(0.75)
+            }
+            .foregroundStyle(.white)
+        } else {
+            switch family {
+            case .systemSmall:
+                let b = reading.first ?? books[0]
+                VStack(alignment: .leading, spacing: 6) {
+                    ShelfBookView(book: b, height: 92)
+                    Text(b.title).font(.system(size: 11, weight: .semibold)).lineLimit(1)
+                    Text(b.reading ? "\(Int(b.progress * 100))% read" : "Up next").font(.system(size: 10)).opacity(0.7)
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            case .systemLarge:
+                VStack(alignment: .leading, spacing: 14) {
+                    Shelf(title: "Reading now", books: reading.isEmpty ? Array(books.prefix(1)) : reading, height: 104)
+                    Shelf(title: "Want to read", books: next, height: 104)
+                }
+            default:
+                Shelf(title: reading.isEmpty ? "Want to read" : "My shelf", books: Array((reading + next).prefix(5)), height: 96)
+            }
+        }
+    }
+}
+
 // MARK: - Widgets
 
 struct TodayWidget: Widget {
@@ -287,9 +402,24 @@ struct CountdownWidget: Widget {
     }
 }
 
+struct BookshelfWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "OrbitBookshelf", provider: Provider()) { entry in
+            BookshelfWidgetView(entry: entry)
+                .containerBackground(LinearGradient(colors: [Color(red: 0.18, green: 0.13, blue: 0.11), Color(red: 0.11, green: 0.08, blue: 0.07)],
+                                                    startPoint: .top, endPoint: .bottom), for: .widget)
+                .widgetURL(URL(string: "com.personal.orbit://open/reading"))
+        }
+        .configurationDisplayName("Bookshelf")
+        .description("The books you're reading and the ones you want to read next.")
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+    }
+}
+
 @main
 struct OrbitWidgets: WidgetBundle {
     var body: some Widget {
+        BookshelfWidget()
         TodayWidget()
         HabitsWidget()
         CountdownWidget()

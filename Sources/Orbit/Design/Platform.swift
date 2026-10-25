@@ -126,9 +126,12 @@ extension PlatformImage {
         #if os(macOS)
         cgImage(forProposedRect: nil, context: nil, hints: nil)
         #else
-        if let cgImage { return cgImage }
-        let r = UIGraphicsImageRenderer(size: size)
-        return r.image { _ in draw(at: .zero) }.cgImage
+        // Camera photos are stored sideways with an orientation flag; draw them upright so text reads the right way.
+        if imageOrientation == .up, let cgImage { return cgImage }
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = scale
+        let r = UIGraphicsImageRenderer(size: size, format: format)
+        return r.image { _ in draw(in: CGRect(origin: .zero, size: size)) }.cgImage
         #endif
     }
 

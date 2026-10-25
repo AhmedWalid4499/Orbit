@@ -224,6 +224,8 @@ struct ClaudeClient {
         /// Content blocks to append to the conversation unchanged (thinking, text, tool_use…).
         let blocks: [[String: Any]]
         let stopReason: String?
+        /// The code-execution sandbox this conversation used, to keep using the same one (its files stay).
+        var container: String? = nil
         /// Tool calls with their parsed input; `input` is nil if the JSON didn't parse.
         var toolCalls: [(id: String, name: String, input: [String: Any]?)] {
             blocks.compactMap { b in
@@ -238,7 +240,7 @@ struct ClaudeClient {
     }
 
     /// One streamed model turn, optionally with tools. Text deltas are reported through `onText`.
-    func streamTurn(system: String, messages: [[String: Any]], tools: [[String: Any]]?, effort: String, maxTokens: Int = 16000,
+    func streamTurn(system: String, messages: [[String: Any]], tools: [[String: Any]]?, effort: String, maxTokens: Int = 32000, container: String? = nil,
                     onText: @escaping @MainActor (String) -> Void) async throws -> Turn {
         var body: [String: Any] = [
             "model": Self.model,
@@ -250,6 +252,7 @@ struct ClaudeClient {
             "stream": true,
         ]
         if let tools, !tools.isEmpty { body["tools"] = tools }
+        if let container { body["container"] = container }
         var req = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!)
         req.httpMethod = "POST"
         req.timeoutInterval = 600
@@ -279,6 +282,7 @@ struct ClaudeClient {
         var blocks: [Int: [String: Any]] = [:]
         var partialJSON: [Int: String] = [:]
         var stopReason: String?
+        var containerID: String?
         func visibleText() -> String {
             blocks.keys.sorted().compactMap { i in blocks[i]?["type"] as? String == "text" ? blocks[i]?["text"] as? String : nil }.joined()
         }
@@ -319,8 +323,11 @@ struct ClaudeClient {
                     else { block["input"] = [String: Any](); block["_invalid"] = true }
                     blocks[i] = block
                 }
+            case "message_start":
+                if let id = ((event["message"] as? [String: Any])?["container"] as? [String: Any])?["id"] as? String { containerID = id }
             case "message_delta":
                 if let d = event["delta"] as? [String: Any], let r = d["stop_reason"] as? String { stopReason = r }
+                if let id = ((event["delta"] as? [String: Any])?["container"] as? [String: Any])?["id"] as? String { containerID = id }
             case "error":
                 let msg = ((event["error"] as? [String: Any])?["message"] as? String) ?? "Stream error"
                 if msg.lowercased().contains("overloaded") { throw Failure.overloaded }
@@ -338,6 +345,6 @@ struct ClaudeClient {
                 return i < boundary && t != "text" ? nil : b
             }
         }
-        return Turn(text: visibleText(), blocks: ordered, stopReason: stopReason)
+        return Turn(text: visibleText(), blocks: ordered, stopReason: stopReason, container: containerID ?? container)
     }
 }

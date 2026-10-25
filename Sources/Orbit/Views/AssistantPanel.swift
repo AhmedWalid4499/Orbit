@@ -372,13 +372,81 @@ private struct ChatTranscript: View {
 struct AssistantText: View {
     let text: String
 
+    /// Prose and ``` code blocks, in order.
+    private var parts: [(code: Bool, lang: String, text: String)] {
+        var out: [(Bool, String, String)] = []
+        var rest = Substring(text)
+        while let open = rest.range(of: "```") {
+            let before = rest[..<open.lowerBound]
+            if !before.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { out.append((false, "", String(before).trimmingCharacters(in: .newlines))) }
+            let afterOpen = rest[open.upperBound...]
+            let langEnd = afterOpen.firstIndex(of: "\n") ?? afterOpen.endIndex
+            let lang = afterOpen[..<langEnd].trimmingCharacters(in: .whitespaces)
+            let codeStart = langEnd < afterOpen.endIndex ? afterOpen.index(after: langEnd) : langEnd
+            let body = afterOpen[codeStart...]
+            if let close = body.range(of: "```") {
+                out.append((true, lang, String(body[..<close.lowerBound]).trimmingCharacters(in: .newlines)))
+                rest = body[close.upperBound...]
+            } else {
+                // Still being written: show what's there as code.
+                out.append((true, lang, String(body)))
+                rest = ""
+            }
+        }
+        if !rest.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { out.append((false, "", String(rest).trimmingCharacters(in: .newlines))) }
+        return out
+    }
+
     var body: some View {
-        let attributed = (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
-            ?? AttributedString(text)
-        Text(attributed).font(Theme.ui(14)).lineSpacing(3).textSelection(.enabled)
+        if !text.contains("```") {
+            prose(text)
+        } else {
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(Array(parts.enumerated()), id: \.offset) { _, p in
+                    if p.code { CodeBlock(code: p.text, language: p.lang) } else { prose(p.text) }
+                }
+            }
+        }
+    }
+
+    private func prose(_ s: String) -> some View {
+        let attributed = (try? AttributedString(markdown: s, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
+            ?? AttributedString(s)
+        return Text(attributed).font(Theme.ui(14)).lineSpacing(3).textSelection(.enabled)
             .foregroundStyle(Theme.ink)
             .fixedSize(horizontal: false, vertical: true)
             .frame(alignment: .leading)
+    }
+}
+
+/// Code from the assistant: monospaced on a dark card, scrolls sideways, with a Copy button.
+struct CodeBlock: View {
+    let code: String
+    let language: String
+    @State private var copied = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text(language.isEmpty ? "code" : language).font(Theme.ui(11, weight: .semibold)).foregroundStyle(.white.opacity(0.6))
+                Spacer()
+                Button {
+                    Platform.copy(code)
+                    copied = true
+                    Task { try? await Task.sleep(for: .seconds(1.5)); copied = false }
+                } label: { Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc").font(Theme.ui(11, weight: .semibold)) }
+                .buttonStyle(.plain).foregroundStyle(.white.opacity(0.8))
+            }
+            .padding(.horizontal, 12).padding(.vertical, 7)
+            .background(Color.white.opacity(0.06))
+            ScrollView(.horizontal) {
+                Text(code).font(.system(size: 12.5, design: .monospaced)).foregroundStyle(Color(hex: 0xE6E6E6))
+                    .textSelection(.enabled).fixedSize(horizontal: true, vertical: true).padding(12)
+            }
+            .scrollIndicators(.automatic)
+        }
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color(hex: 0x1B1B1F)))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 

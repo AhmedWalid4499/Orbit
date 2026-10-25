@@ -36,7 +36,7 @@ struct ChatAttachment: Identifiable, Equatable {
         }
     }
 
-    static let allowedTypes: [UTType] = [.pdf, .image, .plainText, .commaSeparatedText, .json, .html, .rtf, .rtfd, .xml,
+    static let allowedTypes: [UTType] = [.pdf, .image, .plainText, .sourceCode, .commaSeparatedText, .json, .html, .rtf, .rtfd, .xml, .yaml,
                                          UTType("org.openxmlformats.wordprocessingml.document") ?? .data,
                                          UTType("com.microsoft.word.doc") ?? .data, UTType("net.daringfireball.markdown") ?? .plainText,
                                          UTType("org.oasis-open.opendocument.text") ?? .data]

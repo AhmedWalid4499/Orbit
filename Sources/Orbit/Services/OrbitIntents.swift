@@ -123,7 +123,11 @@ struct LogBankMessageIntent: AppIntent {
         let result: String
         do { result = await BankMessages.log(message: message, sender: from, context: try orbitContext()) }
         catch { AutoLogActivity.record(.sms, sender: from, text: message, result: "Orbit wasn't ready: \(error.localizedDescription)"); throw error }
-        AutoLogActivity.record(.sms, sender: from, text: message, result: result)
+        // Ordinary texts (from friends, OTPs…) also reach Orbit when the automation runs on every message: they're
+        // ignored here and kept out of the activity list, so it only shows bank texts.
+        if !result.hasPrefix("Not from one of your banks") {
+            AutoLogActivity.record(.sms, sender: from, text: message, result: result)
+        }
         return .result(value: result, dialog: IntentDialog(stringLiteral: result))
     }
 }

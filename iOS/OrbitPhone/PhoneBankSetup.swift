@@ -38,10 +38,11 @@ struct PhoneBankSetup: View {
                     guide("Bank text messages", symbol: "message.fill", color: Theme.cyan, steps: [
                         "Tap **Add to Shortcuts** below, choose **Shortcuts** in the share sheet, then **Add Shortcut**.",
                         "In Shortcuts: **Automation** tab › **+** › **Message**.",
-                        "Tap **Message Contains**, type **EGP**, tap **Done**. Leave Sender empty.",
-                        "Choose **Run Immediately** and switch on **Notify When Run**, so you see a banner each time it runs. Tap **Next**.",
+                        "Tap **Message Contains**, type just a full stop **.** and tap **Done**. Leave Sender empty. Every payment text has one in its amount (350**.**00), however your bank writes the currency.",
+                        "Choose **Run Immediately**. Switch on **Notify When Run** for now, so you can see it work. Tap **Next**.",
                         "Tap the red **Orbit Bank Message** tile in the top row (swipe the row sideways if you don't see it).",
-                        "Repeat steps 2–5 for each word your bank uses for the currency: **LE**, **ج.م** and **جنيه**. One automation only catches texts with its exact word.",
+                        "Once a bank text shows up under Recent activity, turn **Notify When Run** off again: the automation runs for most texts, and Orbit quietly ignores the ones that aren't from your banks, on your iPhone.",
+                        "Already made automations for EGP or other words? Delete them, so the same text isn't sent twice.",
                     ], file: "Orbit Bank Message")
 
                     guide("Apple Pay", symbol: "wave.3.right", color: Theme.lime, steps: [
@@ -81,7 +82,7 @@ struct PhoneBankSetup: View {
             Text("Status").font(Theme.display(20))
             statusRow("Bank texts", ok: sms != nil,
                       sms.map { "Last one reached Orbit \($0.date.formatted(.relative(presentation: .named)))." }
-                        ?? (tested ? "The test reached Orbit, so the shortcut works. No real bank text has triggered the automation yet: check that each currency word has its own automation and that it's switched on."
+                        ?? (tested ? "The test reached Orbit, so the shortcut works, but no real bank text has started the automation yet. Set its trigger to Message Contains “.” (steps below): a currency word like EGP misses texts that write LE or ج.م."
                                    : "Nothing yet. Tap “Test the bank shortcut” below first, to check the shortcut itself works."))
             statusRow("Apple Pay", ok: wallet != nil,
                       wallet.map { "Last tap reached Orbit \($0.date.formatted(.relative(presentation: .named)))." }

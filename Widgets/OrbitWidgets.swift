@@ -264,65 +264,130 @@ func coverImage(_ name: String) -> Image? {
     #endif
 }
 
-/// One book standing on the shelf: its cover (or a coloured spine with the title), and progress if you're reading it.
-struct ShelfBookView: View {
+struct ShelfCover: View {
     let book: WidgetSnapshot.ShelfBook
-    var height: CGFloat
-
-    private var spine: Color {
-        let palette: [Color] = [W.pink, W.lime, Color(red: 0.71, green: 0.55, blue: 0.97), Color(red: 0.15, green: 0.83, blue: 0.96),
-                                Color(red: 0.56, green: 0.93, blue: 0.75), Color(red: 1, green: 0.78, blue: 0.64)]
-        return palette[abs(book.title.unicodeScalars.reduce(0) { $0 + Int($1.value) }) % palette.count]
+    var width: CGFloat
+    private var tint: Color {
+        let p: [Color] = [Color(red: 0.97, green: 0.76, blue: 0.93), Color(red: 0.90, green: 1.0, blue: 0.12), Color(red: 0.71, green: 0.55, blue: 0.97),
+                          Color(red: 0.15, green: 0.83, blue: 0.96), Color(red: 0.56, green: 0.93, blue: 0.75), Color(red: 1, green: 0.78, blue: 0.64)]
+        return p[abs(book.title.unicodeScalars.reduce(0) { $0 + Int($1.value) }) % p.count]
     }
-
     var body: some View {
-        VStack(spacing: 3) {
-            ZStack {
-                if let img = coverImage(book.cover) {
-                    img.resizable().aspectRatio(contentMode: .fill)
-                } else {
-                    spine
-                    Text(book.title).font(.system(size: 8, weight: .bold, design: .serif)).foregroundStyle(W.ink)
-                        .multilineTextAlignment(.center).lineLimit(4).padding(3)
+        ZStack {
+            if let img = coverImage(book.cover) {
+                img.resizable().aspectRatio(contentMode: .fill)
+            } else {
+                LinearGradient(colors: [tint, tint.opacity(0.75)], startPoint: .top, endPoint: .bottom)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(book.title).font(.system(size: max(8, width * 0.13), weight: .bold, design: .serif)).lineLimit(4)
+                    Spacer(minLength: 0)
+                    Text(book.author).font(.system(size: max(6, width * 0.08), weight: .medium)).opacity(0.7).lineLimit(1)
+                }
+                .foregroundStyle(Color(white: 0.07)).padding(width * 0.09).frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .frame(width: width, height: width * 1.5)
+        .clipShape(RoundedRectangle(cornerRadius: width * 0.06, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: width * 0.06, style: .continuous).strokeBorder(.primary.opacity(0.08), lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.22), radius: width * 0.05, x: 0, y: width * 0.04)
+    }
+}
+
+struct ShelfProgress: View {
+    let value: Double
+    var body: some View {
+        GeometryReader { g in
+            ZStack(alignment: .leading) {
+                Capsule().fill(.primary.opacity(0.1))
+                Capsule().fill(.primary).frame(width: max(4, g.size.width * value))
+            }
+        }
+        .frame(height: 4)
+    }
+}
+
+struct ShelfLabel: View {
+    let text: String
+    var body: some View { Text(text.uppercased()).font(.system(size: 9, weight: .bold)).tracking(0.8).foregroundStyle(.secondary) }
+}
+
+struct ShelfCurrent: View {
+    let book: WidgetSnapshot.ShelfBook
+    var cover: CGFloat
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            ShelfCover(book: book, width: cover)
+            VStack(alignment: .leading, spacing: 3) {
+                ShelfLabel(text: book.reading ? "Reading" : "Up next")
+                Text(book.title).font(.system(size: 15, weight: .bold, design: .serif)).lineLimit(3).minimumScaleFactor(0.8)
+                    .fixedSize(horizontal: false, vertical: true).padding(.top, 2)
+                Text(book.author).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
+                Spacer(minLength: 4)
+                if book.reading {
+                    Text("\(Int(book.progress * 100))%").font(.system(size: 20, weight: .bold, design: .serif))
+                    ShelfProgress(value: book.progress)
                 }
             }
-            .frame(width: height * 0.66, height: height)
-            .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
-            .shadow(color: .black.opacity(0.35), radius: 2, x: 1, y: 2)
-            if book.reading {
-                GeometryReader { g in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(.white.opacity(0.25))
-                        Capsule().fill(W.lime).frame(width: max(3, g.size.width * book.progress))
-                    }
-                }
-                .frame(width: height * 0.66, height: 3)
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
 
-/// A wooden shelf with up to five books standing on it.
-struct Shelf: View {
-    let title: String
+struct BookshelfLayout: View {
+    let family: WidgetFamily
     let books: [WidgetSnapshot.ShelfBook]
-    var height: CGFloat
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title.uppercased()).font(.system(size: 9, weight: .bold)).tracking(0.6).foregroundStyle(.white.opacity(0.7))
-            VStack(spacing: 0) {
-                HStack(alignment: .bottom, spacing: 8) {
-                    ForEach(Array(books.prefix(5).enumerated()), id: \.offset) { _, b in ShelfBookView(book: b, height: height) }
-                    Spacer(minLength: 0)
+        let reading = books.filter(\.reading), next = books.filter { !$0.reading }
+        let main = reading.first ?? books[0]
+        switch family {
+        case .systemSmall:
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .bottom, spacing: 10) {
+                    ShelfCover(book: main, width: 58)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Spacer(minLength: 0)
+                        if main.reading {
+                            Text("\(Int(main.progress * 100))%").font(.system(size: 24, weight: .bold, design: .serif))
+                            Text("read").font(.system(size: 10)).foregroundStyle(.secondary)
+                        } else { ShelfLabel(text: "Up next") }
+                    }
                 }
-                .padding(.horizontal, 6)
-                // The plank.
-                LinearGradient(colors: [Color(red: 0.62, green: 0.42, blue: 0.26), Color(red: 0.42, green: 0.27, blue: 0.16)],
-                               startPoint: .top, endPoint: .bottom)
-                    .frame(height: 7)
-                    .clipShape(RoundedRectangle(cornerRadius: 2))
-                    .shadow(color: .black.opacity(0.4), radius: 3, y: 3)
+                Spacer(minLength: 0)
+                Text(main.title).font(.system(size: 12, weight: .bold, design: .serif)).lineLimit(2)
+                if main.reading { ShelfProgress(value: main.progress) }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        case .systemMedium:
+            HStack(spacing: 14) {
+                ShelfCurrent(book: main, cover: 78)
+                let rest = Array((reading.dropFirst() + next).prefix(2))
+                if !rest.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ShelfLabel(text: "Up next")
+                        HStack(spacing: 8) { ForEach(Array(rest.enumerated()), id: \.offset) { ShelfCover(book: $0.element, width: 46) } }
+                    }
+                    .fixedSize()
+                }
+            }
+        default:
+            VStack(alignment: .leading, spacing: 16) {
+                ShelfCurrent(book: main, cover: 104)
+                    .frame(height: 156)
+                let rest = Array((reading.dropFirst() + next).prefix(5))
+                if !rest.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        ShelfLabel(text: next.isEmpty ? "Also reading" : "Want to read")
+                        HStack(alignment: .top, spacing: 10) {
+                            ForEach(Array(rest.enumerated()), id: \.offset) { _, b in
+                                VStack(alignment: .leading, spacing: 5) {
+                                    ShelfCover(book: b, width: 54)
+                                    Text(b.title).font(.system(size: 9, weight: .semibold)).lineLimit(2).frame(width: 54, alignment: .leading)
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(minLength: 0)
             }
         }
     }
@@ -334,32 +399,14 @@ struct BookshelfWidgetView: View {
 
     var body: some View {
         let books = entry.snapshot?.books ?? []
-        let reading = books.filter(\.reading), next = books.filter { !$0.reading }
         if books.isEmpty {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Bookshelf").font(.system(size: 13, weight: .bold, design: .serif))
-                Text("Add books in Orbit › Reading and they'll stand here.").font(.caption).opacity(0.75)
+                ShelfLabel(text: "Bookshelf")
+                Text("Add books in Orbit › Reading and they'll show up here.").font(.system(size: 13, weight: .semibold, design: .serif))
             }
-            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } else {
-            switch family {
-            case .systemSmall:
-                let b = reading.first ?? books[0]
-                VStack(alignment: .leading, spacing: 6) {
-                    ShelfBookView(book: b, height: 92)
-                    Text(b.title).font(.system(size: 11, weight: .semibold)).lineLimit(1)
-                    Text(b.reading ? "\(Int(b.progress * 100))% read" : "Up next").font(.system(size: 10)).opacity(0.7)
-                }
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            case .systemLarge:
-                VStack(alignment: .leading, spacing: 14) {
-                    Shelf(title: "Reading now", books: reading.isEmpty ? Array(books.prefix(1)) : reading, height: 104)
-                    Shelf(title: "Want to read", books: next, height: 104)
-                }
-            default:
-                Shelf(title: reading.isEmpty ? "Want to read" : "My shelf", books: Array((reading + next).prefix(5)), height: 96)
-            }
+            BookshelfLayout(family: family, books: books)
         }
     }
 }
@@ -405,9 +452,7 @@ struct CountdownWidget: Widget {
 struct BookshelfWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "OrbitBookshelf", provider: Provider()) { entry in
-            BookshelfWidgetView(entry: entry)
-                .containerBackground(LinearGradient(colors: [Color(red: 0.18, green: 0.13, blue: 0.11), Color(red: 0.11, green: 0.08, blue: 0.07)],
-                                                    startPoint: .top, endPoint: .bottom), for: .widget)
+            BookshelfWidgetView(entry: entry).containerBackground(.background, for: .widget)
                 .widgetURL(URL(string: "com.personal.orbit://open/reading"))
         }
         .configurationDisplayName("Bookshelf")

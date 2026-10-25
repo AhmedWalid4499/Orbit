@@ -92,7 +92,10 @@ struct PhoneRoot: View {
                 WidgetBridge.update(context: context, apple: apple)
                 WatchBridge.shared.push(context: context, apple: apple)
                 if rounds % 30 == 0 {
+                    // Health first, so the morning brief can mention last night's sleep.
+                    await HealthStore.shared.refresh(context: context)
                     await AIAssistant.shared.refreshBrief(context: context, apple: apple)
+                    await LinkedInStore.shared.refreshIfDue()
                     await ReadingSync.shared.syncIfDue(context: context)
                     await InboxStore.shared.refreshIfDue(context: context)
                     await EmailExpenses.shared.syncIfDue(context: context)

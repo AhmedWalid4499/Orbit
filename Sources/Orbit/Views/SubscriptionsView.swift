@@ -47,7 +47,7 @@ struct SubscriptionsView: View {
                 Button { SubscriptionTracker.detect(context: context) } label: { Label("Find in my transactions", systemImage: "sparkle.magnifyingglass") }
                     .buttonStyle(SoftButtonStyle())
                 Button { state.openAssistant(with: "Look at my subscriptions and tell me which ones I could cancel or downgrade to save money.") } label: {
-                    Label("Which can I cut?", systemImage: "sparkles")
+                    Label { Text("Which can I cut?") } icon: { AssistantAvatar(size: 18) }
                 }
                 .buttonStyle(SoftButtonStyle())
                 Button { adding = true } label: { Label("Add", systemImage: "plus") }.buttonStyle(SoftButtonStyle())

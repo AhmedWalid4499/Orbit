@@ -6,7 +6,7 @@ import SwiftUI
 enum Brand: String, CaseIterable {
     case github, youtube, goodreads, gmail, googleCalendar, googleMaps, apple, amazon, instagram, x, facebook, tiktok, whatsapp, telegram, linkedin, behance, dribbble, medium, spotify, googleKeep, snapchat, threads, discord, reddit, pinterest, twitch, substack, googleDrive, applePay, calendly, claude, openai
     /// Drawn in BrandLogo: no mark in Simple Icons.
-    case kindle, appleBooks, appleCalendar, appleReminders, appleMaps
+    case kindle, appleBooks, appleCalendar, appleReminders, appleMaps, appleHealth
 
     var title: String {
         switch self {
@@ -47,6 +47,7 @@ enum Brand: String, CaseIterable {
         case .appleCalendar: "Apple Calendar"
         case .appleReminders: "Apple Reminders"
         case .appleMaps: "Apple Maps"
+        case .appleHealth: "Apple Health"
         }
     }
 
@@ -90,6 +91,7 @@ enum Brand: String, CaseIterable {
         case .appleCalendar: 0xFF3B30
         case .appleReminders: 0x007AFF
         case .appleMaps: 0x34C759
+        case .appleHealth: 0xFF2D55
         }
     }
 

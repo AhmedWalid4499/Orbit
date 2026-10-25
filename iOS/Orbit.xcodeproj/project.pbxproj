@@ -455,7 +455,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.27.1;
+				MARKETING_VERSION = 1.28.0;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -472,6 +472,7 @@
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Orbit turns what you say into text on your iPhone, so your assistant can understand you.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take a photo of a receipt or document to send to your assistant.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Orbit uses your location when you ask for food or places nearby, to find what's close to you.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Orbit reads your steps, sleep, workouts and heart rate to show them next to your habits and day, and to tick off workout habits. It never writes to Health.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
@@ -488,7 +489,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.27.1;
+				MARKETING_VERSION = 1.28.0;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -505,6 +506,7 @@
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Orbit turns what you say into text on your iPhone, so your assistant can understand you.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take a photo of a receipt or document to send to your assistant.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Orbit uses your location when you ask for food or places nearby, to find what's close to you.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Orbit reads your steps, sleep, workouts and heart rate to show them next to your habits and day, and to tick off workout habits. It never writes to Health.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
@@ -521,7 +523,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.27.1;
+				MARKETING_VERSION = 1.28.0;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -543,7 +545,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.27.1;
+				MARKETING_VERSION = 1.28.0;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -565,7 +567,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.27.1;
+				MARKETING_VERSION = 1.28.0;
 				SDKROOT = watchos;
 				SUPPORTED_PLATFORMS = "watchos watchsimulator";
 				TARGETED_DEVICE_FAMILY = 4;
@@ -591,7 +593,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.27.1;
+				MARKETING_VERSION = 1.28.0;
 				SDKROOT = watchos;
 				SUPPORTED_PLATFORMS = "watchos watchsimulator";
 				TARGETED_DEVICE_FAMILY = 4;
@@ -617,7 +619,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.27.1;
+				MARKETING_VERSION = 1.28.0;
 				SDKROOT = watchos;
 				SUPPORTED_PLATFORMS = "watchos watchsimulator";
 				TARGETED_DEVICE_FAMILY = 4;
@@ -640,7 +642,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.27.1;
+				MARKETING_VERSION = 1.28.0;
 				SDKROOT = watchos;
 				SUPPORTED_PLATFORMS = "watchos watchsimulator";
 				TARGETED_DEVICE_FAMILY = 4;

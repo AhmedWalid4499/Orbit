@@ -18,6 +18,7 @@ VERSION = (ROOT / "VERSION").read_text().strip()
 TEAM = "Y2K55S3UA9"
 BUNDLE_ID = "com.ahmedwalid.orbit"
 WIDGETS = "--no-widgets" not in sys.argv
+HEALTH = "--no-health" not in sys.argv  # Apple Health (read-only); install-iphone.sh drops it if the account can't sign it
 WATCH = "--no-watch" not in sys.argv
 
 # Shared Mac files that can't run on iPhone (Mac-only windows, hotkeys, updater).
@@ -96,6 +97,7 @@ app = {
     "INFOPLIST_KEY_NSSpeechRecognitionUsageDescription": "Orbit turns what you say into text on your iPhone, so your assistant can understand you.",
     "INFOPLIST_KEY_NSCameraUsageDescription": "Take a photo of a receipt or document to send to your assistant.",
     "INFOPLIST_KEY_NSLocationWhenInUseUsageDescription": "Orbit uses your location when you ask for food or places nearby, to find what's close to you.",
+    "INFOPLIST_KEY_NSHealthShareUsageDescription": "Orbit reads your steps, sleep, workouts and heart rate to show them next to your habits and day, and to tick off workout habits. It never writes to Health.",
     "INFOPLIST_KEY_UIApplicationSceneManifest_Generation": "YES",
     "INFOPLIST_KEY_UILaunchScreen_Generation": "YES",
     "INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone": "UIInterfaceOrientationPortrait",
@@ -103,8 +105,12 @@ app = {
     "PRODUCT_BUNDLE_IDENTIFIER": BUNDLE_ID,
     "PRODUCT_NAME": "Orbit",
 }
-if WIDGETS:
+if WIDGETS and HEALTH:
     app["CODE_SIGN_ENTITLEMENTS"] = "Support/OrbitPhone.entitlements"
+elif WIDGETS:
+    app["CODE_SIGN_ENTITLEMENTS"] = "Support/OrbitPhone-NoHealth.entitlements"
+elif HEALTH:
+    app["CODE_SIGN_ENTITLEMENTS"] = "Support/OrbitPhone-Health.entitlements"
 widgets = {
     **common_target,
     "GENERATE_INFOPLIST_FILE": "YES",

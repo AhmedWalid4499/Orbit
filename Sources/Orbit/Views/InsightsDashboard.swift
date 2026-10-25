@@ -27,6 +27,7 @@ struct InsightsDashboard: View {
                     Text("This week compared with last, and the trends behind it.").font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
                 } actions: { EmptyView() }
                 tiles(mood)
+                HealthCard()
                 YouTubeCard()
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: Platform.isPhone ? 300 : 360), spacing: 16, alignment: .top)], spacing: 16) {
                     spendingByMonth

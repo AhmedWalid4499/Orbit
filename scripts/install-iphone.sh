@@ -53,6 +53,12 @@ if ! build; then
     python3 scripts/gen-ios-project.py --no-watch >/dev/null
     trap 'python3 scripts/gen-ios-project.py >/dev/null' EXIT
     build || { echo "Build failed. Details: build/ios-build.log"; exit 1; }
+  elif grep -qiE "healthkit" build/ios-build.log; then
+    # The account can't sign Apple Health: install everything else.
+    echo "Your Apple account can't give Orbit access to Apple Health, so installing without it."
+    python3 scripts/gen-ios-project.py --no-health >/dev/null
+    trap 'python3 scripts/gen-ios-project.py >/dev/null' EXIT
+    build || { echo "Build failed. Details: build/ios-build.log"; exit 1; }
   elif grep -qiE "app group|personal development team" build/ios-build.log; then
     # Free accounts can't use App Groups, which the home-screen widgets need: install without widgets.
     echo "Your Apple account can't give widgets access to Orbit's data, so installing without widgets."

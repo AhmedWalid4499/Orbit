@@ -100,7 +100,7 @@ struct BucketListView: View {
                 .frame(width: 54, height: 54)
             }
             Button { state.openAssistant(with: "Help me add some ideas to my bucket list. Ask me a couple of questions first.") } label: {
-                Label("Ideas from \(AssistantName.current)", systemImage: "sparkles")
+                Label { Text("Ideas from \(AssistantName.current)") } icon: { AssistantAvatar(size: 18) }
             }
             .buttonStyle(SoftButtonStyle())
             Button { adding = true } label: { Label("Add dream", systemImage: "plus") }.buttonStyle(SoftButtonStyle())

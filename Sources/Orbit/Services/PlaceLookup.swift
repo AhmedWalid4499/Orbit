@@ -3,7 +3,8 @@ import MapKit
 import SwiftData
 
 /// Turns what you give Orbit (a Google or Apple Maps link, or just a name like "Zooba Zamalek") into a place with
-/// coordinates, an address and a kind (food, café, shop, museum…), using Apple Maps.
+/// coordinates, an address and a kind (food, café, shop, museum…), using Apple Maps, plus Google Maps when you've added
+/// a Google Maps key (see GooglePlaces).
 @MainActor
 enum PlaceLookup {
     struct Found {
@@ -28,9 +29,12 @@ enum PlaceLookup {
 
     static func found(_ item: MKMapItem, url: String) -> Found {
         let name = item.name ?? ""
-        return Found(name: name, address: address(item), coordinate: item.placemark.coordinate,
+        // A Google result keeps its Google Maps link and Google's address.
+        let googleAddress = GooglePlaces.address(of: item)
+        let google = googleAddress != nil
+        return Found(name: name, address: googleAddress ?? address(item), coordinate: item.placemark.coordinate,
                      category: category(item.pointOfInterestCategory, name: name),
-                     url: url.isEmpty ? appleMapsURL(name: name, coordinate: item.placemark.coordinate) : url)
+                     url: !url.isEmpty ? url : google ? item.url!.absoluteString : appleMapsURL(name: name, coordinate: item.placemark.coordinate))
     }
 
     static func search(_ query: String, near: CLLocationCoordinate2D?) async -> [MKMapItem] {
@@ -38,7 +42,9 @@ enum PlaceLookup {
         request.naturalLanguageQuery = query
         request.resultTypes = [.pointOfInterest, .address]
         if let near { request.region = MKCoordinateRegion(center: near, latitudinalMeters: 1500, longitudinalMeters: 1500) }
-        return (try? await MKLocalSearch(request: request).start().mapItems) ?? []
+        async let apple = (try? await MKLocalSearch(request: request).start().mapItems) ?? []
+        async let google = GooglePlaces.search(query, near: near)
+        return GooglePlaces.merged(apple: await apple, google: await google)
     }
 
     static func appleMapsURL(name: String, coordinate: CLLocationCoordinate2D) -> String {

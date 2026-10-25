@@ -172,8 +172,11 @@ struct TodayView: View {
             ClockWeather()
             VStack(alignment: .trailing, spacing: 4) {
                 HStack(spacing: 10) {
-                    Image(systemName: capturing ? "hourglass" : (ai.smartCaptureActive ? "sparkles" : "plus"))
-                        .foregroundStyle(Theme.inkSecondary)
+                    if ai.smartCaptureActive {
+                        AssistantAvatar(size: 22, busy: capturing)
+                    } else {
+                        Image(systemName: capturing ? "hourglass" : "plus").foregroundStyle(Theme.inkSecondary)
+                    }
                     TextField(ai.smartCaptureActive ? "Add anything — “gym 7am, $12 lunch”" : "Add a task, event, expense or note…",
                               text: $capture)
                         .textFieldStyle(.plain)

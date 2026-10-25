@@ -8,7 +8,8 @@ struct PhoneMore: View {
 
     @AppStorage("hiddenTabs") private var hiddenTabs = ""
     private var sections: [Tab] {
-        [.insights, .habits, .notes, .reading, .bucket, .documents, .github].filter { !hiddenTabs.split(separator: ",").contains(Substring($0.rawValue)) }
+        // Everything that isn't in the tab bar, so new sections (YouTube, LinkedIn…) show up here by themselves.
+        Tab.allCases.filter { ![.today, .calendar, .tasks, .money].contains($0) && !hiddenTabs.split(separator: ",").contains(Substring($0.rawValue)) }
     }
 
     var body: some View {
@@ -16,7 +17,14 @@ struct PhoneMore: View {
             Section {
                 ForEach(sections) { t in
                     NavigationLink(value: t) {
-                        Label { Text(t.title).font(Theme.ui(16, weight: .medium)) } icon: { icon(t.symbol, color(t)) }
+                        Label { Text(t.title).font(Theme.ui(16, weight: .medium)) } icon: {
+                            switch t {
+                            case .linkedin: BrandLogo(brand: .linkedin, size: 30)
+                            case .youtube: BrandLogo(brand: .youtube, size: 30)
+                            case .github: BrandLogo(brand: .github, size: 30)
+                            default: icon(t.symbol, color(t))
+                            }
+                        }
                     }
                 }
             }

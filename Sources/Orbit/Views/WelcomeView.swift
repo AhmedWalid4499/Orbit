@@ -90,7 +90,7 @@ struct WelcomeView: View {
                     }
                 }
                 HStack(spacing: 10) {
-                    Image(systemName: "sparkles").frame(width: 24)
+                    AssistantAvatar(size: 24)
                     if ai.hasKey {
                         Text("\(assistantName.isEmpty ? "Ask" : assistantName) is ready").font(Theme.ui(13, weight: .medium))
                         Spacer()

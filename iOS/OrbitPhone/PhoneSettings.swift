@@ -156,7 +156,12 @@ struct PhoneCapture: View {
                 Text(QuickParser.parse(text).summary).font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
             }
             Button(action: save) {
-                Label(busy ? "Saving…" : "Add", systemImage: ai.smartCaptureActive ? "sparkles" : "plus").frame(maxWidth: .infinity)
+                Label {
+                    Text(busy ? "Saving…" : "Add")
+                } icon: {
+                    if ai.smartCaptureActive { AssistantAvatar(size: 18, busy: busy) } else { Image(systemName: "plus") }
+                }
+                .frame(maxWidth: .infinity)
             }
             .buttonStyle(PrimaryButtonStyle()).disabled(busy || text.trimmingCharacters(in: .whitespaces).isEmpty)
             if let result { Label(result, systemImage: "checkmark.circle.fill").font(Theme.ui(14, weight: .medium)).foregroundStyle(Theme.good) }

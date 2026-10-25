@@ -48,6 +48,11 @@ final class SharedListStore: ObservableObject {
     @Published private(set) var lists: [SharedList] = Snapshot.isDemo ? SharedListStore.demo : []
     @Published private(set) var loading = false
     @Published var error: String?
+    /// False once Orbit has seen that the shared_lists table isn't in Supabase yet: the feature then stays out of sight
+    /// (no error message) until the setup is done. Checked again at every launch.
+    @Published private(set) var isSetUp = UserDefaults.standard.object(forKey: "sharedLists.setUp") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(isSetUp, forKey: "sharedLists.setUp") }
+    }
 
     static var me: String { Platform.userName.split(separator: " ").first.map(String.init) ?? "" }
     var isAvailable: Bool { CloudSync.shared.isSignedIn || Snapshot.isDemo }
@@ -62,6 +67,10 @@ final class SharedListStore: ObservableObject {
         do {
             let rows = try await call("\(base)/shared_lists?select=id,code,title,owner,members,items,updated_at&order=updated_at.desc", "GET") as? [[String: Any]] ?? []
             lists = rows.compactMap(Self.parse)
+            error = nil
+            isSetUp = true
+        } catch let e as CloudError where e.message.contains("one-time setup") {
+            isSetUp = false
             error = nil
         } catch {
             self.error = error.localizedDescription

@@ -409,7 +409,7 @@ private let syncKinds: [SyncKind] = [
 
 /// Preferences that follow you between Macs (API keys and sign-ins never leave the Keychain).
 /// Preferences that follow you to every device. Connection secrets travel separately, in the key vault.
-private let syncedSettings = ["monthlyBudget", "readingGoal", "currencyCode", "assistantName", "userName", "weatherCity", "profileCard", "cardPhoto",
+private let syncedSettings = ["monthlyBudget", "readingGoal", "currencyCode", "assistantName", "userName", "weatherCity", "profileCard", "cardPhoto", "health.daily",
                               "goodreadsUser", "readingAutoSync", "appleCalendarEnabled", "appleRemindersEnabled", "googleCalendarEnabled",
                               "emailExpensesEnabled", "aiMorningBrief", "aiSmartCapture", "assistantSpeaks", "focusMinutes", "launchSound",
                               "notify.tasks", "notify.events", "notify.bills", "notify.habits", "notify.journal", "notify.review",

@@ -53,6 +53,12 @@ struct BrandLogo: View {
                     }
                 })
                 .frame(width: size, height: size)
+        case .appleHealth:
+            RoundedRectangle(cornerRadius: size * 0.24, style: .continuous).fill(.white)
+                .overlay(RoundedRectangle(cornerRadius: size * 0.24, style: .continuous).strokeBorder(.black.opacity(0.08), lineWidth: 0.5))
+                .overlay(Image(systemName: "heart.fill").font(.system(size: size * 0.5, weight: .semibold))
+                    .foregroundStyle(LinearGradient(colors: [Color(hex: 0xFF6482), Color(hex: 0xFF2D55)], startPoint: .top, endPoint: .bottom)))
+                .frame(width: size, height: size)
         case .appleMaps:
             RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
                 .fill(LinearGradient(colors: [Color(hex: 0x8EE07A), Color(hex: 0x5BC2F0)], startPoint: .topLeading, endPoint: .bottomTrailing))

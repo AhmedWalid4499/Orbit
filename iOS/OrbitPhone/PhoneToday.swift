@@ -63,36 +63,200 @@ struct PhoneToday: View {
 
     @Query private var readingSessions: [ReadingSession]
 
+    @State private var briefOpen = false
+    @State private var mailOpen = false
+    @ObservedObject private var health = HealthStore.shared
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("\(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide))) · \(greeting)").font(Theme.ui(14)).foregroundStyle(Theme.inkSecondary)
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("\(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide))) · \(greeting)").font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
                     actions
                 }
                 captureField
-                stats
-                DaySummaryCard(compact: true)
+                glance
+                brief
+                upNext
+                habitsRow
                 CheckInCard()
-                BriefCard()
-                if let todaysPlan { TopThreeList(plan: todaysPlan) }
-                dueToday
-                agenda
-                habitsStrip
-                HStack(alignment: .top, spacing: 12) {
-                    moneyMini
-                    moodMini
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                readingCard
-                lookingForward
-                if inbox.isConnected { inboxCard }
+                if isEvening { DaySummaryCard(compact: true) }
+                alsoToday
             }
             .padding(.horizontal, 16).padding(.bottom, 24)
         }
         .scrollIndicators(.never)
         .refreshable { await CloudSync.shared.syncIfSignedIn(context: context) }
+        .sheet(isPresented: $mailOpen) { MailboxSheet() }
         .phoneChrome("Today")
+    }
+
+    // MARK: Summary
+
+    /// Four small numbers in one row; each opens its section.
+    private var glance: some View {
+        HStack(spacing: 8) {
+            mini("\(openToday.count)", "Due", Theme.peach) { state.tab = .tasks }
+            mini("\(habits.filter { $0.isDone(on: today) }.count)/\(habits.count)", "Habits", Theme.lime) { state.tab = .habits }
+            mini(Fmt.money(max(monthlyBudget - spentThisMonth, 0)), "Left", Theme.cyan) { state.tab = .money }
+            if health.hasData {
+                mini(health.today.steps >= 1000 ? String(format: "%.1fk", Double(health.today.steps) / 1000) : "\(health.today.steps)", "Steps", Theme.mint) { state.tab = .insights }
+            } else {
+                mini("\(readThisYear)/\(readingGoal)", "Books", Theme.purple) { state.tab = .reading }
+            }
+        }
+    }
+
+    private func mini(_ value: String, _ label: String, _ color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(value).font(Theme.display(18)).lineLimit(1).minimumScaleFactor(0.5)
+                Text(label).font(Theme.ui(11, weight: .semibold)).opacity(0.75)
+            }
+            .foregroundStyle(Theme.stickerInk)
+            .padding(.horizontal, 10).padding(.vertical, 9)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(color))
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// The morning brief in two lines; tap for the whole thing.
+    @ViewBuilder private var brief: some View {
+        if let b = ai.brief, ai.hasTodaysBrief {
+            Button { withAnimation(.snappy) { briefOpen.toggle() } } label: {
+                HStack(alignment: .top, spacing: 10) {
+                    AssistantAvatar(size: 26)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(b.headline).font(Theme.ui(15, weight: .semibold)).lineLimit(briefOpen ? nil : 1)
+                        Text(b.summary).font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary).lineLimit(briefOpen ? nil : 2)
+                        if briefOpen {
+                            ForEach(Array(b.focus.enumerated()), id: \.offset) { i, f in
+                                Text("\(i + 1). \(f)").font(Theme.ui(13, weight: .medium)).padding(.top, 2)
+                            }
+                            if !b.heads_up.isEmpty { Label(b.heads_up, systemImage: "exclamationmark.circle").font(Theme.ui(12)).foregroundStyle(Theme.orange) }
+                        }
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: briefOpen ? "chevron.up" : "chevron.down").font(.system(size: 11, weight: .bold)).foregroundStyle(Theme.inkMuted)
+                }
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.card))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        } else if ai.hasKey {
+            BriefCard()
+        }
+    }
+
+    /// Top 3, what's due and what's next on the calendar, a few of each, in one card.
+    private var upNext: some View {
+        let reminders = apple.reminders.filter { ($0.due ?? .distantFuture) < today.adding(days: 1) }
+        let next = todayEntries.filter { $0.end > .now }
+        return Card(padding: 14) {
+            VStack(alignment: .leading, spacing: 8) {
+                SectionHeader(title: "Up next", trailing: "All tasks") { state.tab = .tasks }
+                if let todaysPlan { TopThreeList(plan: todaysPlan) }
+                if openToday.isEmpty && reminders.isEmpty && next.isEmpty && todaysPlan == nil {
+                    EmptyHint(symbol: "checkmark.seal", text: "Nothing due and nothing on the calendar. Nice.")
+                }
+                ForEach(openToday.prefix(3)) { TaskRow(task: $0, showDue: $0.isOverdue) }
+                ForEach(reminders.prefix(max(0, 3 - openToday.count))) { ReminderRow(reminder: $0) }
+                if openToday.count + reminders.count > 3 {
+                    Button("+\(openToday.count + reminders.count - 3) more due today") { state.tab = .tasks }
+                        .buttonStyle(.plain).font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
+                }
+                if !next.isEmpty {
+                    Divider().padding(.vertical, 2)
+                    ForEach(next.prefix(2)) { AgendaRow(entry: $0) }
+                    if next.count > 2 {
+                        Button("+\(next.count - 2) more today") { state.tab = .calendar }
+                            .buttonStyle(.plain).font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Habits as one line of chips to tick off.
+    @ViewBuilder private var habitsRow: some View {
+        if !habits.isEmpty {
+            ScrollView(.horizontal) {
+                HStack(spacing: 8) {
+                    ForEach(habits) { h in
+                        let done = h.isDone(on: today)
+                        Button { withAnimation(.snappy) { h.toggle(today) } } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: done ? "checkmark" : h.symbol).font(.system(size: 11, weight: .bold))
+                                Text(h.name).font(Theme.ui(13, weight: .semibold)).lineLimit(1)
+                                if h.currentStreak > 1 { Text("\(h.currentStreak)🔥").font(Theme.ui(11)) }
+                            }
+                            .foregroundStyle(done ? Theme.stickerInk : Theme.ink)
+                            .padding(.horizontal, 12).padding(.vertical, 8)
+                            .background(Capsule().fill(done ? h.area.color : Theme.canvas))
+                            .overlay(Capsule().strokeBorder(h.area.color, lineWidth: done ? 0 : 1.5))
+                        }
+                        .buttonStyle(.plain)
+                        .sensoryFeedback(.success, trigger: done)
+                    }
+                }
+                .padding(.vertical, 1)
+            }
+            .scrollIndicators(.never)
+        }
+    }
+
+    /// Everything else as small chips: mood, reading, the next thing to look forward to, email.
+    private var alsoToday: some View {
+        let entry = notes.first { $0.isJournal && $0.createdAt.isToday }
+        let current = BookLibrary.currentlyReading(books, sessions: readingSessions).first
+        let upcoming = dreams.filter { ($0.targetDate ?? .distantPast) >= today }.min { $0.targetDate! < $1.targetDate! }
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 4) {
+                Text("How's today?").font(Theme.ui(13, weight: .semibold))
+                Spacer()
+                ForEach(1...5, id: \.self) { m in
+                    Button { setMood(m) } label: {
+                        Text(Mood.faces[m]).font(.system(size: 20)).frame(width: 34, height: 34)
+                            .background(Circle().fill(entry?.mood == m ? Theme.lime : .clear))
+                            .opacity(entry == nil || entry?.mood == 0 || entry?.mood == m ? 1 : 0.4)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.blush))
+            ScrollView(.horizontal) {
+                HStack(spacing: 8) {
+                    if let current {
+                        smallChip("\(current.title) · \(Int(current.progress * 100))%", "book.fill", Theme.purple) { state.tab = .reading }
+                    }
+                    if let upcoming, let d = upcoming.targetDate {
+                        let days = Calendar.current.dateComponents([.day], from: today, to: d.startOfDay).day ?? 0
+                        smallChip("\(upcoming.title) · \(days == 0 ? "today" : "\(days)d")", upcoming.kind.symbol, upcoming.kind.color) { state.tab = .bucket }
+                    }
+                    if inbox.isConnected, let n = inbox.digest?.needsReply.count, n > 0 {
+                        smallChip("\(n) email\(n == 1 ? "" : "s") to answer", "envelope.fill", Theme.pink) { mailOpen = true }
+                    }
+                    smallChip("Journal", "bubble.left.and.text.bubble.right", Theme.peach) { state.openTodayJournal = true; state.tab = .notes }
+                }
+            }
+            .scrollIndicators(.never)
+        }
+    }
+
+    private func smallChip(_ title: String, _ symbol: String, _ color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: symbol).font(.system(size: 11, weight: .bold)).foregroundStyle(Theme.stickerInk)
+                    .frame(width: 22, height: 22).background(Circle().fill(color))
+                Text(title).font(Theme.ui(13, weight: .medium)).lineLimit(1)
+            }
+            .padding(.leading, 6).padding(.trailing, 12).padding(.vertical, 6)
+            .background(Capsule().fill(Theme.card))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: Sections
@@ -122,7 +286,11 @@ struct PhoneToday: View {
     private var captureField: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 10) {
-                Image(systemName: capturing ? "hourglass" : (ai.smartCaptureActive ? "sparkles" : "plus")).foregroundStyle(Theme.inkSecondary)
+                if ai.smartCaptureActive {
+                    AssistantAvatar(size: 22, busy: capturing)
+                } else {
+                    Image(systemName: capturing ? "hourglass" : "plus").foregroundStyle(Theme.inkSecondary)
+                }
                 TextField(ai.smartCaptureActive ? "Add anything: “gym tomorrow 7am”" : "Add a task, event, expense or note…", text: $capture)
                     .font(Theme.ui(15)).disabled(capturing).submitLabel(.done).onSubmit(runCapture)
                 MicButton { heard in capture = heard; runCapture() }
@@ -149,127 +317,11 @@ struct PhoneToday: View {
         }
     }
 
-    private var stats: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 10) {
-                StatTile(value: "\(openToday.count)", label: "Due today", symbol: "sun.max.fill", color: Theme.peach) { state.tab = .tasks }
-                    .frame(width: 150)
-                StatTile(value: "\(habits.filter { $0.isDone(on: today) }.count)/\(habits.count)", label: "Habits today",
-                         symbol: "flame.fill", color: Theme.lime) { state.tab = .habits }.frame(width: 150)
-                StatTile(value: Fmt.money(spentThisMonth), label: "Spent this month", symbol: "creditcard.fill", color: Theme.cyan) { state.tab = .money }
-                    .frame(width: 170)
-                StatTile(value: "\(readThisYear)/\(readingGoal)", label: "Books this year", symbol: "books.vertical.fill", color: Theme.purple) { state.tab = .reading }
-                    .frame(width: 150)
-                if inbox.isConnected {
-                    StatTile(value: "\(inbox.digest?.needsReply.count ?? 0)", label: "Emails to answer", symbol: "envelope.fill", color: Theme.pink) {}
-                        .frame(width: 160)
-                }
-            }
-        }
-        .scrollIndicators(.never)
-    }
 
-    private var dueToday: some View {
-        Card(padding: 14) {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionHeader(title: "Due today", trailing: "All tasks") { state.tab = .tasks }
-                let reminders = apple.reminders.filter { ($0.due ?? .distantFuture) < today.adding(days: 1) }
-                if openToday.isEmpty && reminders.isEmpty { EmptyHint(symbol: "checkmark.seal", text: "Nothing due. Nice.") }
-                ForEach(openToday) { TaskRow(task: $0, showDue: $0.isOverdue) }
-                ForEach(reminders) { ReminderRow(reminder: $0) }
-            }
-        }
-    }
 
-    private var agenda: some View {
-        Card(padding: 14) {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionHeader(title: "Agenda", trailing: "Calendar") { state.tab = .calendar }
-                if todayEntries.isEmpty {
-                    EmptyHint(symbol: "sun.max", text: apple.calendarEnabled ? "Nothing scheduled today." : "Nothing scheduled. Connect Apple Calendar in Settings.")
-                }
-                ForEach(todayEntries) { AgendaRow(entry: $0) }
-            }
-        }
-    }
 
-    private var habitsStrip: some View {
-        Card(padding: 14) {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionHeader(title: "Habits", trailing: habits.isEmpty ? "Add habit" : "View all") { state.tab = .habits }
-                if habits.isEmpty {
-                    EmptyHint(symbol: "repeat", text: "Build a streak: add your first habit.")
-                } else {
-                    FlowLayout(spacing: 8) {
-                        ForEach(habits) { h in
-                            let done = h.isDone(on: today)
-                            Button { withAnimation(.snappy) { h.toggle(today) } } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: done ? "checkmark" : h.symbol).font(.system(size: 11, weight: .bold))
-                                    Text(h.name).font(Theme.ui(13, weight: .semibold)).lineLimit(1)
-                                    if h.currentStreak > 1 { Text("\(h.currentStreak)🔥").font(Theme.ui(11)) }
-                                }
-                                .foregroundStyle(done ? Theme.stickerInk : Theme.ink)
-                                .padding(.horizontal, 12).padding(.vertical, 8)
-                                .background(Capsule().fill(done ? h.area.color : Theme.canvas))
-                                .overlay(Capsule().strokeBorder(h.area.color, lineWidth: done ? 0 : 1.5))
-                            }
-                            .buttonStyle(.plain)
-                            .sensoryFeedback(.success, trigger: done)
-                        }
-                    }
-                }
-            }
-        }
-    }
 
-    private var moneyMini: some View {
-        let ratio = monthlyBudget > 0 ? min(spentThisMonth / monthlyBudget, 1) : 0
-        return Button { state.tab = .money } label: {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Left to spend").font(Theme.ui(12, weight: .semibold))
-                Text(Fmt.money(max(monthlyBudget - spentThisMonth, 0))).font(Theme.display(22)).lineLimit(1).minimumScaleFactor(0.5)
-                GeometryReader { g in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Color.black.opacity(0.12))
-                        Capsule().fill(Color(hex: 0x111111)).frame(width: g.size.width * ratio)
-                    }
-                }
-                .frame(height: 6)
-                Text("of \(Fmt.money(monthlyBudget))").font(Theme.ui(11)).opacity(0.7)
-            }
-            .foregroundStyle(Theme.stickerInk)
-            .padding(14)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous).fill(Theme.lime))
-        }
-        .buttonStyle(.plain)
-    }
 
-    private var moodMini: some View {
-        let entry = notes.first { $0.isJournal && $0.createdAt.isToday }
-        return VStack(alignment: .leading, spacing: 8) {
-            Text("How's today?").font(Theme.ui(12, weight: .semibold))
-            HStack(spacing: 0) {
-                ForEach(1...5, id: \.self) { m in
-                    Button { setMood(m) } label: {
-                        Text(Mood.faces[m]).font(.system(size: 20))
-                            .frame(width: 30, height: 32)
-                            .background(Circle().fill(entry?.mood == m ? Theme.lime : .clear))
-                            .opacity(entry == nil || entry?.mood == 0 || entry?.mood == m ? 1 : 0.4)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            Button { state.openTodayJournal = true; state.tab = .notes } label: {
-                Label(entry?.chat == nil ? "Check in" : "Journal", systemImage: "bubble.left.and.text.bubble.right").font(Theme.ui(12, weight: .semibold))
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous).fill(Theme.blush))
-    }
 
     private func setMood(_ m: Int) {
         let entry = notes.first { $0.isJournal && $0.createdAt.isToday } ?? {
@@ -281,78 +333,7 @@ struct PhoneToday: View {
         entry.moodSetByUser = entry.mood != 0
     }
 
-    private var readingCard: some View {
-        let current = BookLibrary.currentlyReading(books, sessions: readingSessions).first
-        return Button { state.tab = .reading } label: {
-            HStack(spacing: 12) {
-                if let current {
-                    BookCover(book: current).frame(width: 40, height: 60)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Reading").font(Theme.ui(11, weight: .semibold)).foregroundStyle(Theme.inkMuted)
-                        Text(current.title).font(Theme.ui(14, weight: .semibold)).lineLimit(1)
-                        ProgressView(value: current.progress).tint(Theme.ink)
-                        Text("\(Int(current.progress * 100))% · \(readThisYear) of \(readingGoal) books this year").font(Theme.ui(11)).foregroundStyle(Theme.inkSecondary)
-                    }
-                } else {
-                    Image(systemName: "books.vertical.fill").frame(width: 40, height: 40).background(Circle().fill(Theme.purple)).foregroundStyle(Theme.stickerInk)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(readThisYear) of \(readingGoal) books this year").font(Theme.ui(14, weight: .semibold))
-                        Text("Nothing on the go. Pick your next read.").font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
-                    }
-                }
-                Spacer()
-            }
-            .padding(12)
-            .background(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous).fill(Theme.card))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
 
-    private var lookingForward: some View {
-        let upcoming = dreams.filter { ($0.targetDate ?? .distantPast) >= today }.sorted { $0.targetDate! < $1.targetDate! }
-        return Group {
-            if !upcoming.isEmpty {
-                Card(padding: 14) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        SectionHeader(title: "Looking forward to", trailing: "Bucket list") { state.tab = .bucket }
-                        ForEach(upcoming.prefix(4)) { item in
-                            let days = Calendar.current.dateComponents([.day], from: today, to: item.targetDate!.startOfDay).day ?? 0
-                            HStack(spacing: 12) {
-                                Text(days == 0 ? "🎉" : "\(days)d").font(Theme.display(17)).frame(width: 50)
-                                    .padding(.vertical, 6).background(RoundedRectangle(cornerRadius: 10).fill(item.kind.color))
-                                    .foregroundStyle(Theme.stickerInk)
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(item.title).font(Theme.ui(14, weight: .semibold)).lineLimit(1)
-                                    Text(item.targetDate!.formatted(.dateTime.weekday(.abbreviated).day().month())).font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
-                                }
-                                Spacer()
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
 
-    private var inboxCard: some View {
-        Card(padding: 14) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("Inbox").font(Theme.display(22))
-                    Spacer()
-                    if inbox.loading { ProgressView() } else {
-                        Button { Task { await inbox.refresh() } } label: { Image(systemName: "arrow.clockwise") }.buttonStyle(.plain)
-                    }
-                }
-                if let d = inbox.digest {
-                    InboxSummary(digest: d, multi: inbox.accounts.count > 1)
-                } else if let error = inbox.error {
-                    Label(error, systemImage: "exclamationmark.triangle.fill").font(Theme.ui(12)).foregroundStyle(Theme.orange)
-                } else {
-                    EmptyHint(symbol: "envelope", text: "Pull down to refresh your inbox summary.")
-                }
-            }
-        }
-    }
+
 }

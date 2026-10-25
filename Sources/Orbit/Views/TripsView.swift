@@ -305,7 +305,7 @@ struct TripSheet: View {
                         } catch { self.error = error.localizedDescription }
                         suggesting = false
                     }
-                } label: { Label(suggesting ? "Thinking…" : "Suggest", systemImage: "sparkles") }
+                } label: { Label { Text(suggesting ? "Thinking…" : "Suggest") } icon: { AssistantAvatar(size: 18, busy: suggesting) } }
                 .buttonStyle(SoftButtonStyle()).disabled(suggesting)
             }
             HStack(spacing: 8) {

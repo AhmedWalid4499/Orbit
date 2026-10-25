@@ -34,6 +34,7 @@ struct TasksView: View {
 
     @Environment(\.modelContext) private var context
     @EnvironmentObject private var apple: AppleSync
+    @ObservedObject private var sharedLists = SharedListStore.shared
     @Query(sort: \TaskItem.createdAt, order: .reverse) private var tasks: [TaskItem]
 
     @State private var filter: Filter = .today
@@ -98,6 +99,8 @@ struct TasksView: View {
         .padding(.horizontal, 32)
         .padding(.top, 10)
         .sheet(item: $editing) { TaskEditor(task: $0) }
+        .task { await sharedLists.refresh() }
+        .onChange(of: sharedLists.isSetUp) { _, ready in if !ready && filter == .shared { filter = .today } }
     }
 
     private var sidebar: some View {
@@ -108,7 +111,9 @@ struct TasksView: View {
                 }
                 Text("Lists").font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkMuted)
                     .padding(.top, 18).padding(.bottom, 4).padding(.leading, 12)
-                FilterRow(filter: .shared, count: nil, selected: filter == .shared) { filter = .shared }
+                if sharedLists.isSetUp {
+                    FilterRow(filter: .shared, count: nil, selected: filter == .shared) { filter = .shared }
+                }
                 if apple.remindersEnabled {
                     FilterRow(filter: .reminders, count: apple.reminders.count, selected: filter == .reminders) { filter = .reminders }
                 } else {
@@ -242,7 +247,7 @@ struct TaskEditor: View {
                     Text("New task").font(Theme.ui(13, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
                     Spacer()
                     if let onQuickAdd {
-                        Button { discard(); onQuickAdd() } label: { Label("Quick add", systemImage: "sparkles") }
+                        Button { discard(); onQuickAdd() } label: { Label { Text("Quick add") } icon: { AssistantAvatar(size: 16) } }
                             .buttonStyle(.orbitLink).font(Theme.ui(13))
                     }
                 }

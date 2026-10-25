@@ -7,6 +7,7 @@ struct PhoneTasks: View {
 
     @Environment(\.modelContext) private var context
     @EnvironmentObject private var apple: AppleSync
+    @ObservedObject private var sharedLists = SharedListStore.shared
     @Query(sort: \TaskItem.createdAt, order: .reverse) private var tasks: [TaskItem]
 
     @State private var filter: Filter = .today
@@ -37,7 +38,7 @@ struct PhoneTasks: View {
     }
 
     private var filters: [Filter] {
-        [.today, .upcoming, .inbox, .completed, .shared] + (apple.remindersEnabled ? [.reminders] : [])
+        [.today, .upcoming, .inbox, .completed] + (sharedLists.isSetUp ? [.shared] : []) + (apple.remindersEnabled ? [.reminders] : [])
     }
 
     var body: some View {
@@ -124,6 +125,8 @@ struct PhoneTasks: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .sheet(item: $editing) { TaskEditor(task: $0) }
+        .task { await sharedLists.refresh() }
+        .onChange(of: sharedLists.isSetUp) { _, ready in if !ready && filter == .shared { filter = .today } }
         .phoneChrome("Tasks")
     }
 

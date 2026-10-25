@@ -174,6 +174,8 @@ final class AIAssistant: ObservableObject {
         lines.append("\nMoney this month: spent \(Fmt.money(spent)) of \(Fmt.money(budget)) budget; day \(dayOfMonth) of \(daysInMonth).")
 
         lines += DayPlanner.briefLines(context: context)
+        let health = HealthStore.shared.summary()
+        if !health.isEmpty { lines.append("\n" + health) }
 
         if let journal = notes.filter({ $0.isJournal && $0.createdAt >= today.adding(days: -1) && $0.createdAt < today }).first,
            !journal.body.isEmpty {

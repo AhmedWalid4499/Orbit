@@ -45,7 +45,7 @@ struct BillsView: View {
             }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 280, maximum: 420), spacing: 14, alignment: .top)], spacing: 14) {
                 ForEach(cycles, id: \.0.persistentModelID) { bill, cycle in
-                    BillRow(bill: bill, cycle: cycle).onTapGesture { editing = bill }
+                    BillRow(bill: bill, cycle: cycle) { editing = bill }
                 }
             }
         }
@@ -55,8 +55,13 @@ struct BillsView: View {
 }
 
 struct BillRow: View {
+    @Environment(\.modelContext) private var context
     let bill: Bill
     let cycle: BillTracker.Cycle
+    /// Opens the editor. Only the date and name area does this, so Mark paid always gets its own tap.
+    var onEdit: () -> Void = {}
+    @State private var askingAmount = false
+    @State private var amountText = ""
 
     private var tint: Color {
         switch cycle.status {
@@ -69,24 +74,34 @@ struct BillRow: View {
     var body: some View {
         let sticker = tint != Theme.card
         HStack(alignment: .top, spacing: 12) {
-            VStack(spacing: 0) {
-                Text(cycle.due.formatted(.dateTime.month(.abbreviated))).font(Theme.ui(10, weight: .semibold)).textCase(.uppercase)
-                Text(cycle.due.formatted(.dateTime.day())).font(Theme.display(20))
-            }
-            .frame(width: 44, height: 48)
-            .background(RoundedRectangle(cornerRadius: 10).fill(sticker ? Color.white.opacity(0.55) : Theme.canvas))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(bill.name).font(Theme.ui(15, weight: .semibold)).lineLimit(1)
-                Text(BillTracker.describe(cycle.status)).font(Theme.ui(12, weight: .medium))
-                if let p = cycle.payment {
-                    Text("Matched “\(p.title)” \(Fmt.money(p.amount))").font(Theme.ui(11)).lineLimit(1).opacity(0.7)
+            Button(action: onEdit) {
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(spacing: 0) {
+                        Text(cycle.due.formatted(.dateTime.month(.abbreviated))).font(Theme.ui(10, weight: .semibold)).textCase(.uppercase)
+                        Text(cycle.due.formatted(.dateTime.day())).font(Theme.display(20))
+                    }
+                    .frame(width: 44, height: 48)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(sticker ? Color.white.opacity(0.55) : Theme.canvas))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(bill.name).font(Theme.ui(15, weight: .semibold)).lineLimit(1)
+                        Text(BillTracker.describe(cycle.status)).font(Theme.ui(12, weight: .medium))
+                        if let p = cycle.payment {
+                            Text("Matched “\(p.title)” \(Fmt.money(p.amount))").font(Theme.ui(11)).lineLimit(1).opacity(0.7)
+                        }
+                    }
+                    Spacer(minLength: 6)
                 }
+                .contentShape(Rectangle())
             }
-            Spacer(minLength: 6)
+            .buttonStyle(.plain)
             VStack(alignment: .trailing, spacing: 8) {
                 if bill.amount > 0 { Text(Fmt.money(bill.amount)).font(Theme.ui(14, weight: .semibold)) }
                 if !cycle.isPaid || cycle.payment == nil {
-                    Button(cycle.isPaid ? "Undo" : "Mark paid") { BillTracker.setPaid(bill, due: cycle.due, !cycle.isPaid) }
+                    Button(cycle.isPaid ? "Undo" : "Mark paid") {
+                        // A bill whose amount varies asks how much it was, so the right amount comes off Left to spend.
+                        if !cycle.isPaid && bill.amount <= 0 { amountText = ""; askingAmount = true }
+                        else { BillTracker.setPaid(bill, due: cycle.due, !cycle.isPaid, context: context) }
+                    }
                         .buttonStyle(.plain).font(Theme.ui(12, weight: .semibold))
                         .padding(.horizontal, 10).padding(.vertical, 5)
                         .background(Capsule().fill(sticker ? Color.white.opacity(0.6) : Theme.canvas))
@@ -97,7 +112,16 @@ struct BillRow: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(tint))
-        .contentShape(Rectangle())
+        .alert("How much was \(bill.name)?", isPresented: $askingAmount) {
+            TextField("Amount", text: $amountText)
+            Button("Mark paid") {
+                let value = Double(amountText.replacingOccurrences(of: ",", with: "")) ?? 0
+                BillTracker.setPaid(bill, due: cycle.due, true, amount: value, context: context)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("It's logged as an expense and comes off what's left to spend.")
+        }
     }
 }
 

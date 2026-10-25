@@ -163,10 +163,20 @@ enum Snapshot {
                                  (10, "Uber", -240.0, "Transport"), (11, "Zara", -1900.0, "Shopping"), (12, "Talabat", -380.0, "Food")] {
             let x = Transaction(title: t, amount: a, category: c, date: today.adding(days: -dBack).adding(minutes: 13 * 60))
             x.source = "sms"
+            x.account = ["Zara", "Uber"].contains(t) ? "demo-nbe" : "demo-cib"
             ctx.insert(x)
         }
         let pay = Transaction(title: "Salary", amount: 18000, category: "Income", date: today.startOfMonth.adding(minutes: 10 * 60)); pay.source = "sms"
+        pay.account = "demo-nbe"
         ctx.insert(pay)
+        // Two banks, as if learnt from their texts.
+        for (id, name, last4, kind, color, bal) in [("demo-cib", "CIB", "1234", "card", 0, 45210.5), ("demo-nbe", "NBE", "5678", "account", 2, 8400.0),
+                                                    ("demo-vf", "Vodafone Cash", "", "wallet", 3, 0.0)] {
+            let acct = BankAccount(name: name, last4: last4, kind: kind)
+            acct.uuid = id; acct.colorIndex = color
+            if bal > 0 { acct.balance = bal; acct.balanceAt = .now.adding(minutes: -95) }
+            ctx.insert(acct)
+        }
         let dom = Calendar.current.component(.day, from: today)
         func day(_ ahead: Int) -> Int { Calendar.current.component(.day, from: today.adding(days: ahead)) }
         for (n, amt, d, match) in [("Rent", 8000.0, day(4), "rent"), ("Internet", 650.0, day(9), "we, telecom egypt"),

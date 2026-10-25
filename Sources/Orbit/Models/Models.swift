@@ -212,6 +212,8 @@ final class Transaction {
     /// What the receipt said before converting to your currency (e.g. 12.99 USD).
     var originalAmount: Double = 0
     var originalCurrency: String = ""
+    /// The bank account or card it went through (a BankAccount uuid), "" if unknown.
+    var account: String = ""
 
     init(title: String, amount: Double, category: String = "General", date: Date = .now, isRecurring: Bool = false) {
         self.title = title
@@ -505,6 +507,35 @@ final class Bill {
             .map { $0.trimmingCharacters(in: .whitespaces) }.filter { $0.count >= 2 }
         return words
     }
+}
+
+// MARK: - Bank accounts
+
+/// A bank account, card or wallet. Orbit adds them by itself from bank texts and Apple Pay (bank + last 4 digits),
+/// and keeps the available balance the latest text mentioned. You can also add, rename and recolour them.
+@Model
+final class BankAccount {
+    /// Permanent id used to sync this item between devices.
+    var uuid: String = ""
+    /// "CIB", "NBE", "Vodafone Cash"…
+    var name: String = ""
+    var last4: String = ""
+    /// card, account, wallet or cash
+    var kind: String = "card"
+    var colorIndex: Int = 0
+    /// Latest available balance (or credit left) seen in a bank text; 0 with no date means unknown.
+    var balance: Double = 0
+    var balanceAt: Date? = nil
+    var createdAt: Date = Date.now
+
+    init(name: String, last4: String = "", kind: String = "card") {
+        self.name = name
+        self.last4 = last4
+        self.kind = kind
+        self.createdAt = .now
+    }
+
+    var title: String { last4.isEmpty ? name : "\(name) ••\(last4)" }
 }
 
 // MARK: - Goals

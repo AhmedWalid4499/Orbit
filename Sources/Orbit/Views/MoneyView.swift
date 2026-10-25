@@ -72,6 +72,7 @@ struct MoneyView: View {
                 } else if mode == "bills" {
                     BillsView()
                 } else {
+                    AccountsStrip(period: period)
                     WeeklyMoneyCard()
                     MoneyCoachCard()
                     HStack(alignment: .top, spacing: 20) {

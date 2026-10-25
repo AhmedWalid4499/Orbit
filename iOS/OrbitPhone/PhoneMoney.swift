@@ -71,6 +71,7 @@ struct PhoneMoney: View {
                         }
                     }
                     .scrollIndicators(.never)
+                    AccountsStrip(period: period)
                     autoLogCard
                     WeeklyMoneyCard()
                     MoneyCoachCard()

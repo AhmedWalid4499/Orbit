@@ -30,9 +30,11 @@ enum WeeklyMoney {
     }
 
     static func report(transactions: [Transaction], subscriptions: [Subscription], bills: [Bill] = [], now: Date = .now) -> Report {
-        let end = now.startOfDay.adding(days: 1), from = end.adding(days: -7), before = from.adding(days: -7)
+        // After "New month", the week starts no earlier than the new budget month, and there's no "last week" to compare.
+        let periodStart = BudgetPeriod.current.start
+        let end = now.startOfDay.adding(days: 1), from = max(end.adding(days: -7), periodStart), before = end.adding(days: -14)
         let week = transactions.filter { $0.date >= from && $0.date < end }
-        let prior = transactions.filter { $0.date >= before && $0.date < from }
+        let prior = periodStart > before ? [] : transactions.filter { $0.date >= before && $0.date < end.adding(days: -7) }
         func spent(_ list: [Transaction]) -> Double { -list.filter(\.isExpense).reduce(0) { $0 + $1.amount } }
         func byCategory(_ list: [Transaction]) -> [String: Double] {
             Dictionary(grouping: list.filter(\.isExpense), by: \.category).mapValues { -$0.reduce(0) { $0 + $1.amount } }

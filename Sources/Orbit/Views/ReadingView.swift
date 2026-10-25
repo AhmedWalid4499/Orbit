@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(iOS)
+import PhotosUI
+#endif
 import SwiftData
 import UniformTypeIdentifiers
 
@@ -406,16 +409,22 @@ struct BookCover: View {
     @State private var image: PlatformImage?
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .leading) {
             placeholder
             if let image {
                 image.swiftUI.resizable().aspectRatio(contentMode: .fill).transition(.opacity)
             }
+            // Like a real book: the spine's fold on the left and a little light across the cover.
+            LinearGradient(stops: [.init(color: .black.opacity(0.28), location: 0), .init(color: .white.opacity(0.18), location: 0.035),
+                                   .init(color: .black.opacity(0.08), location: 0.07), .init(color: .clear, location: 0.12),
+                                   .init(color: .clear, location: 0.9), .init(color: .black.opacity(0.06), location: 1)],
+                           startPoint: .leading, endPoint: .trailing)
+                .allowsHitTesting(false)
         }
-        // Cached on disk; a missing or broken cover is looked up by title and author.
+        // Cached on disk; a missing, blurry or mismatched cover is looked up by title and author.
         .task(id: book.coverURL + book.title) { image = await BookCovers.image(for: book) }
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .shadow(color: .black.opacity(0.15), radius: 6, y: 4)
+        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 2, bottomLeadingRadius: 2, bottomTrailingRadius: 6, topTrailingRadius: 6, style: .continuous))
+        .shadow(color: .black.opacity(0.22), radius: 6, x: 2, y: 4)
     }
 
     private var placeholder: some View {
@@ -668,6 +677,7 @@ struct BookDetailSheet: View {
     @Query(sort: \Highlight.createdAt) private var allHighlights: [Highlight]
     @Query private var allSessions: [ReadingSession]
     @ObservedObject private var timer = ReadingTimer.shared
+    @State private var changingCover = false
 
     /// Reading time, the timer button, and this book's highlights.
     @ViewBuilder private var bookExtras: some View {
@@ -718,6 +728,7 @@ struct BookDetailSheet: View {
             }
             .padding(.horizontal, Platform.isPhone ? 20 : 32)
             .padding(.vertical, 24)
+            .sheet(isPresented: $changingCover) { CoverPicker(book: book) }
         }
         .scrollIndicators(.never)
         .background(Theme.canvas)
@@ -730,7 +741,9 @@ struct BookDetailSheet: View {
         return VStack(spacing: 10) {
             BookCover(book: book).frame(width: 150, height: 225)
                 .shadow(color: .black.opacity(0.18), radius: 16, y: 10)
-                .padding(.bottom, 8)
+            Button { changingCover = true } label: { Label("Change cover", systemImage: "photo.on.rectangle") }
+                .buttonStyle(.plain).font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
+                .padding(.bottom, 4)
             TextField("Title", text: $book.title, axis: .vertical)
                 .textFieldStyle(.plain).font(Theme.display(24)).multilineTextAlignment(.center)
             TextField("Author", text: $book.author)
@@ -1165,6 +1178,94 @@ struct HighlightRow: View {
                 Platform.copy("“\(highlight.text)” — \(highlight.bookTitle)")
             }
             Button("Delete", role: .destructive) { context.delete(highlight) }
+        }
+    }
+}
+
+/// Pick a different cover: the matches Orbit found, best first, or your own picture.
+struct CoverPicker: View {
+    @Environment(\.dismiss) private var dismiss
+    @Bindable var book: Book
+    @State private var options: [String] = []
+    @State private var loading = true
+    #if os(iOS)
+    @State private var picked: PhotosPickerItem?
+    #endif
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Choose a cover").font(Theme.display(24))
+                Spacer()
+                Button("Done") { dismiss() }.buttonStyle(PrimaryButtonStyle()).fixedSize()
+            }
+            Text("Covers that match “\(book.title)”\(book.author.isEmpty ? "" : " by \(book.author)"), sharpest first.").font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
+            ScrollView {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 14)], spacing: 16) {
+                    ForEach(options, id: \.self) { url in
+                        Button { book.coverURL = url; dismiss() } label: {
+                            CoverOption(url: url, selected: book.coverURL == url)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                if loading { ProgressView().frame(maxWidth: .infinity).padding() }
+                if !loading && options.isEmpty {
+                    Text("No other covers found for this title. Check the title and author, or use your own picture.").font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
+                }
+            }
+            HStack {
+                #if os(macOS)
+                Button("Use my own picture…") {
+                    let panel = NSOpenPanel()
+                    panel.allowedContentTypes = [.image]
+                    if panel.runModal() == .OK, let u = panel.url, let img = NSImage(contentsOf: u) { BookCovers.setCustom(img, for: book); dismiss() }
+                }
+                .buttonStyle(SoftButtonStyle())
+                #else
+                PhotosPicker(selection: $picked, matching: .images) { Text("Use my own picture") }.buttonStyle(SoftButtonStyle())
+                #endif
+                Spacer()
+            }
+        }
+        .padding(24)
+        .sheetFrame(width: 620, height: 600)
+        .task {
+            options = await BookCovers.find(title: book.title, author: book.author, isbn: book.isbn)
+            loading = false
+        }
+        #if os(iOS)
+        .onChange(of: picked) { _, item in
+            Task {
+                if let data = try? await item?.loadTransferable(type: Data.self), let img = PlatformImage(data: data) { BookCovers.setCustom(img, for: book); dismiss() }
+            }
+        }
+        #endif
+    }
+}
+
+private struct CoverOption: View {
+    let url: String
+    let selected: Bool
+    @State private var image: PlatformImage?
+    @State private var failed = false
+
+    var body: some View {
+        Group {
+            if let image {
+                VStack(spacing: 4) {
+                    image.swiftUI.resizable().aspectRatio(2/3, contentMode: .fill).frame(width: 104, height: 156).clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(selected ? Theme.ink : .clear, lineWidth: 3))
+                    Text("\(image.cg?.width ?? 0)×\(image.cg?.height ?? 0)").font(Theme.ui(10)).foregroundStyle(Theme.inkMuted)
+                }
+            } else if !failed {
+                RoundedRectangle(cornerRadius: 6).fill(Theme.card).frame(width: 104, height: 156).overlay(ProgressView().controlSize(.small))
+            }
+        }
+        .task {
+            image = await BookCovers.image(at: url)
+            failed = image == nil
         }
     }
 }

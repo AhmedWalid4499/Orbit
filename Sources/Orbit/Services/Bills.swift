@@ -60,15 +60,36 @@ enum BillTracker {
 
     private static func cycle(_ bill: Bill, due: Date, transactions: [Transaction], today: Date) -> Cycle {
         let days = Calendar.current.dateComponents([.day], from: today, to: due).day ?? 0
-        if bill.paidMonths.contains(monthKey(due)) { return Cycle(due: due, status: .paid(nil), payment: nil) }
+        if bill.paidMonths.contains(monthKey(due)) {
+            let mine = transactions.first { $0.sourceID == paymentID(bill, due: due) }
+            return Cycle(due: due, status: .paid(mine?.date), payment: nil)
+        }
         if let p = payment(bill, due: due, in: transactions) { return Cycle(due: due, status: .paid(p.date), payment: p) }
         return Cycle(due: due, status: days < 0 ? .overdue(-days) : .dueIn(days), payment: nil)
     }
 
-    static func setPaid(_ bill: Bill, due: Date, _ paid: Bool) {
+    /// The expense Orbit logs when you mark a bill paid by hand.
+    static func paymentID(_ bill: Bill, due: Date) -> String { "bill:\(bill.uuid.isEmpty ? bill.name : bill.uuid):\(monthKey(due))" }
+
+    /// Marks this month's bill paid (logging `amount` as an expense, so it comes off Left to spend), or undoes that.
+    static func setPaid(_ bill: Bill, due: Date, _ paid: Bool, amount: Double? = nil, context: ModelContext) {
         let key = monthKey(due)
-        if paid { if !bill.paidMonths.contains(key) { bill.paidMonths.append(key) } }
-        else { bill.paidMonths.removeAll { $0 == key } }
+        let id = paymentID(bill, due: due)
+        let logged = ((try? context.fetch(FetchDescriptor<Transaction>(predicate: #Predicate { $0.sourceID == id }))) ?? [])
+        if paid {
+            if !bill.paidMonths.contains(key) { bill.paidMonths.append(key) }
+            let value = abs(amount ?? bill.amount)
+            if logged.isEmpty, value > 0 {
+                let t = Transaction(title: bill.name, amount: -value, category: bill.category.isEmpty ? "Bills" : bill.category, date: .now, isRecurring: true)
+                t.source = "bill"
+                t.sourceID = id
+                context.insert(t)
+            }
+        } else {
+            bill.paidMonths.removeAll { $0 == key }
+            logged.forEach(context.delete)
+        }
+        try? context.save()
     }
 
     /// Bills still to pay this month, in your home currency.

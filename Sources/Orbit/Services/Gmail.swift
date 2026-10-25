@@ -54,6 +54,19 @@ enum GoogleAuth {
     /// Opens the browser for consent and returns the signed-in email address.
     @MainActor
     static func signIn(hint: String? = nil) async throws -> String {
+        let tokens = try await authorize(scope: scope, hint: hint)
+        let email = try await profileEmail(accessToken: tokens.access)
+        Keychain.write(tokens.refresh, account: "gmail:\(email)")
+        accessTokens[email] = (tokens.access, Date.now.addingTimeInterval(Double(tokens.expiresIn) - 60))
+        var accounts = UserDefaults.standard.stringArray(forKey: "gmailAccounts") ?? []
+        if !accounts.contains(email) { accounts.append(email) }
+        UserDefaults.standard.set(accounts, forKey: "gmailAccounts")
+        return email
+    }
+
+    /// Google's consent screen for `scope` (Gmail, YouTube…), returning the tokens.
+    @MainActor
+    static func authorize(scope: String, hint: String? = nil) async throws -> (refresh: String, access: String, expiresIn: Int) {
         guard isConfigured else { throw GmailError("Add your Google OAuth client ID and secret first.") }
         let verifier = randomURLSafe(64)
         let challenge = Data(SHA256.hash(data: Data(verifier.utf8))).base64URL
@@ -84,13 +97,16 @@ enum GoogleAuth {
         guard let refresh = tokens["refresh_token"] as? String, let access = tokens["access_token"] as? String else {
             throw GmailError("Google didn't return a refresh token. Remove Orbit from your Google account's third-party access and try again.")
         }
-        let email = try await profileEmail(accessToken: access)
-        Keychain.write(refresh, account: "gmail:\(email)")
-        accessTokens[email] = (access, Date.now.addingTimeInterval(Double(tokens["expires_in"] as? Int ?? 3600) - 60))
-        var accounts = UserDefaults.standard.stringArray(forKey: "gmailAccounts") ?? []
-        if !accounts.contains(email) { accounts.append(email) }
-        UserDefaults.standard.set(accounts, forKey: "gmailAccounts")
-        return email
+        return (refresh, access, tokens["expires_in"] as? Int ?? 3600)
+    }
+
+    /// A fresh access token from a saved refresh token.
+    static func refreshAccess(_ refresh: String) async throws -> (token: String, expiresIn: Int) {
+        let tokens = try await tokenRequest([
+            "grant_type": "refresh_token", "refresh_token": refresh, "client_id": clientID, "client_secret": clientSecret,
+        ])
+        guard let access = tokens["access_token"] as? String else { throw GmailError("Google sign-in expired. Connect again in Settings › Connections.") }
+        return (access, tokens["expires_in"] as? Int ?? 3600)
     }
 
     static func remove(_ email: String) {

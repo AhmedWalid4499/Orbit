@@ -94,91 +94,87 @@ struct CardFace: View {
 
     // MARK: Photo card
 
-    /// Your photo fills the card; name, details and links sit on a dark fade at the bottom. The QR code is on the back.
+    /// Like a profile page: your photo fills the top and fades into a dark panel with where you're based, your name,
+    /// what you do, a line about you and your links as pills. The QR code is on the back (the round button turns it over).
     private func photoCard(_ cover: PlatformImage) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 2) {
-                Text("orbit").font(.system(size: 15, weight: .black, design: .rounded))
-                Circle().fill(card.color).frame(width: 5, height: 5).offset(y: 4)
-            }
-            .opacity(0.85)
-            .shadow(color: .black.opacity(0.35), radius: 6)
-            Spacer(minLength: 0)
-            VStack(alignment: .leading, spacing: 5) {
-                Text(card.name.isEmpty ? "Your name" : card.name).font(.system(size: 34, weight: .bold, design: .serif))
-                    .lineLimit(2).minimumScaleFactor(0.6)
-                let sub = [card.headline, card.company].filter { !$0.isEmpty }.joined(separator: " · ")
-                if !sub.isEmpty {
-                    Text(sub).font(.system(size: 15, weight: .semibold)).foregroundStyle(card.isDark ? .white : card.color).lineLimit(2)
+        let accent = card.isDark ? Theme.orange : card.color
+        let role = [card.headline, card.company].filter { !$0.isEmpty }.joined(separator: card.headline.isEmpty || card.company.isEmpty ? "" : " at ")
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                HStack(spacing: 2) {
+                    Text("orbit").font(.system(size: 15, weight: .black, design: .rounded))
+                    Circle().fill(accent).frame(width: 5, height: 5).offset(y: 4)
                 }
-                if !card.location.isEmpty {
-                    Label(card.location, systemImage: "mappin").font(.system(size: 12, weight: .medium)).opacity(0.75)
-                }
-            }
-            if !card.bio.isEmpty {
-                Text(card.bio).font(.system(size: 14, design: .serif)).opacity(0.85).lineLimit(2).fixedSize(horizontal: false, vertical: true)
-            }
-            if !card.email.isEmpty || !card.phone.isEmpty {
-                HStack(spacing: 8) {
-                    if !card.email.isEmpty { glassContact("envelope.fill", card.email, url: "mailto:\(card.email)") }
-                    if !card.phone.isEmpty { glassContact("phone.fill", card.phone, url: "tel:\(card.phone.filter { $0.isNumber || $0 == "+" })") }
-                }
-            }
-            HStack(alignment: .bottom, spacing: 14) {
-                VStack(alignment: .leading, spacing: 10) {
-                    // Round buttons, so the links don't cover the photo.
-                    LazyVGrid(columns: Array(repeating: GridItem(.fixed(42), spacing: 8), count: 4), alignment: .leading, spacing: 8) {
-                        ForEach(card.filledLinks.prefix(8)) { link in
-                            Button { if interactive, let u = URL(string: link.url) { openURL(u) } } label: {
-                                Image(systemName: link.kind.symbol).font(.system(size: 15, weight: .bold))
-                                    .foregroundStyle(card.isDark ? Theme.stickerInk : Theme.stickerInk)
-                                    .frame(width: 42, height: 42)
-                                    .background(Circle().fill(card.isDark ? Color.white : card.color))
-                            }
-                            .buttonStyle(.plain).disabled(!interactive)
-                            .help(link.kind == .other ? link.handle : "\(link.kind.title): \(link.handle)")
-                        }
-                    }
-                }
-                Spacer(minLength: 0)
-                // The QR code lives on the back; this small button turns the card over.
+                .shadow(color: .black.opacity(0.4), radius: 6)
+                Spacer()
                 if interactive, qr != nil {
                     Button(action: flip) {
-                        Image(systemName: "qrcode").font(.system(size: 19, weight: .semibold))
-                            .frame(width: 48, height: 48)
-                            .background(Circle().fill(Color.white.opacity(0.16)))
-                            .overlay(Circle().strokeBorder(Color.white.opacity(0.28), lineWidth: 1))
+                        Image(systemName: "qrcode").font(.system(size: 18, weight: .semibold))
+                            .frame(width: 46, height: 46)
+                            .background(Circle().fill(.ultraThinMaterial).environment(\.colorScheme, .dark))
+                            .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
                     }
                     .buttonStyle(.plain).help("Show my QR code")
                 }
             }
+            Spacer(minLength: 0)
+            VStack(alignment: .leading, spacing: 8) {
+                if !card.location.isEmpty {
+                    HStack(spacing: 6) {
+                        Image(systemName: "mappin.circle.fill").font(.system(size: 13))
+                        Text(card.location.uppercased()).font(.system(size: 12, weight: .semibold)).tracking(2.2).lineLimit(1)
+                    }
+                    .opacity(0.85)
+                }
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(card.name.isEmpty ? "Your name" : card.name).font(.system(size: 34, weight: .bold))
+                        .lineLimit(2).minimumScaleFactor(0.6)
+                    Image(systemName: "checkmark.seal.fill").font(.system(size: 22)).foregroundStyle(accent)
+                }
+                if !role.isEmpty {
+                    Text(role).font(.system(size: 18, weight: .regular)).opacity(0.82).lineLimit(2).minimumScaleFactor(0.85)
+                }
+                if !card.bio.isEmpty {
+                    Text(card.bio).font(.system(size: 14)).opacity(0.9).lineLimit(3).lineSpacing(2)
+                        .fixedSize(horizontal: false, vertical: true).padding(.top, 4)
+                }
+                FlowLayout(spacing: 8) {
+                    if !card.email.isEmpty { pill("envelope.fill", "Email", accent, url: "mailto:\(card.email)") }
+                    if !card.phone.isEmpty { pill("phone.fill", "Call", accent, url: "tel:\(card.phone.filter { $0.isNumber || $0 == "+" })") }
+                    ForEach(card.filledLinks.prefix(6)) { link in
+                        pill(link.kind.symbol, link.kind == .other ? (link.handle.isEmpty ? "Link" : link.handle) : link.kind.title, accent, url: link.url)
+                    }
+                }
+                .padding(.top, 8)
+            }
         }
         .foregroundStyle(.white)
-        .padding(28)
+        .padding(26)
         .frame(width: 420, height: 620, alignment: .topLeading)
         .background {
-            ZStack {
-                Color(hex: 0x141416)
-                cover.swiftUI.resizable().scaledToFill().frame(width: 420, height: 620).clipped()
-                // Dark at the top for the mark, clear over the face, then a deep fade for the text.
-                LinearGradient(stops: [.init(color: .black.opacity(0.35), location: 0), .init(color: .clear, location: 0.18),
-                                       .init(color: .clear, location: 0.38), .init(color: .black.opacity(0.62), location: 0.6),
-                                       .init(color: .black.opacity(0.9), location: 1)],
+            ZStack(alignment: .top) {
+                Color(hex: 0x111113)
+                cover.swiftUI.resizable().scaledToFill().frame(width: 420, height: 430).clipped()
+                // A soft shade at the top for the buttons, then the photo melts into the dark panel.
+                LinearGradient(stops: [.init(color: .black.opacity(0.3), location: 0), .init(color: .clear, location: 0.16),
+                                       .init(color: .clear, location: 0.36), .init(color: Color(hex: 0x111113).opacity(0.85), location: 0.58),
+                                       .init(color: Color(hex: 0x111113), location: 0.7)],
                                startPoint: .top, endPoint: .bottom)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
     }
 
-    private func glassContact(_ symbol: String, _ text: String, url: String) -> some View {
+    /// A rounded link button, like the topic chips on a profile page.
+    private func pill(_ symbol: String, _ title: String, _ accent: Color, url: String) -> some View {
         Button { if interactive, let u = URL(string: url) { openURL(u) } } label: {
-            HStack(spacing: 6) {
-                Image(systemName: symbol).font(.system(size: 10, weight: .bold))
-                Text(text).font(.system(size: 12, weight: .medium)).lineLimit(1).truncationMode(.middle)
+            HStack(spacing: 7) {
+                Image(systemName: symbol).font(.system(size: 12, weight: .bold)).foregroundStyle(accent)
+                Text(title).font(.system(size: 14, weight: .medium)).lineLimit(1)
             }
-            .padding(.horizontal, 10).padding(.vertical, 6)
-            .background(Capsule().fill(Color.white.opacity(0.16)))
-            .overlay(Capsule().strokeBorder(Color.white.opacity(0.22), lineWidth: 1))
+            .padding(.horizontal, 14).padding(.vertical, 9)
+            .background(Capsule().fill(Color.white.opacity(0.07)))
+            .overlay(Capsule().strokeBorder(Color.white.opacity(0.16), lineWidth: 1))
         }
         .buttonStyle(.plain)
         .disabled(!interactive)

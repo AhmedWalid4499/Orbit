@@ -14,7 +14,7 @@ enum BudgetPeriod {
             return t > 0 ? Date(timeIntervalSince1970: t) : nil
         }
         set {
-            if let newValue { UserDefaults.standard.set(newValue.startOfDay.timeIntervalSince1970, forKey: key) }
+            if let newValue { UserDefaults.standard.set(newValue.timeIntervalSince1970, forKey: key) }
             else { UserDefaults.standard.removeObject(forKey: key) }
         }
     }
@@ -44,8 +44,12 @@ enum BudgetPeriod {
         period(containing: Calendar.current.date(byAdding: .month, value: months, to: p.start)!.addingTimeInterval(3600))
     }
 
-    /// Starts a new budget month today.
-    static func startNew(_ day: Date = .now) { anchor = day }
+    /// Starts a new budget month right now: anything spent before this moment, even earlier today, no longer counts.
+    /// Works any time, also in the middle of a budget month or twice on the same day.
+    @MainActor static func startNew(_ moment: Date = .now) {
+        anchor = moment
+        MoneyCoach.shared.forget()
+    }
 
     /// "October 2026", or "25 Oct – 24 Nov" for a month that starts on payday.
     static func title(_ p: DateInterval) -> String {
@@ -75,11 +79,11 @@ extension View {
         return confirmationDialog("Start a new budget month today?", isPresented: shown, titleVisibility: .visible) {
             Button("Start new month") { BudgetPeriod.startNew(); onChange() }
             if BudgetPeriod.isCustom {
-                Button("Go back to calendar months") { BudgetPeriod.anchor = nil; onChange() }
+                Button("Go back to calendar months") { BudgetPeriod.anchor = nil; MoneyCoach.shared.forget(); onChange() }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Your budget will run from today to \(next.formatted(.dateTime.day().month(.wide))), then month to month from this day. Spending before today won't count. Handy on payday.")
+            Text("Your budget starts again from now and runs to \(next.formatted(.dateTime.day().month(.wide))), then month to month from this day. Nothing spent before now counts. Handy on payday.")
         }
     }
 }

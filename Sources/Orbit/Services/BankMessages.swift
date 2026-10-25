@@ -47,8 +47,15 @@ enum BankMessages {
         let existing = (try? context.fetch(FetchDescriptor<Transaction>())) ?? []
         if existing.contains(where: { $0.sourceID == id }) { return "Already logged." }
 
-        guard let p = await read(text), p.kind != .notPayment, p.amount > 0 else { return "Not a payment, nothing logged." }
-        return await save(p, source: "sms", sourceID: id, existing: existing, context: context)
+        // Which bank and card it was, and the balance the text mentions, for the account pages in Money.
+        let account = Accounts.forMessage(text, sender: sender, context: context)
+        if let account, let bal = Accounts.balance(in: text) { account.balance = bal; account.balanceAt = .now }
+        guard let p = await read(text), p.kind != .notPayment, p.amount > 0 else {
+            try? context.save()
+            if let account, account.balanceAt.map({ Date.now.timeIntervalSince($0) < 60 }) == true { return "Balance for \(account.title) updated." }
+            return "Not a payment, nothing logged."
+        }
+        return await save(p, source: "sms", sourceID: id, existing: existing, account: account, context: context)
     }
 
     /// Wording only banks use about a card or account, plus an amount.
@@ -77,10 +84,12 @@ enum BankMessages {
                        category: QuickParser.guessCategory(name))
         let minute = Int(Date.now.timeIntervalSince1970 / 60)
         let existing = (try? context.fetch(FetchDescriptor<Transaction>())) ?? []
-        return await save(p, source: "wallet", sourceID: "wallet:" + digest("\(minute)|\(amount)|\(merchant)"), existing: existing, context: context)
+        return await save(p, source: "wallet", sourceID: "wallet:" + digest("\(minute)|\(amount)|\(merchant)"), existing: existing,
+                          account: Accounts.forWalletCard(card, context: context), context: context)
     }
 
-    private static func save(_ p: Parsed, source: String, sourceID: String, existing: [Transaction], context: ModelContext) async -> String {
+    private static func save(_ p: Parsed, source: String, sourceID: String, existing: [Transaction], account: BankAccount? = nil,
+                             context: ModelContext) async -> String {
         let currency = p.currency.isEmpty ? Fmt.currencyCode : p.currency
         let converted = await Currency.convert(p.amount, from: currency, to: Fmt.currencyCode)
         let value = converted ?? p.amount
@@ -92,6 +101,8 @@ enum BankMessages {
         }
         if let twin {
             if twin.source == "wallet", source == "sms", twin.title == "Card payment", !p.merchant.isEmpty { twin.title = p.merchant }
+            // The bank's text knows the exact card; a Wallet tap only knows the card's nickname.
+            if let account, twin.account.isEmpty || source == "sms" { twin.account = account.uuid }
             try? context.save()
             return "Already logged as \(twin.title)."
         }
@@ -100,6 +111,7 @@ enum BankMessages {
                             amount: signed, category: p.kind == .expense ? p.category : "Income")
         t.source = source
         t.sourceID = sourceID
+        t.account = account?.uuid ?? ""
         if currency != Fmt.currencyCode { t.originalAmount = p.amount; t.originalCurrency = currency }
         context.insert(t)
         try? context.save()

@@ -99,6 +99,7 @@ struct PhoneConnections: View {
                 }
                 Text("Apple Books and Kindle are imported by Orbit on your Mac, and the books then appear here on their own.").font(Theme.ui(12)).foregroundStyle(Theme.inkMuted)
             }
+            OtherConnections()
         }
         .sheet(isPresented: $readingSources) { ReadingSourcesSheet() }
     }

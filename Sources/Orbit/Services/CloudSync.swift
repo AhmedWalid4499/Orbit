@@ -234,11 +234,12 @@ private let syncKinds: [SyncKind] = [
              fetch: { (try? $0.fetch(FetchDescriptor<Transaction>())) ?? [] }, uuid: { ($0 as! Transaction).uuid },
              encode: { m in let t = m as! Transaction
                  return ["title": t.title, "amount": t.amount, "category": t.category, "date": J.date(t.date), "isRecurring": t.isRecurring,
-                         "source": t.source, "sourceID": t.sourceID, "originalAmount": t.originalAmount, "originalCurrency": t.originalCurrency] },
+                         "source": t.source, "sourceID": t.sourceID, "originalAmount": t.originalAmount, "originalCurrency": t.originalCurrency,
+                         "account": t.account] },
              apply: { d, m in let t = m as! Transaction
                  t.title = J.str(d["title"]); t.amount = J.num(d["amount"]); t.category = J.str(d["category"]); t.date = J.date(d["date"]) ?? t.date
                  t.isRecurring = J.bool(d["isRecurring"]); t.source = J.str(d["source"]); t.sourceID = J.str(d["sourceID"])
-                 t.originalAmount = J.num(d["originalAmount"]); t.originalCurrency = J.str(d["originalCurrency"]) },
+                 t.originalAmount = J.num(d["originalAmount"]); t.originalCurrency = J.str(d["originalCurrency"]); t.account = J.str(d["account"]) },
              make: { let t = Transaction(title: "", amount: 0); $0.insert(t); return t }),
     SyncKind(kind: "note",
              fetch: { (try? $0.fetch(FetchDescriptor<Note>())) ?? [] }, uuid: { ($0 as! Note).uuid },
@@ -382,6 +383,16 @@ private let syncKinds: [SyncKind] = [
                  b.remindDays = J.int(d["remindDays"]); b.match = J.str(d["match"]); b.category = J.str(d["category"])
                  b.paidMonths = J.strings(d["paidMonths"]); b.notes = J.str(d["notes"]); b.createdAt = J.date(d["createdAt"]) ?? b.createdAt },
              make: { let b = Bill(name: ""); $0.insert(b); return b }),
+    SyncKind(kind: "account",
+             fetch: { (try? $0.fetch(FetchDescriptor<BankAccount>())) ?? [] }, uuid: { ($0 as! BankAccount).uuid },
+             encode: { m in let a = m as! BankAccount
+                 return ["name": a.name, "last4": a.last4, "kind": a.kind, "colorIndex": a.colorIndex, "balance": a.balance,
+                         "balanceAt": J.date(a.balanceAt), "createdAt": J.date(a.createdAt)] },
+             apply: { d, m in let a = m as! BankAccount
+                 a.name = J.str(d["name"]); a.last4 = J.str(d["last4"]); a.kind = J.str(d["kind"]).isEmpty ? "card" : J.str(d["kind"])
+                 a.colorIndex = J.int(d["colorIndex"]); a.balance = J.num(d["balance"]); a.balanceAt = J.date(d["balanceAt"])
+                 a.createdAt = J.date(d["createdAt"]) ?? a.createdAt },
+             make: { let a = BankAccount(name: ""); $0.insert(a); return a }),
     SyncKind(kind: "goal",
              fetch: { (try? $0.fetch(FetchDescriptor<Goal>())) ?? [] }, uuid: { ($0 as! Goal).uuid },
              encode: { m in let g = m as! Goal
@@ -534,6 +545,7 @@ final class CloudSync: ObservableObject {
         case let x as Trip: x.uuid = id
         case let x as Booking: x.uuid = id
         case let x as Bill: x.uuid = id
+        case let x as BankAccount: x.uuid = id
         case let x as Goal: x.uuid = id
         default: break
         }

@@ -41,6 +41,12 @@ final class MoneyCoach: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: cacheKey) { advice = try? JSONDecoder().decode(Advice.self, from: data) }
     }
 
+    /// Drops the saved advice (after starting a new budget month), so the next look at Money writes fresh advice.
+    func forget() {
+        advice = nil
+        UserDefaults.standard.removeObject(forKey: cacheKey)
+    }
+
     /// Refreshes once a day when Money is opened; `force` for the refresh button.
     func refresh(context: ModelContext, force: Bool = false) async {
         guard !loading, !Snapshot.isActive, AIAssistant.shared.hasKey, let claude = ClaudeClient() else { return }
@@ -53,7 +59,8 @@ final class MoneyCoach: ObservableObject {
         defer { loading = false }
         let system = """
         You are a practical, kind money coach inside a personal budgeting app. Look at the spending data and suggest specific ways to save.
-        - headline: one short sentence on how this month is going compared with the budget and previous months.
+        - headline: one short sentence on how this budget month is going compared with the budget and previous months.
+        The budget month may start on payday rather than the 1st; only spending inside the current budget month counts against this month's budget.
         - tips: 3-4 concrete actions based on THIS data (name the merchants, categories and subscriptions involved), each with a realistic monthly_saving in the user's currency (\(Fmt.currencyCode)). detail is 1-2 sentences. No generic advice like "make a budget".
         Don't shame; be encouraging. Plain text, no markdown.
         """
@@ -84,16 +91,19 @@ final class MoneyCoach: ObservableObject {
         let txns = (try? context.fetch(FetchDescriptor<Transaction>(sortBy: [SortDescriptor(\.date)]))) ?? []
         let tasks = (try? context.fetch(FetchDescriptor<TaskItem>())) ?? []
         let budget = UserDefaults.standard.object(forKey: "monthlyBudget") as? Double ?? 2000
-        let cal = Calendar.current
         var lines = ["Currency: \(Fmt.currencyCode). Monthly budget: \(Fmt.money(budget)). Today: \(Date.now.formatted(date: .complete, time: .omitted))."]
+        if let anchor = BudgetPeriod.anchor {
+            lines.append("The user started a new budget month on \(anchor.formatted(date: .long, time: .shortened)); budget months run from that day each month.")
+        }
 
         for back in (0..<months).reversed() {
-            let start = cal.date(byAdding: .month, value: -back, to: Date.now.startOfMonth)!
-            let end = cal.date(byAdding: .month, value: 1, to: start)!
+            let p = BudgetPeriod.shifted(BudgetPeriod.current, by: -back)
+            let start = p.start, end = p.end
             let m = txns.filter { $0.date >= start && $0.date < end }
             let spent = -m.filter(\.isExpense).reduce(0) { $0 + $1.amount }
             let income = m.filter { !$0.isExpense }.reduce(0) { $0 + $1.amount }
-            lines.append("\n\(start.formatted(.dateTime.month(.wide).year()))\(back == 0 ? " (so far, day \(cal.component(.day, from: .now)))" : ""): spent \(Fmt.money(spent)), income \(Fmt.money(income))")
+            let (day, of) = BudgetPeriod.day(of: p)
+            lines.append("\n\(back == 0 ? "This budget month" : "Budget month") \(BudgetPeriod.title(p))\(back == 0 ? " (so far, day \(day) of \(of))" : ""): spent \(Fmt.money(spent)), income \(Fmt.money(income))")
             let byCat = Dictionary(grouping: m.filter(\.isExpense), by: \.category).mapValues { -$0.reduce(0) { $0 + $1.amount } }
             for (c, v) in byCat.sorted(by: { $0.value > $1.value }) { lines.append("  \(c): \(Fmt.money(v))") }
             let byMerchant = Dictionary(grouping: m.filter(\.isExpense), by: { $0.title }).mapValues { ($0.count, -$0.reduce(0) { $0 + $1.amount }) }

@@ -31,21 +31,24 @@ struct PhoneBankSetup: View {
                             .font(Theme.ui(13, weight: .semibold)).foregroundStyle(Theme.good)
                     }
 
+                    status
+
                     banksCard
 
                     guide("Bank text messages", symbol: "message.fill", color: Theme.cyan, steps: [
                         "Tap **Add to Shortcuts** below, choose **Shortcuts** in the share sheet, then **Add Shortcut**.",
                         "In Shortcuts: **Automation** tab › **+** › **Message**.",
                         "Tap **Message Contains**, type **EGP**, tap **Done**. Leave Sender empty.",
-                        "Choose **Run Immediately**, tap **Next**, then tap the red **Orbit Bank Message** tile in the top row (swipe the row sideways if you don't see it). That's it.",
+                        "Choose **Run Immediately** and switch on **Notify When Run**, so you see a banner each time it runs. Tap **Next**.",
+                        "Tap the red **Orbit Bank Message** tile in the top row (swipe the row sideways if you don't see it).",
+                        "Repeat steps 2–5 for each word your bank uses for the currency: **LE**, **ج.م** and **جنيه**. One automation only catches texts with its exact word.",
                     ], file: "Orbit Bank Message")
-                    Text("Bank texts you in Arabic? Add a second Message automation with **جنيه** instead of EGP, running the same shortcut.")
-                        .font(Theme.ui(12)).foregroundStyle(Theme.inkMuted)
 
                     guide("Apple Pay", symbol: "wave.3.right", color: Theme.lime, steps: [
+                        "First open the **Wallet** app and tap your card. If your recent Apple Pay purchases aren't listed there, your bank doesn't share them with iPhone and this automation can never run: use bank texts above instead.",
                         "Tap **Add to Shortcuts** below, choose **Shortcuts** in the share sheet, then **Add Shortcut**.",
-                        "In Shortcuts: **Automation** tab › **+** › **Wallet**.",
-                        "Pick your cards, choose **Run Immediately**, tap **Next**.",
+                        "In Shortcuts: **Automation** tab › **+** › **Wallet** (called **Transaction** on some iPhones).",
+                        "Pick your cards, choose **Run Immediately** and switch on **Notify When Run**. Tap **Next**.",
                         "Tap the green **Orbit Card Payment** tile in the top row. That's it.",
                     ], file: "Orbit Card Payment")
 
@@ -66,6 +69,40 @@ struct PhoneBankSetup: View {
             .navigationTitle("Auto-log card payments")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        }
+    }
+
+    /// Has anything ever reached Orbit, and if not, the most likely reason.
+    private var status: some View {
+        let sms = entries.first { $0.kind == .sms && !$0.result.hasPrefix("Test worked") }
+        let wallet = entries.first { $0.kind == .wallet }
+        let tested = entries.contains { $0.result.hasPrefix("Test worked") }
+        return VStack(alignment: .leading, spacing: 12) {
+            Text("Status").font(Theme.display(20))
+            statusRow("Bank texts", ok: sms != nil,
+                      sms.map { "Last one reached Orbit \($0.date.formatted(.relative(presentation: .named)))." }
+                        ?? (tested ? "The test reached Orbit, so the shortcut works. No real bank text has triggered the automation yet: check that each currency word has its own automation and that it's switched on."
+                                   : "Nothing yet. Tap “Test the bank shortcut” below first, to check the shortcut itself works."))
+            statusRow("Apple Pay", ok: wallet != nil,
+                      wallet.map { "Last tap reached Orbit \($0.date.formatted(.relative(presentation: .named)))." }
+                        ?? "Nothing yet. If your purchases don't show in the Wallet app, your bank doesn't share them and the Wallet automation won't run.")
+            Text("Automations only run while they're switched on in Shortcuts › Automation. With Notify When Run on, a banner shows every time one runs.")
+                .font(Theme.ui(11)).foregroundStyle(Theme.inkMuted).fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 18).fill(Theme.card))
+        .onAppear { entries = AutoLogActivity.entries }
+    }
+
+    private func statusRow(_ title: String, ok: Bool, _ detail: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: ok ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                .foregroundStyle(ok ? Theme.good : Theme.orange).font(.system(size: 16))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(Theme.ui(14, weight: .semibold))
+                Text(detail).font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 

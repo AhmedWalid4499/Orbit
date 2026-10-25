@@ -143,8 +143,9 @@ struct ConnectionsSettings: View {
                 Button("Connect & import…") { readingSources = true }
             }
         }
+        OtherConnections()
         Section("Coming next — need something from you") {
-            PlannedRow(name: "Bank accounts", detail: "Automatic bank sync is coming. For now, use Money › Import statement with your bank’s CSV or PDF.", symbol: "building.columns")
+            PlannedRow(name: "Bank accounts", detail: "Each bank and card gets its own page in Money, filled from bank texts, Apple Pay and statements. Live bank links aren't available for Egyptian banks yet.", symbol: "building.columns")
             PlannedRow(name: "Apple Health", detail: "Sleep, steps, workouts. Needs an iPhone companion app.", symbol: "heart")
         }
     }

@@ -49,6 +49,7 @@ extension Snapshot {
             withDefault("calendarMode", "day") { render("calendar-day", tab: .calendar, appearance: .aqua) }
             withDefault("moneyTab", "calendar") { render("money-calendar", tab: .money, appearance: .aqua) }
             withDefault("moneyTab", "subscriptions") { render("money-subscriptions", tab: .money, appearance: .aqua) }
+            withDefault("moneyTab", "overview") { render("money-overview", tab: .money, appearance: .aqua) }
             withDefault("moneyTab", "bills") { render("money-bills", tab: .money, appearance: .aqua); render("money-bills", tab: .money, appearance: .darkAqua) }
             withDefault("bucketSection", "goals") { render("goals", tab: .bucket, appearance: .aqua); render("goals", tab: .bucket, appearance: .darkAqua) }
             render("assistant", tab: .today, appearance: .aqua) { $0.assistantOpen = true }
@@ -87,6 +88,9 @@ extension Snapshot {
             renderAlone("review-insights", width: 920, height: 740, ReviewView(startOnInsights: true))
             for (i, a) in [0.6, 2.2, 4.0].enumerated() { renderAlone("splash-\(i)", width: size.width, height: size.height, SplashView(angle: a)) }
             renderAlone("plan-tomorrow", width: 1040, height: 720, PlanTomorrowSheet())
+            if let acct = try? container.mainContext.fetch(FetchDescriptor<BankAccount>(sortBy: [SortDescriptor(\.createdAt)])).first {
+                renderAlone("account", width: 720, height: 760, AccountPage(account: acct))
+            }
             renderAlone("goto", width: 1100, height: 820, wait: 3, ScrollView { GoToSection().padding(28) })
             renderAlone("money-rules", width: 560, height: 720, MoneyRulesSheet())
             renderAlone("tour", width: 1040, height: 660, wait: 1.5, TourView {})
@@ -208,6 +212,10 @@ enum SyncTest {
                 check("Mac B gets documents (\(count(DocItem.self, b))/\(count(DocItem.self, a)))", count(DocItem.self, a) == count(DocItem.self, b))
                 check("Mac B gets focus sessions (\(count(FocusSession.self, b))/\(count(FocusSession.self, a)))", count(FocusSession.self, a) == count(FocusSession.self, b))
                 check("Mac B gets day plans (\(count(DayPlan.self, b))/\(count(DayPlan.self, a)))", count(DayPlan.self, a) == count(DayPlan.self, b))
+                check("Mac B gets bank accounts (\(count(BankAccount.self, b))/\(count(BankAccount.self, a)))", count(BankAccount.self, a) == count(BankAccount.self, b) && count(BankAccount.self, a) > 0)
+                let cibB = try b.fetch(FetchDescriptor<BankAccount>()).first { $0.name == "CIB" }
+                let linked = try b.fetch(FetchDescriptor<Transaction>()).filter { $0.account == cibB?.uuid }.count
+                check("Balances and linked payments come across (\(linked) on CIB)", cibB?.balance == 45210.5 && cibB?.last4 == "1234" && linked > 0)
                 check("Mac B gets trips and bookings (\(count(Trip.self, b))+\(count(Booking.self, b)))", count(Trip.self, a) == count(Trip.self, b) && count(Booking.self, a) == count(Booking.self, b))
                 let tripB = try b.fetch(FetchDescriptor<Trip>()).first
                 let bookingsB = try b.fetch(FetchDescriptor<Booking>()).filter { $0.tripUUID == tripB?.uuid }

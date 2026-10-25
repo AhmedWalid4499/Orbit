@@ -2,31 +2,56 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key><string>Orbit</string>
-    <key>CFBundleDisplayName</key><string>Orbit</string>
-    <key>CFBundleIdentifier</key><string>com.personal.orbit</string>
-    <key>CFBundleExecutable</key><string>Orbit</string>
-    <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleShortVersionString</key><string>0.1.0</string>
-    <key>CFBundleVersion</key><string>1</string>
-    <key>CFBundleIconFile</key><string>AppIcon</string>
-    <key>CFBundleURLTypes</key>
-    <array>
-        <dict>
-            <key>CFBundleURLName</key><string>Orbit sign-in</string>
-            <key>CFBundleURLSchemes</key><array><string>com.personal.orbit</string></array>
-        </dict>
-    </array>
-    <key>LSMinimumSystemVersion</key><string>15.0</string>
-    <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
-    <key>NSHighResolutionCapable</key><true/>
-    <key>NSCalendarsFullAccessUsageDescription</key><string>Orbit shows your calendar events alongside your tasks and plans.</string>
-    <key>NSCalendarsUsageDescription</key><string>Orbit shows your calendar events alongside your tasks and plans.</string>
-    <key>NSLocationUsageDescription</key><string>Orbit uses your location when you ask for food or places nearby, to find what's close to you.</string>
-    <key>NSLocationWhenInUseUsageDescription</key><string>Orbit uses your location when you ask for food or places nearby, to find what's close to you.</string>
-    <key>NSMicrophoneUsageDescription</key><string>Orbit listens when you hold ⌥Space or tap the mic, so you can talk to your assistant and plan by voice.</string>
-    <key>NSSpeechRecognitionUsageDescription</key><string>Orbit turns what you say into text on your Mac, so your assistant can understand you and file what you said.</string>
-    <key>NSRemindersFullAccessUsageDescription</key><string>Orbit shows and completes your Apple Reminders next to your tasks.</string>
-    <key>NSRemindersUsageDescription</key><string>Orbit shows and completes your Apple Reminders next to your tasks.</string>
+	<key>CFBundleDisplayName</key>
+	<string>Orbit</string>
+	<key>CFBundleExecutable</key>
+	<string>Orbit</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.personal.orbit</string>
+	<key>CFBundleName</key>
+	<string>Orbit</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>Orbit sign-in</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.personal.orbit</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.productivity</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>15.0</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Orbit opens searches in Chrome and, when you ask, looks at the page you have open so your assistant can help with it.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Orbit shows your calendar events alongside your tasks and plans.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Orbit shows your calendar events alongside your tasks and plans.</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSLocationUsageDescription</key>
+	<string>Orbit uses your location when you ask for food or places nearby, to find what's close to you.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Orbit uses your location when you ask for food or places nearby, to find what's close to you.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Orbit listens when you hold ⌥Space or tap the mic, so you can talk to your assistant and plan by voice.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Orbit shows and completes your Apple Reminders next to your tasks.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>Orbit shows and completes your Apple Reminders next to your tasks.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Orbit turns what you say into text on your Mac, so your assistant can understand you and file what you said.</string>
 </dict>
 </plist>

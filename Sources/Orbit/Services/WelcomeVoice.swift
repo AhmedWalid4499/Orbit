@@ -27,7 +27,7 @@ enum WelcomeVoice {
         let h = Calendar.current.component(.hour, from: .now)
         let part = h < 5 ? "You're up late" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"
         let first = Platform.userName.split(separator: " ").first.map(String.init) ?? ""
-        var lines = ["\(part)\(first.isEmpty ? "" : ", \(first)"). Welcome back to Orbit."]
+        var lines = ["\(part)\(first.isEmpty ? "" : ", \(first)"). Welcome back."]
         guard let b = brief else { return (lines + ["Tap me whenever you need anything."]).joined(separator: " ") }
         lines.append("Here's your day. \(b.headline).")
         lines.append(b.summary)

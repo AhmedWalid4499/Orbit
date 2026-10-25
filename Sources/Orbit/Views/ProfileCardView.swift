@@ -16,18 +16,85 @@ struct CardFace: View {
     var interactive = true
     /// The card's own background photo; falls back to the profile photo.
     var backdrop: PlatformImage? = CardPhoto.image
+    /// Start on the QR side of the photo card (for screenshots).
+    var startOnBack = false
     @Environment(\.openURL) private var openURL
+    @State private var onBack: Bool?
+    @State private var turn = 0.0
 
     private var ink: Color { card.isDark ? Color(hex: 0xF4F4F5) : Theme.stickerInk }
     private var cover: PlatformImage? { card.showPhoto ? (backdrop ?? photo) : nil }
 
     var body: some View {
-        if card.style == "photo", let cover { photoCard(cover) } else { colorCard }
+        if card.style == "photo", let cover {
+            Group {
+                if onBack ?? startOnBack { qrBack } else { photoCard(cover) }
+            }
+            .rotation3DEffect(.degrees(turn), axis: (x: 0, y: 1, z: 0), perspective: 0.6)
+        } else {
+            colorCard
+        }
+    }
+
+    /// Turns the card over: a quarter turn out, swap sides, a quarter turn back in.
+    private func flip() {
+        withAnimation(.easeIn(duration: 0.16)) { turn = 90 }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(160))
+            onBack = !(onBack ?? startOnBack)
+            turn = -90
+            withAnimation(.easeOut(duration: 0.2)) { turn = 0 }
+        }
+    }
+
+    /// The back of the photo card: a big QR code, so it's easy to scan.
+    private var qrBack: some View {
+        VStack(spacing: 18) {
+            HStack {
+                HStack(spacing: 2) {
+                    Text("orbit").font(.system(size: 15, weight: .black, design: .rounded))
+                    Circle().fill(card.color).frame(width: 5, height: 5).offset(y: 4)
+                }
+                .opacity(0.85)
+                Spacer()
+                if interactive {
+                    Button(action: flip) {
+                        Image(systemName: "arrow.uturn.backward").font(.system(size: 14, weight: .bold))
+                            .frame(width: 40, height: 40).background(Circle().fill(Color.white.opacity(0.16)))
+                    }
+                    .buttonStyle(.plain).help("Back to the card")
+                }
+            }
+            Spacer(minLength: 0)
+            if let qr {
+                qr.swiftUI.interpolation(.none).resizable()
+                    .frame(width: 250, height: 250)
+                    .padding(16)
+                    .background(RoundedRectangle(cornerRadius: 26, style: .continuous).fill(.white))
+            }
+            VStack(spacing: 6) {
+                Text(card.name.isEmpty ? "Your name" : card.name).font(.system(size: 26, weight: .bold, design: .serif))
+                    .lineLimit(1).minimumScaleFactor(0.6)
+                Text(card.qrTarget == "contact" ? "Scan to save my contact" : "Scan to open my link")
+                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(card.isDark ? .white : card.color)
+            }
+            Spacer(minLength: 0)
+            if interactive {
+                Text("Tap anywhere to turn back").font(.system(size: 11, weight: .medium)).opacity(0.5)
+            }
+        }
+        .foregroundStyle(.white)
+        .padding(28)
+        .frame(width: 420, height: 620)
+        .background(RoundedRectangle(cornerRadius: 32, style: .continuous).fill(Color(hex: 0x141416)))
+        .overlay(RoundedRectangle(cornerRadius: 32, style: .continuous).strokeBorder(card.color.opacity(0.5), lineWidth: 2))
+        .contentShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+        .onTapGesture { if interactive { flip() } }
     }
 
     // MARK: Photo card
 
-    /// Your photo fills the card; name, details, links and the QR code sit on a dark fade at the bottom.
+    /// Your photo fills the card; name, details and links sit on a dark fade at the bottom. The QR code is on the back.
     private func photoCard(_ cover: PlatformImage) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 2) {
@@ -72,15 +139,17 @@ struct CardFace: View {
                             .help(link.kind == .other ? link.handle : "\(link.kind.title): \(link.handle)")
                         }
                     }
-                    Text(card.qrTarget == "contact" ? "Scan to save my contact" : "Scan to open")
-                        .font(.system(size: 11, weight: .semibold)).opacity(0.7)
                 }
                 Spacer(minLength: 0)
-                if let qr {
-                    qr.swiftUI.interpolation(.none).resizable()
-                        .frame(width: 104, height: 104)
-                        .padding(7)
-                        .background(RoundedRectangle(cornerRadius: 14).fill(.white))
+                // The QR code lives on the back; this small button turns the card over.
+                if interactive, qr != nil {
+                    Button(action: flip) {
+                        Image(systemName: "qrcode").font(.system(size: 19, weight: .semibold))
+                            .frame(width: 48, height: 48)
+                            .background(Circle().fill(Color.white.opacity(0.16)))
+                            .overlay(Circle().strokeBorder(Color.white.opacity(0.28), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain).help("Show my QR code")
                 }
             }
         }

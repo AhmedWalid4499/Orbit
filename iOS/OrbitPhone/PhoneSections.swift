@@ -57,6 +57,7 @@ struct PhoneMore: View {
         case .documents: Theme.mint
         case .insights: Theme.lime
         case .calendar: Theme.cyan
+        case .ideas: Theme.sand
         case .github: Theme.lavender
         case .youtube: Theme.peach
         case .linkedin: Theme.cyan

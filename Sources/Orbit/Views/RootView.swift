@@ -4,7 +4,6 @@ import SwiftData
 struct RootView: View {
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var apple: AppleSync
-    @ObservedObject private var wake = WakeListener.shared
     @Environment(\.modelContext) private var context
     @AppStorage("userName") private var userName = NSFullUserName()
     @AppStorage("tourSeen") private var tourSeen = false
@@ -32,6 +31,7 @@ struct RootView: View {
                 case .habits: HabitsView()
                 case .money: MoneyView()
                 case .notes: NotesView()
+                case .ideas: IdeasView()
                 case .reading: ReadingView()
                 case .documents: DocumentsView()
                 case .bucket: BucketListView()
@@ -87,10 +87,7 @@ struct RootView: View {
         .task { focus.restore(context: context) }
         .task { await WelcomeVoice.greetIfDue(context: context, apple: apple) }
         .task { WakeListener.shared.apple = apple }   // starts hands-free listening when it's switched on
-        .overlay {
-            if wake.inConversation { VoiceOrbView().transition(.opacity) }
-        }
-        .animation(.easeOut(duration: 0.25), value: wake.inConversation)
+        .overlay { VoiceOrbHost() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             Task { await WelcomeVoice.greetIfDue(context: context, apple: apple) }
         }

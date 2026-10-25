@@ -17,6 +17,7 @@ struct OtherConnections: View {
             row("Goodreads", .goodreads, reading.goodreadsUser.isEmpty ? nil : "Shelves sync from your profile") {
                 reading.goodreadsUser = ""
             }
+            GoodreadsSyncRow()
             if !Platform.isPhone {
                 row("Apple Books", .appleBooks, reading.appleBooksLinked ? "Library on this Mac syncs daily" : nil) { reading.disconnect("apple", context: context) }
                 row("Kindle", .kindle, reading.kindleLinked ? "Kindle app library syncs daily" : nil) { reading.disconnect("kindle", context: context) }

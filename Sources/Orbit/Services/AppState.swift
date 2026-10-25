@@ -6,16 +6,16 @@ enum OrbitSchema {
     static let models: [any PersistentModel.Type] = [TaskItem.self, EventItem.self, Habit.self, Transaction.self, Note.self, Book.self,
                                                      BookCategory.self, BucketItem.self, ReadingSession.self, Highlight.self, Subscription.self,
                                                      DocItem.self, FocusSession.self, DayPlan.self, Trip.self, Booking.self,
-                                                     Bill.self, Goal.self, BankAccount.self]
+                                                     Bill.self, Goal.self, BankAccount.self, IdeaProject.self, Idea.self]
     static var schema: Schema { Schema(models) }
 }
 
 enum Tab: String, CaseIterable, Identifiable {
-    case today, assistant, insights, calendar, tasks, habits, bucket, money, notes, reading, documents, github, youtube, linkedin
+    case today, assistant, insights, calendar, tasks, habits, bucket, money, notes, ideas, reading, documents, github, youtube, linkedin
     var id: String { rawValue }
 
     /// Documents and YouTube were retired as tabs (YouTube stays connected for the assistant); old links to them still open.
-    static var allCases: [Tab] { [.today, .assistant, .insights, .calendar, .tasks, .habits, .bucket, .money, .notes, .reading, .github, .linkedin] }
+    static var allCases: [Tab] { [.today, .assistant, .insights, .calendar, .tasks, .habits, .bucket, .money, .notes, .ideas, .reading, .github, .linkedin] }
 
     var title: String {
         switch self {
@@ -39,6 +39,8 @@ enum Tab: String, CaseIterable, Identifiable {
             return "Insights"
         case .assistant:
             return AssistantName.current
+        case .ideas:
+            return "Ideas"
         default:
             return rawValue.capitalized
         }
@@ -48,6 +50,7 @@ enum Tab: String, CaseIterable, Identifiable {
         switch self {
         case .today: "sun.max.fill"
         case .assistant: "sparkles"
+        case .ideas: "lightbulb.max.fill"
         case .insights: "chart.xyaxis.line"
         case .calendar: "calendar"
         case .tasks: "checklist"
@@ -64,7 +67,7 @@ enum Tab: String, CaseIterable, Identifiable {
     }
 
     /// Nav groups: day, plan, life.
-    static let groups: [[Tab]] = [[.today, .assistant, .insights], [.calendar, .tasks, .habits, .bucket], [.money, .notes, .reading, .github, .linkedin]]
+    static let groups: [[Tab]] = [[.today, .assistant, .insights], [.calendar, .tasks, .habits, .bucket], [.money, .notes, .ideas, .reading, .github, .linkedin]]
 
     /// Tabs you turned off in Settings › General › Tabs (synced). Today is always there.
     static var hidden: Set<Tab> {
@@ -78,6 +81,7 @@ enum Tab: String, CaseIterable, Identifiable {
         switch self {
         case .today: "Your day at a glance"
         case .assistant: "Chat with your AI and see past chats"
+        case .ideas: "Writing projects and the ideas that grow in them"
         case .insights: "Charts of your week and month"
         case .calendar: "Apple and Google calendars"
         case .tasks: "To-dos and reminders"

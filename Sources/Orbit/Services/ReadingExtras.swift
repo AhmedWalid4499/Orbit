@@ -233,6 +233,7 @@ struct FinishedReadingSheet: View {
                             if book.progress >= 1 { book.status = .read }
                         }
                         try? context.save()
+                        GoodreadsSync.shared.schedule(book)
                     }
                     dismiss()
                 }

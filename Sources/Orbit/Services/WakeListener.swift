@@ -142,7 +142,7 @@ final class WakeListener: ObservableObject {
             var sum: Float = 0
             if let data { for i in 0..<n { sum += data[i] * data[i] } }
             let rms = n > 0 ? sqrt(sum / Float(n)) : 0
-            Task { @MainActor in self?.level = min(1, rms * 14) }
+            Task { @MainActor in self?.setLevel(min(1, rms * 14)) }
         }
         do {
             engine.prepare()
@@ -170,14 +170,24 @@ final class WakeListener: ObservableObject {
         }
     }
 
+    private var levelAt = Date.distantPast
+    /// The orb's pulse: only while it's showing, at most 15 times a second, and only when it really changes.
+    private func setLevel(_ v: Float) {
+        guard inConversation, Date.now.timeIntervalSince(levelAt) > 0.066, abs(v - level) > 0.04 else { return }
+        levelAt = .now
+        level = v
+    }
+
     /// Looks for the wake word; once heard, voice mode starts and everything after it is the question.
     private func update() {
         if let r = Self.wakeRange(in: transcript) {
             awake = true
             inConversation = true
-            heard = String(transcript[r.upperBound...]).trimmingCharacters(in: CharacterSet(charactersIn: " ,.!?"))
+            let h = String(transcript[r.upperBound...]).trimmingCharacters(in: CharacterSet(charactersIn: " ,.!?"))
+            if h != heard { heard = h }
         } else if awake {
-            heard = transcript.trimmingCharacters(in: .whitespaces)
+            let h = transcript.trimmingCharacters(in: .whitespaces)
+            if h != heard { heard = h }
         }
     }
 

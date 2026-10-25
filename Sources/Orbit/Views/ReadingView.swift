@@ -682,6 +682,10 @@ struct BookDetailSheet: View {
     @Query private var allSessions: [ReadingSession]
     @ObservedObject private var timer = ReadingTimer.shared
     @State private var changingCover = false
+    /// Title and author show as text (not a selected field) until you tap the pencil.
+    @State private var editingName = false
+    @ObservedObject private var goodreads = GoodreadsSync.shared
+    @State private var reviewStatus: String?
 
     /// Reading time, the timer button, and this book's highlights.
     @ViewBuilder private var bookExtras: some View {
@@ -710,6 +714,8 @@ struct BookDetailSheet: View {
         ScrollView {
             VStack(spacing: 22) {
                 hero
+                    .onChange(of: book.progress) { goodreads.schedule(book) }
+                    .onChange(of: book.statusRaw) { goodreads.schedule(book) }
                 shelfPicker
                 if book.status == .reading { progressCard }
                 detailsCard
@@ -723,6 +729,15 @@ struct BookDetailSheet: View {
                         .padding(8)
                         .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
                         .frame(height: 110)
+                    if goodreads.signedIn && !book.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        HStack {
+                            Button {
+                                Task { reviewStatus = "Posting…"; reviewStatus = await goodreads.postReview(book, text: book.notes, rating: book.rating) }
+                            } label: { Label("Post as my Goodreads review", systemImage: "paperplane") }
+                                .buttonStyle(SoftButtonStyle())
+                            if let s = reviewStatus { Text(s).font(Theme.ui(11)).foregroundStyle(Theme.inkSecondary).lineLimit(2) }
+                        }
+                    }
                 }
                 HStack {
                     Button("Delete", role: .destructive) { context.delete(book); dismiss() }.buttonStyle(SoftButtonStyle())
@@ -748,10 +763,22 @@ struct BookDetailSheet: View {
             Button { changingCover = true } label: { Label("Change cover", systemImage: "photo.on.rectangle") }
                 .buttonStyle(.plain).font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
                 .padding(.bottom, 4)
-            TextField("Title", text: $book.title, axis: .vertical)
-                .textFieldStyle(.plain).font(Theme.display(24)).multilineTextAlignment(.center)
-            TextField("Author", text: $book.author)
-                .textFieldStyle(.plain).font(Theme.ui(15)).foregroundStyle(Theme.inkSecondary).multilineTextAlignment(.center)
+            if editingName {
+                TextField("Title", text: $book.title, axis: .vertical)
+                    .textFieldStyle(.roundedBorder).font(Theme.display(20)).multilineTextAlignment(.center)
+                TextField("Author", text: $book.author)
+                    .textFieldStyle(.roundedBorder).font(Theme.ui(15)).multilineTextAlignment(.center)
+                    .onSubmit { editingName = false }
+                Button("Done") { editingName = false }.buttonStyle(SoftButtonStyle())
+            } else {
+                Text(book.title.isEmpty ? "Untitled" : book.title).font(Theme.display(24)).multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 6) {
+                    Text(book.author.isEmpty ? "Unknown author" : book.author).font(Theme.ui(15)).foregroundStyle(Theme.inkSecondary)
+                    Button { editingName = true } label: { Image(systemName: "pencil").font(.system(size: 12, weight: .semibold)) }
+                        .buttonStyle(.plain).foregroundStyle(Theme.inkMuted).help("Edit title and author")
+                }
+            }
             Stars(rating: book.rating, size: 20) { book.rating = $0 }.padding(.top, 2)
             Text(sourceLabel).font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
         }

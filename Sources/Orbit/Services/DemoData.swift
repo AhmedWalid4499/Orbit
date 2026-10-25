@@ -177,6 +177,27 @@ enum Snapshot {
             if bal > 0 { acct.balance = bal; acct.balanceAt = .now.adding(minutes: -95) }
             ctx.insert(acct)
         }
+        // Ideas: a novel with a few ideas, one of them grown into more.
+        let novel = IdeaProject(title: "The Lighthouse Novel", summary: "A family saga on the Alexandria coast, told across three summers.")
+        novel.uuid = "demo-novel"; novel.colorIndex = 1
+        ctx.insert(novel)
+        let blog = IdeaProject(title: "Blog posts")
+        blog.uuid = "demo-blog"; blog.colorIndex = 3; blog.updatedAt = .now.adding(days: -3)
+        ctx.insert(blog)
+        for (id, title, body, parent, pinned) in [
+            ("i1", "The sister knew all along", "Nour found the letters years ago and never said a word. Why keep the secret? Maybe it protected her more than anyone.", "", true),
+            ("i2", "Open on the storm of '98", "Start with the night the lighthouse went dark: the whole town on the corniche, nobody looking at the sea.", "", false),
+            ("i3", "Grandfather's radio", "The radio only plays one station. Every chapter starts with what's on it.", "", false),
+            ("i4", "She burns the last letter", "Ends part two: we never learn what it said.", "i1", false),
+            ("i5", "Told from Nour's diary", "Part three switches to first person, her diary from that summer.", "i1", false),
+        ] {
+            let idea = Idea(title: title, body: body, projectUUID: "demo-novel", parentUUID: parent.isEmpty ? "" : "demo-\(parent)")
+            idea.uuid = "demo-\(id)"; idea.pinned = pinned
+            ctx.insert(idea)
+        }
+        let post = Idea(title: "What 30 days of journaling taught me", body: "", projectUUID: "demo-blog")
+        post.uuid = "demo-p1"
+        ctx.insert(post)
         let dom = Calendar.current.component(.day, from: today)
         func day(_ ahead: Int) -> Int { Calendar.current.component(.day, from: today.adding(days: ahead)) }
         for (n, amt, d, match) in [("Rent", 8000.0, day(4), "rent"), ("Internet", 650.0, day(9), "we, telecom egypt"),

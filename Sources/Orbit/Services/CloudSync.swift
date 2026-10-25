@@ -393,6 +393,26 @@ private let syncKinds: [SyncKind] = [
                  a.colorIndex = J.int(d["colorIndex"]); a.balance = J.num(d["balance"]); a.balanceAt = J.date(d["balanceAt"])
                  a.createdAt = J.date(d["createdAt"]) ?? a.createdAt },
              make: { let a = BankAccount(name: ""); $0.insert(a); return a }),
+    SyncKind(kind: "ideaProject",
+             fetch: { (try? $0.fetch(FetchDescriptor<IdeaProject>())) ?? [] }, uuid: { ($0 as! IdeaProject).uuid },
+             encode: { m in let p = m as! IdeaProject
+                 return ["title": p.title, "summary": p.summary, "colorIndex": p.colorIndex, "archived": p.archived,
+                         "createdAt": J.date(p.createdAt), "updatedAt": J.date(p.updatedAt)] },
+             apply: { d, m in let p = m as! IdeaProject
+                 p.title = J.str(d["title"]); p.summary = J.str(d["summary"]); p.colorIndex = J.int(d["colorIndex"])
+                 p.archived = d["archived"] as? Bool ?? false
+                 p.createdAt = J.date(d["createdAt"]) ?? p.createdAt; p.updatedAt = J.date(d["updatedAt"]) ?? p.updatedAt },
+             make: { let p = IdeaProject(title: ""); $0.insert(p); return p }),
+    SyncKind(kind: "idea",
+             fetch: { (try? $0.fetch(FetchDescriptor<Idea>())) ?? [] }, uuid: { ($0 as! Idea).uuid },
+             encode: { m in let i = m as! Idea
+                 return ["projectUUID": i.projectUUID, "parentUUID": i.parentUUID, "title": i.title, "body": i.body, "pinned": i.pinned,
+                         "createdAt": J.date(i.createdAt), "updatedAt": J.date(i.updatedAt)] },
+             apply: { d, m in let i = m as! Idea
+                 i.projectUUID = J.str(d["projectUUID"]); i.parentUUID = J.str(d["parentUUID"]); i.title = J.str(d["title"])
+                 i.body = J.str(d["body"]); i.pinned = d["pinned"] as? Bool ?? false
+                 i.createdAt = J.date(d["createdAt"]) ?? i.createdAt; i.updatedAt = J.date(d["updatedAt"]) ?? i.updatedAt },
+             make: { let i = Idea(title: "", projectUUID: ""); $0.insert(i); return i }),
     SyncKind(kind: "goal",
              fetch: { (try? $0.fetch(FetchDescriptor<Goal>())) ?? [] }, uuid: { ($0 as! Goal).uuid },
              encode: { m in let g = m as! Goal
@@ -546,6 +566,8 @@ final class CloudSync: ObservableObject {
         case let x as Booking: x.uuid = id
         case let x as Bill: x.uuid = id
         case let x as BankAccount: x.uuid = id
+        case let x as IdeaProject: x.uuid = id
+        case let x as Idea: x.uuid = id
         case let x as Goal: x.uuid = id
         default: break
         }

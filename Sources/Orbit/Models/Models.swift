@@ -549,6 +549,52 @@ final class BankAccount {
     var title: String { last4.isEmpty ? name : "\(name) ••\(last4)" }
 }
 
+// MARK: - Ideas
+
+/// A writing project in Ideas (a novel, a series of posts, a screenplay…) holding the ideas that belong to it.
+@Model
+final class IdeaProject {
+    /// Permanent id used to sync this item between devices.
+    var uuid: String = ""
+    var title: String = ""
+    /// What the project is about, in a line or two.
+    var summary: String = ""
+    var colorIndex: Int = 0
+    var archived: Bool = false
+    var createdAt: Date = Date.now
+    var updatedAt: Date = Date.now
+
+    init(title: String, summary: String = "") {
+        self.title = title
+        self.summary = summary
+        self.createdAt = .now
+        self.updatedAt = .now
+    }
+}
+
+/// One idea in a project. It grows: its body is a page you keep writing on, and it can branch into smaller ideas
+/// (`parentUUID` is the idea it grew from; empty for a top-level idea).
+@Model
+final class Idea {
+    var uuid: String = ""
+    var projectUUID: String = ""
+    var parentUUID: String = ""
+    var title: String = ""
+    var body: String = ""
+    var pinned: Bool = false
+    var createdAt: Date = Date.now
+    var updatedAt: Date = Date.now
+
+    init(title: String, body: String = "", projectUUID: String, parentUUID: String = "") {
+        self.title = title
+        self.body = body
+        self.projectUUID = projectUUID
+        self.parentUUID = parentUUID
+        self.createdAt = .now
+        self.updatedAt = .now
+    }
+}
+
 // MARK: - Goals
 
 enum GoalKind: String, CaseIterable, Identifiable {

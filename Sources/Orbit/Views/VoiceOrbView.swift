@@ -1,5 +1,17 @@
 import SwiftUI
 
+/// Shows voice mode over the window. Kept in its own small view so the rest of the app doesn't redraw while the
+/// microphone is listening.
+struct VoiceOrbHost: View {
+    @ObservedObject private var wake = WakeListener.shared
+    var body: some View {
+        ZStack {
+            if wake.inConversation { VoiceOrbView().transition(.opacity) }
+        }
+        .animation(.easeOut(duration: 0.25), value: wake.inConversation)
+    }
+}
+
 /// Voice mode: the assistant's orb in the middle of the screen. It pulses with your voice while it listens,
 /// swirls while it thinks and moves with its words while it answers. Say "stop" or tap ✕ to end.
 struct VoiceOrbView: View {

@@ -127,7 +127,7 @@ final class Dictation: ObservableObject {
             var sum: Float = 0
             if let data { for i in 0..<n { sum += data[i] * data[i] } }
             let rms = n > 0 ? sqrt(sum / Float(n)) : 0
-            Task { @MainActor in self?.level = min(1, rms * 12) }
+            Task { @MainActor in self?.setLevel(min(1, rms * 12)) }
         }
         do {
             engine.prepare()
@@ -155,6 +155,14 @@ final class Dictation: ObservableObject {
                 if (!self.text.isEmpty && quiet > 1.6) || (self.text.isEmpty && quiet > 12) { self.stop(); return }
             }
         }
+    }
+
+    private var levelAt = Date.distantPast
+    /// At most 15 updates a second, so the chat doesn't redraw for every bit of sound.
+    private func setLevel(_ v: Float) {
+        guard Date.now.timeIntervalSince(levelAt) > 0.066, abs(v - level) > 0.04 else { return }
+        levelAt = .now
+        level = v
     }
 
     /// Stops and hands over what was heard.

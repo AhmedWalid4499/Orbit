@@ -1,44 +1,12 @@
 import Foundation
 #if os(macOS)
 import AppKit
-#else
-import UIKit
 #endif
 
-/// The assistant's way into your browser: it opens searches and pages in Google Chrome (or your usual browser
-/// when Chrome isn't installed), and on the Mac it can see the page you have open in Chrome to help with it.
+/// On the Mac the assistant can see the page you have open in Chrome (or Safari) to help with it.
 @MainActor
 enum Browser {
     static let chromeID = "com.google.Chrome"
-
-    /// A Google search for `query`.
-    static func searchURL(_ query: String) -> URL {
-        var c = URLComponents(string: "https://www.google.com/search")!
-        c.queryItems = [.init(name: "q", value: query)]
-        return c.url!
-    }
-
-    /// Opens `url` in Chrome when it's installed, else in your default browser. Returns the browser's name.
-    @discardableResult
-    static func open(_ url: URL) async -> String {
-        #if os(macOS)
-        if let chrome = NSWorkspace.shared.urlForApplication(withBundleIdentifier: chromeID) {
-            let config = NSWorkspace.OpenConfiguration()
-            config.activates = true
-            if (try? await NSWorkspace.shared.open([url], withApplicationAt: chrome, configuration: config)) != nil { return "Chrome" }
-        }
-        NSWorkspace.shared.open(url)
-        return "your browser"
-        #else
-        // Chrome on iPhone opens googlechromes:// links; without Chrome, Safari takes the normal link.
-        if var c = URLComponents(url: url, resolvingAgainstBaseURL: false), let scheme = c.scheme?.lowercased(), scheme.hasPrefix("http") {
-            c.scheme = scheme == "https" ? "googlechromes" : "googlechrome"
-            if let chromeURL = c.url, await UIApplication.shared.open(chromeURL) { return "Chrome" }
-        }
-        await UIApplication.shared.open(url)
-        return "Safari"
-        #endif
-    }
 
     struct Tab { var title: String; var url: String; var text: String }
 

@@ -9,7 +9,6 @@ struct PhoneRoot: View {
     @EnvironmentObject private var apple: AppleSync
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var phase
-    @ObservedObject private var wake = WakeListener.shared
     @ObservedObject private var cloud = CloudSync.shared
     @ObservedObject private var focus = FocusTimer.shared
     @ObservedObject private var reading = ReadingTimer.shared
@@ -32,10 +31,7 @@ struct PhoneRoot: View {
         }
         .tint(Theme.ink)
         // Voice mode ("Hey <name>"): the orb in the middle of the screen, over everything.
-        .overlay {
-            if wake.inConversation { VoiceOrbView().transition(.opacity) }
-        }
-        .animation(.easeOut(duration: 0.25), value: wake.inConversation)
+        .overlay { VoiceOrbHost() }
         .sheet(isPresented: $state.assistantOpen) { AssistantPanel().presentationDragIndicator(.visible) }
         .sheet(isPresented: $state.searchOpen) { SearchView() }
         .fullScreenCover(isPresented: $state.tourOpen) { TourView { state.tourOpen = false } }
@@ -173,6 +169,7 @@ struct PhoneSection: View {
         case .insights: InsightsDashboard().phoneChrome("Insights")
         case .habits: PhoneHabits()
         case .notes: PhoneNotes()
+        case .ideas: IdeasView().phoneChrome("Ideas")
         case .reading: PhoneReading()
         case .bucket: PhoneBucket()
         case .documents: PhoneDocuments()

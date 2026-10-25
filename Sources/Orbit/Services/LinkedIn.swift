@@ -494,6 +494,48 @@ final class LinkedInAccount: ObservableObject {
     private let tokenKey = "linkedin-token", secretKey = "linkedin-client-secret"
 
     var hasSecret: Bool { !(Keychain.read(secretKey) ?? "").isEmpty }
+
+    // MARK: Profile link
+
+    /// Your LinkedIn profile, kept as the LinkedIn link on your card (so it syncs and shows on the card too).
+    var profileLink: String? {
+        ProfileCard.load().filledLinks.first { $0.kind == .linkedin }.flatMap { Self.slug(from: $0.value).map { "https://www.linkedin.com/in/\($0)" } }
+    }
+    var isConnected: Bool { isSignedIn || profileLink != nil }
+
+    /// "ahmed-elbourgy-msc-4488201b0" from anything people paste: a full link, www.…, linkedin.com/in/…, in/…, or the name alone.
+    static func slug(from raw: String) -> String? {
+        let t = raw.trimmingCharacters(in: .whitespacesAndNewlines).removingPercentEncoding ?? raw
+        if let r = t.range(of: #"(?i)(?:linkedin\.com)?/?in/([^/?#\s]+)"#, options: .regularExpression) {
+            let part = t[r].split(separator: "/").last.map(String.init) ?? ""
+            return part.isEmpty ? nil : part
+        }
+        // Just the name part, e.g. "ahmed-elbourgy-msc-4488201b0".
+        return t.range(of: #"^[\p{L}\p{N}_-]{3,100}$"#, options: .regularExpression) != nil ? t : nil
+    }
+
+    /// Saves your profile link; returns false when it isn't a LinkedIn profile link.
+    @discardableResult func connect(link raw: String) -> Bool {
+        guard let slug = Self.slug(from: raw) else {
+            error = "That doesn't look like a LinkedIn profile link. It should look like linkedin.com/in/your-name."
+            return false
+        }
+        var card = ProfileCard.load()
+        let value = "linkedin.com/in/\(slug)"
+        if let i = card.links.firstIndex(where: { $0.kind == .linkedin }) { card.links[i].value = value }
+        else { card.links.insert(.init(kind: .linkedin, value: value), at: 0) }
+        card.save()
+        error = nil
+        objectWillChange.send()
+        return true
+    }
+
+    func disconnectLink() {
+        var card = ProfileCard.load()
+        card.links.removeAll { $0.kind == .linkedin }
+        card.save()
+        objectWillChange.send()
+    }
     var isSignedIn: Bool { profile != nil && Keychain.read(tokenKey) != nil }
     var isSetUp: Bool { !clientID.isEmpty && hasSecret }
 
@@ -561,13 +603,16 @@ final class LinkedInAccount: ObservableObject {
     }
 }
 
-/// Who you're signed in to LinkedIn as, with a button to open your profile (top of the LinkedIn tab).
+/// Your LinkedIn: the profile you linked (or signed in with), with a button to open it (top of the LinkedIn tab).
 struct LinkedInAccountCard: View {
     @ObservedObject private var account = LinkedInAccount.shared
+    @AppStorage("profileCard") private var cardJSON = ""
+    @State private var link = ""
 
     var body: some View {
+        let _ = cardJSON
         HStack(spacing: 12) {
-            if let p = account.profile {
+            if let p = account.profile, account.isSignedIn {
                 AsyncImage(url: URL(string: p.picture)) { $0.resizable().scaledToFill() } placeholder: { Color(hex: 0x0A66C2) }
                     .frame(width: 48, height: 48).clipShape(Circle())
                 VStack(alignment: .leading, spacing: 2) {
@@ -575,25 +620,47 @@ struct LinkedInAccountCard: View {
                     Label("Connected to LinkedIn", systemImage: "checkmark.seal.fill").font(Theme.ui(12)).foregroundStyle(Theme.good)
                 }
                 Spacer()
-                Button { Platform.open(URL(string: "https://www.linkedin.com/in/me/")!) } label: { Label("My profile", systemImage: "arrow.up.right") }
-                    .buttonStyle(SoftButtonStyle())
-            } else {
-                BrandLogo(brand: .linkedin, size: 40)
+                openButton(account.profileLink ?? "https://www.linkedin.com/in/me/")
+            } else if let url = account.profileLink {
+                BrandLogo(brand: .linkedin, size: 44)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Connect your LinkedIn account").font(Theme.ui(15, weight: .semibold))
-                    Text(account.isSetUp ? "Sign in so Orbit shows your account here." : "Set it up in Settings › Connections › LinkedIn.")
-                        .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
-                    if let e = account.error { Text(e).font(Theme.ui(11)).foregroundStyle(Theme.orange) }
+                    Text(ProfileCard.load().name.isEmpty ? "Your LinkedIn" : ProfileCard.load().name).font(Theme.ui(16, weight: .semibold))
+                    Text(url.replacingOccurrences(of: "https://www.linkedin.com/", with: "linkedin.com/")).font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary).lineLimit(1).truncationMode(.head)
+                    Label("Connected", systemImage: "checkmark.seal.fill").font(Theme.ui(11)).foregroundStyle(Theme.good)
                 }
                 Spacer()
-                if account.isSetUp {
-                    Button { Task { await account.signIn() } } label: { Text(account.busy ? "Signing in…" : "Sign in with LinkedIn") }
-                        .buttonStyle(PrimaryButtonStyle()).fixedSize().disabled(account.busy)
+                openButton(url)
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 10) {
+                        BrandLogo(brand: .linkedin, size: 36)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("Connect your LinkedIn").font(Theme.ui(15, weight: .semibold))
+                            Text("Paste your profile link.").font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
+                        }
+                    }
+                    HStack(spacing: 8) {
+                        TextField("linkedin.com/in/your-name", text: $link)
+                            .textFieldStyle(.roundedBorder).autocorrectionDisabled()
+                            #if os(iOS)
+                            .textInputAutocapitalization(.never).keyboardType(.URL)
+                            #endif
+                            .onSubmit { if account.connect(link: link) { link = "" } }
+                        Button("Connect") { if account.connect(link: link) { link = "" } }
+                            .buttonStyle(PrimaryButtonStyle()).fixedSize().disabled(link.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                    if let e = account.error { Text(e).font(Theme.ui(11)).foregroundStyle(Theme.orange) }
                 }
+                Spacer(minLength: 0)
             }
         }
         .padding(14)
         .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Theme.card))
+    }
+
+    private func openButton(_ url: String) -> some View {
+        Button { if let u = URL(string: url) { Platform.open(u) } } label: { Label("My profile", systemImage: "arrow.up.right") }
+            .buttonStyle(SoftButtonStyle()).fixedSize()
     }
 }
 
@@ -604,26 +671,41 @@ struct LinkedInConnectionRow: View {
     @ObservedObject private var account = LinkedInAccount.shared
     @State private var clientID = LinkedInAccount.shared.clientID
     @State private var secret = ""
+    @State private var profileLink = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
                 BrandLogo(brand: .linkedin, size: 28)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(account.profile.map { "LinkedIn · \($0.name)" } ?? "LinkedIn account").font(.headline)
-                    Text(account.isSignedIn ? "Signed in with LinkedIn." : "Sign in with your LinkedIn account.").font(.caption).foregroundStyle(.secondary)
+                    Text("LinkedIn profile").font(.headline)
+                    Text(account.profileLink.map { $0.replacingOccurrences(of: "https://www.linkedin.com/", with: "linkedin.com/") } ?? "Paste your profile link to connect it.")
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.head)
                 }
                 Spacer()
-                if account.isSignedIn {
-                    Button("Disconnect", role: .destructive) { account.signOut() }
-                } else if account.isSetUp {
-                    Button(account.busy ? "Signing in…" : "Sign in with LinkedIn") { Task { await account.signIn() } }
-                        .buttonStyle(.borderedProminent).disabled(account.busy)
+                if account.profileLink != nil { Button("Disconnect", role: .destructive) { account.disconnectLink() } }
+            }
+            if account.profileLink == nil {
+                HStack {
+                    TextField("linkedin.com/in/your-name", text: $profileLink).textFieldStyle(.roundedBorder).autocorrectionDisabled()
+                        .onSubmit { if account.connect(link: profileLink) { profileLink = "" } }
+                    Button("Connect") { if account.connect(link: profileLink) { profileLink = "" } }
+                        .disabled(profileLink.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
             if let e = account.error { Text(e).font(.caption).foregroundStyle(Theme.orange).fixedSize(horizontal: false, vertical: true) }
-            if !account.isSignedIn {
-                DisclosureGroup(account.isSetUp ? "LinkedIn app settings" : "Set up (one time)") {
+            if account.isSignedIn {
+                HStack {
+                    Label("Signed in with LinkedIn as \(account.profile?.name ?? "you")", systemImage: "checkmark.seal.fill").font(.caption).foregroundStyle(Theme.good)
+                    Spacer()
+                    Button("Sign out") { account.signOut() }.font(.caption)
+                }
+            } else {
+                DisclosureGroup("Optional: Sign in with LinkedIn (needs a LinkedIn developer app)") {
+                    if account.isSetUp {
+                        Button(account.busy ? "Signing in…" : "Sign in with LinkedIn") { Task { await account.signIn() } }
+                            .buttonStyle(.borderedProminent).disabled(account.busy).padding(.top, 4)
+                    }
                     VStack(alignment: .leading, spacing: 8) {
                         Text("""
                         1. Go to linkedin.com/developers/apps › Create app (LinkedIn asks for a company page; your own page is fine).

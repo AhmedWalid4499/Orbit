@@ -156,6 +156,7 @@ struct PhoneSection: View {
         case .documents: PhoneDocuments()
         case .github: PhoneGitHub()
         case .youtube: PhoneYouTube()
+        case .linkedin: LinkedInView().phoneChrome("LinkedIn")
         default: EmptyView()
         }
     }

@@ -35,6 +35,7 @@ struct RootView: View {
                 case .bucket: BucketListView()
                 case .github: GitHubView()
                 case .youtube: YouTubeView()
+                case .linkedin: LinkedInView()
                 }
             }
             // Content that's taller than the window is cut at the bottom, never pushing the top bar out of view.
@@ -111,6 +112,7 @@ struct RootView: View {
             while !Task.isCancelled {
                 await ReadingSync.shared.syncIfDue(context: context)
                 await InboxStore.shared.refreshIfDue(context: context)
+                await LinkedInStore.shared.refreshIfDue()
                 await EmailExpenses.shared.syncIfDue(context: context)
                 await GoogleCalendarStore.shared.refreshIfDue()
                 SubscriptionTracker.detect(context: context)

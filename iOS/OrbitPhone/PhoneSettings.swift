@@ -55,8 +55,12 @@ struct PhoneSettings: View {
             content().formStyle(.grouped).navigationTitle(title).navigationBarTitleDisplayMode(.inline)
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: symbol).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.stickerInk)
-                    .frame(width: 30, height: 30).background(RoundedRectangle(cornerRadius: 8).fill(color))
+                if title == "AI" {
+                    AssistantAvatar(size: 30)
+                } else {
+                    Image(systemName: symbol).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.stickerInk)
+                        .frame(width: 30, height: 30).background(RoundedRectangle(cornerRadius: 8).fill(color))
+                }
                 Text(title).font(Theme.ui(16, weight: .medium))
                 Spacer()
                 if let detail { Text(detail).font(Theme.ui(13)).foregroundStyle(Theme.inkMuted).lineLimit(1) }

@@ -64,7 +64,7 @@ struct MailSheet: View {
             } else {
                 if ai.hasKey {
                     HStack(spacing: 8) {
-                        Image(systemName: "sparkles").foregroundStyle(Theme.inkSecondary)
+                        AssistantAvatar(size: 22)
                         TextField("What do you want to say? (e.g. yes, 8:30 works)", text: $intent).textFieldStyle(.plain).font(Theme.ui(13))
                             .onSubmit(draft)
                         Button(drafting ? "Writing…" : "Draft reply", action: draft).buttonStyle(SoftButtonStyle()).disabled(drafting)

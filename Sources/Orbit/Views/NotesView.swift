@@ -284,8 +284,7 @@ struct JournalEditor: View {
     private var chat: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                Image(systemName: "sparkles").foregroundStyle(Theme.stickerInk)
-                    .frame(width: 28, height: 28).background(Circle().fill(Theme.lime))
+                AssistantAvatar(size: 28)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Check-in with \(AssistantName.current)").font(Theme.ui(14, weight: .semibold))
                     Text("Talk it through, then turn it into your entry").font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)

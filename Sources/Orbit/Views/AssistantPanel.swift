@@ -46,7 +46,7 @@ struct AssistantPanel: View {
             if !ai.hasKey {
                 VStack(spacing: 12) {
                     Spacer()
-                    Image(systemName: "sparkles").font(.system(size: 30))
+                    AssistantAvatar(size: 56)
                     Text("Add your Anthropic API key to chat with \(assistantName).").font(Theme.ui(13)).multilineTextAlignment(.center)
                     OpenSettingsLink { Text("Open Settings") }.buttonStyle(SoftButtonStyle())
                     Spacer()

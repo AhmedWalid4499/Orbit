@@ -817,8 +817,7 @@ struct BriefCard: View {
 
     private var setupCard: some View {
         HStack(spacing: 14) {
-            Image(systemName: "sparkles").font(.system(size: 18, weight: .semibold))
-                .frame(width: 40, height: 40).background(Circle().fill(Theme.lime)).foregroundStyle(Theme.stickerInk)
+            AssistantAvatar(size: 40)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Get a morning brief from \(AssistantName.current)").font(Theme.ui(15, weight: .semibold))
                 Text("Add your Anthropic API key in Settings › AI to turn on the daily brief and smart capture.")
@@ -834,7 +833,7 @@ struct BriefCard: View {
     private var briefCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
-                Image(systemName: "sparkles").foregroundStyle(Theme.lime)
+                AssistantAvatar(size: 22)
                 Text("Morning brief").font(Theme.ui(12, weight: .semibold)).opacity(0.7)
                 Spacer()
                 if let b = ai.brief, ai.hasTodaysBrief, ai.briefState != .loading {

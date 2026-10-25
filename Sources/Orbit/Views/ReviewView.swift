@@ -111,7 +111,7 @@ struct ReviewView: View {
         let ink = Color(hex: 0xF4F4F5)
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Image(systemName: "sparkles").foregroundStyle(Theme.lime)
+                AssistantAvatar(size: 22)
                 Text("\(AssistantName.current)'s take").font(Theme.ui(12, weight: .semibold)).opacity(0.7)
                 Spacer()
                 if store.loading { ProgressView().controlSize(.small).tint(ink) }

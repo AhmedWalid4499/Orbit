@@ -10,6 +10,7 @@ struct OtherConnections: View {
 
     var body: some View {
         Section("YouTube") { YouTubeConnectionRow() }
+        Section("LinkedIn") { LinkedInConnectionRow() }
         Section {
             row("Goodreads", .goodreads, reading.goodreadsUser.isEmpty ? nil : "Shelves sync from your profile") {
                 reading.goodreadsUser = ""

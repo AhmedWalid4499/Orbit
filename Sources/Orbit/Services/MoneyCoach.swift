@@ -144,7 +144,7 @@ struct MoneyCoachCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Image(systemName: "sparkles").foregroundStyle(Theme.lime)
+                AssistantAvatar(size: 22, busy: coach.loading)
                 Text("Money coach").font(Theme.ui(12, weight: .semibold)).opacity(0.7)
                 Spacer()
                 if coach.loading { ProgressView().controlSize(.small).tint(ink) }

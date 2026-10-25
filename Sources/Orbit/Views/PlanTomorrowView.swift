@@ -113,8 +113,7 @@ struct PlanTomorrowSheet: View {
     private var chatPane: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
-                Image(systemName: "sparkles").font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.stickerInk)
-                    .frame(width: 30, height: 30).background(Circle().fill(Theme.lime))
+                AssistantAvatar(size: 30, busy: chat.busy)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Talk it through").font(Theme.display(20))
                     Text("Tell \(AssistantName.current) about tomorrow").font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)

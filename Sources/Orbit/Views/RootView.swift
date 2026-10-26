@@ -145,7 +145,7 @@ struct TopBar: View {
                 Text("joshu")
                     .font(.system(size: 34, weight: .black, design: .rounded))
                     .tracking(-1)
-                Circle().fill(Theme.lime).frame(width: 9, height: 9).offset(y: 9)
+                OrbDot(size: 11).offset(y: 9)
             }
             .padding(.leading, 70) // traffic lights
             Spacer(minLength: 16)

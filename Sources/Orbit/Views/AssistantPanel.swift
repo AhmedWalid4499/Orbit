@@ -590,6 +590,22 @@ struct AssistantAvatar: View {
     }
 }
 
+/// The orb as a small full stop after the "joshu" wordmark: the assistant's colours, no spark.
+struct OrbDot: View {
+    var size: CGFloat = 10
+
+    var body: some View {
+        ZStack {
+            Circle().fill(AngularGradient(colors: [Color(hex: 0xC6F432), Color(hex: 0x3DDC97), Color(hex: 0x22D3EE), Color(hex: 0x8B7CF6),
+                                                   Color(hex: 0xF472B6), Color(hex: 0xC6F432)], center: .center, angle: .degrees(30)))
+            Circle().fill(RadialGradient(colors: [.white.opacity(0.6), .white.opacity(0)], center: UnitPoint(x: 0.32, y: 0.26),
+                                         startRadius: 0, endRadius: size * 0.6))
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
 /// Colours for the "done" cards in the chat, by what was made.
 enum ActionTint {
     static func color(for symbol: String) -> Color {

@@ -196,9 +196,13 @@ struct WeatherChip: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("\(Int(w.temperature.rounded())) degrees, \(d.label), in \(w.place)")
-            } else if weather.error != nil {
+            } else {
+                // Always something on screen, or the loading task below would never start.
                 Image(systemName: "cloud.sun").font(.system(size: 18)).foregroundStyle(Theme.inkMuted)
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .background(Capsule().fill(Theme.card))
                     .onTapGesture { Task { await weather.refresh() } }
+                    .accessibilityLabel(weather.error ?? "Loading weather")
             }
         }
         .task {

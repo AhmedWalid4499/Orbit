@@ -49,10 +49,13 @@ enum CloudAuth {
         }
     }
 
+    /// Where links in Joshu's emails land: a Joshu page that confirms your email or sets a new password.
+    static let accountPage = "https://ahmedwalid4499.github.io/Orbit/account/"
+
     enum SignUpResult { case signedIn, checkEmail }
 
     static func signUp(email: String, password: String) async throws -> SignUpResult {
-        let json = try await auth("signup", body: ["email": email, "password": password])
+        let json = try await auth("signup?redirect_to=\(accountPage)", body: ["email": email, "password": password])
         if let s = parseSession(json) { session = s; return .signedIn }
         return .checkEmail // email confirmation is on: they confirm, then sign in
     }
@@ -73,6 +76,24 @@ enum CloudAuth {
     /// automatically to an email/password account with the same address.
     static func signInWithGoogle() async throws {
         guard SupabaseConfig.isConfigured else { throw CloudError("Sync isn't set up in this copy of Joshu.") }
+        // Joshu's own Google sign-in first, so Google's page says "Joshu". The sync server takes the Google token
+        // once Joshu's Google client ID is listed under Supabase › Authentication › Google › Client IDs.
+        let fellBack = Date(timeIntervalSince1970: UserDefaults.standard.double(forKey: "auth.googleViaServer"))
+        if GoogleAuth.isConfigured, Date.now.timeIntervalSince(fellBack) > 3 * 86_400 {
+            let idToken = try await GoogleAuth.signInIDToken()
+            do {
+                let json = try await auth("token?grant_type=id_token", body: ["provider": "google", "id_token": idToken])
+                if let s = parseSession(json) { session = s; return }
+            } catch let e as CloudError where e.message.lowercased().contains("audience") {
+                // The server doesn't know Joshu's client yet: use its own Google page, and keep doing so for a few days.
+                UserDefaults.standard.set(Date.now.timeIntervalSince1970, forKey: "auth.googleViaServer")
+            }
+        }
+        try await signInWithGoogleViaServer()
+    }
+
+    /// Google sign-in through the sync server's own Google page (shows the server's address).
+    private static func signInWithGoogleViaServer() async throws {
         pending?.continuation.resume(throwing: CancellationError())
         var bytes = [UInt8](repeating: 0, count: 48)
         _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
@@ -130,7 +151,7 @@ enum CloudAuth {
     }
 
     static func resetPassword(email: String) async throws {
-        _ = try await auth("recover", body: ["email": email])
+        _ = try await auth("recover?redirect_to=\(accountPage)", body: ["email": email])
     }
 
     /// A valid access token, refreshing it when it's about to expire.

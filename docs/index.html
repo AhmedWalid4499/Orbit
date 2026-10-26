@@ -38,9 +38,10 @@
   a { color: inherit; }
   .wrap { width: min(1180px, 100% - 40px); margin-inline: auto; }
 
-  /* Logo: "orbit" with the lime dot */
+  /* Logo: "joshu" with the orb as its full stop */
   .logo { font-family: var(--logo); font-weight: 900; letter-spacing: -.04em; font-size: 30px; text-decoration: none; display: inline-flex; align-items: baseline; }
-  .logo i { width: 8px; height: 8px; border-radius: 50%; background: var(--lime); margin-left: 2px; display: inline-block; box-shadow: 0 0 0 1px rgba(0,0,0,.04); }
+  .logo i { width: 9px; height: 9px; border-radius: 50%; margin-left: 2px; display: inline-block;
+            background: conic-gradient(from 30deg, #c6f432, #3ddc97, #22d3ee, #8b7cf6, #f472b6, #c6f432); }
 
   /* Buttons */
   .btn { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; font-size: 16px; text-decoration: none; border-radius: 999px;
@@ -64,15 +65,18 @@
   nav .gh svg { width: 18px; height: 18px; }
   nav .gh .v { color: var(--ink2); font-weight: 500; font-variant-numeric: tabular-nums; }
   nav .gh:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); }
-  @media (max-width: 640px) { nav .gh > span:not(.v) { display: none; } nav .wrap { gap: 12px; } }
+  @media (max-width: 640px) { nav .gh > span:not(.v) { display: none; } nav .wrap { gap: 12px; } nav .logo { font-size: 26px; } }
+  @media (max-width: 440px) { nav .gh { display: none; } nav .btn.small { margin-left: auto; } }
 
   /* Hero */
   .hero { padding: 72px 0 40px; text-align: center; position: relative; overflow: hidden; }
   .orbit-mark { position: relative; width: 340px; height: 170px; margin: 0 auto 8px; }
   .orbit-mark .word { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--logo); font-weight: 900;
                       font-size: 104px; letter-spacing: -.05em; line-height: 1; z-index: 2; }
-  .orbit-mark .dot { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%;
-                     background: var(--lime); box-shadow: 0 0 18px rgba(230,255,31,.75); will-change: transform; }
+  .orbit-mark .dot { position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%; z-index: 3;
+                     background: radial-gradient(circle at 32% 26%, rgba(255,255,255,.7), rgba(255,255,255,0) 58%),
+                                 conic-gradient(from 30deg, #c6f432, #3ddc97, #22d3ee, #8b7cf6, #f472b6, #c6f432);
+                     box-shadow: 0 6px 18px -4px rgba(139,124,246,.6); will-change: transform; transform-origin: 50% 100%; opacity: 0; }
   .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ink2); }
   h1 { font-family: var(--display); font-weight: 700; font-size: clamp(42px, 7vw, 80px); line-height: 1.02; letter-spacing: -.02em; margin: 12px auto 18px; max-width: 900px; }
   .lede { font-size: clamp(18px, 2.2vw, 21px); color: var(--ink2); max-width: 680px; margin: 0 auto 32px; }
@@ -81,6 +85,10 @@
   .fine a { color: var(--ink2); }
 
   .shot-stage { position: relative; margin: 56px auto 0; max-width: 1100px; }
+  /* The iPhone stands in front of the Mac window, bottom right, so both apps show at once. */
+  .shot-stage .hero-phone { position: absolute; width: 21%; min-width: 120px; right: -3%; bottom: -6%; padding: 7px; border-radius: 34px; }
+  .shot-stage .hero-phone .screen { border-radius: 28px; }
+  @media (max-width: 640px) { .shot-stage .hero-phone { width: 30%; right: -2%; padding: 5px; border-radius: 24px; } .shot-stage .hero-phone .screen { border-radius: 20px; } }
   .window { border-radius: 16px; overflow: hidden; background: var(--canvas); box-shadow: var(--shadow); border: 1px solid var(--line); position: relative; }
   .window .bar { height: 30px; display: flex; gap: 7px; align-items: center; padding: 0 12px; background: var(--card); border-bottom: 1px solid var(--line); }
   .window .bar span { width: 11px; height: 11px; border-radius: 50%; background: #ff5f57; }
@@ -210,10 +218,11 @@
     <div class="links">
       <a href="#features">Features</a>
       <a href="#iphone">iPhone</a>
+      <a href="pricing/">Pricing</a>
       <a href="#install">Install</a>
       <a href="#faq">FAQ</a>
     </div>
-    <a class="gh" href="https://github.com/AhmedWalid4499/Orbit" title="Joshu on GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.56-.29-5.25-1.28-5.25-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.4-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></svg><span>GitHub</span><span class="v" data-version-short>v1.38.0</span></a>
+    <a class="gh" href="https://github.com/AhmedWalid4499/Orbit" title="Joshu on GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.56-.29-5.25-1.28-5.25-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.4-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></svg><span>GitHub</span><span class="v" data-version-short>v1.39.0</span></a>
     <a class="btn primary small" href="https://github.com/AhmedWalid4499/Orbit/releases/latest/download/Joshu.dmg" data-download>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
       Download
@@ -224,9 +233,8 @@
 <header class="hero" id="top">
   <div class="wrap">
     <div class="orbit-mark" aria-hidden="true">
-      <span class="dot" id="dot-back"></span>
-      <span class="word">joshu</span>
-      <span class="dot" id="dot-front"></span>
+      <span class="word"><span id="word-text">joshu</span></span>
+      <span class="dot" id="dot"></span>
     </div>
     <span class="eyebrow">For Mac · iPhone coming soon</span>
     <h1>Your whole life, in one calm place.</h1>
@@ -238,12 +246,13 @@
       </a>
       <a class="btn soft" href="#features">See what it does</a>
     </div>
-    <p class="fine"><span data-version>Free · Version 1.38.0</span> · macOS 15 or later · Apple silicon · 7 MB · <a href="https://github.com/AhmedWalid4499/Orbit/releases">Release notes</a></p>
+    <p class="fine"><span data-version>Free · Version 1.39.0</span> · macOS 15 or later · Apple silicon · 7 MB · <a href="https://github.com/AhmedWalid4499/Orbit/releases">Release notes</a></p>
 
     <div class="shot-stage">
       <div class="window"><div class="bar"><span></span><span></span><span></span></div>
         <img src="assets/today.jpg" width="2880" height="1800" alt="Joshu's Today screen: a summary of your day, your top 3, habits, inbox, morning brief and agenda.">
       </div>
+      <div class="phone hero-phone"><div class="screen"><img src="assets/phone-today.jpg" width="690" height="1500" alt="The same day in Joshu for iPhone: weather, your top 3 and the morning brief."></div></div>
     </div>
   </div>
 </header>
@@ -439,7 +448,7 @@
     <ul class="points" style="--dot:var(--mint)">
       <li><span><b>Keys stay in the Keychain</b>, never in files.</span></li>
       <li><span><b>End-to-end encrypted key sync</b> with your own passphrase, so the server only stores ciphertext.</span></li>
-      <li><span><b>Bring your own Claude key.</b> AI features talk to Anthropic directly from your Mac, with your own API key.</span></li>
+      <li><span><b>The AI only sees what you ask about.</b> With Pro, your question and the details it needs go to the AI when you ask, and aren't used to train it.</span></li>
     </ul>
   </div>
 </div>
@@ -472,18 +481,30 @@
       </ul>
     </div>
   </div>
+  <p class="more"><a class="btn soft" href="pricing/">See everything the AI can do →</a></p>
 </section>
 <style>
   .pricing { padding: 72px 0 24px; text-align: center; }
   .pricing h2 { margin-bottom: 28px; }
   .plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; max-width: 760px; margin: 0 auto; text-align: left; }
   .plan { background: var(--card, #f3f3f3); border-radius: 24px; padding: 26px; }
-  .plan.pro { background: #111114; color: #f4f4f5; box-shadow: 0 0 0 3px #d4ff3a inset; }
+  /* Pro: a ring in the orb's colours that slowly turns, with a soft glow behind it. */
+  @property --halo { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+  .plan.pro { color: #f4f4f5; position: relative; border: 3px solid transparent;
+              background: linear-gradient(#111114, #111114) padding-box,
+                          conic-gradient(from var(--halo), #c6f432, #3ddc97, #22d3ee, #8b7cf6, #f472b6, #c6f432) border-box;
+              animation: halo 6s linear infinite; }
+  .plans { isolation: isolate; }
+  .plan.pro::after { content: ""; position: absolute; inset: -8px; border-radius: 27px; z-index: -1; filter: blur(26px); opacity: .65;
+    background: conic-gradient(from var(--halo), #c6f432, #3ddc97, #22d3ee, #8b7cf6, #f472b6, #c6f432); animation: halo 6s linear infinite; }
+  @keyframes halo { to { --halo: 360deg; } }
+  @media (prefers-reduced-motion: reduce) { .plan.pro, .plan.pro::after { animation: none; } }
   .plan h3 { margin: 0 0 6px; font-size: 20px; }
   .plan .amount { font-size: 38px; font-weight: 800; margin: 0; }
   .plan .amount small { font-size: 15px; font-weight: 500; opacity: .7; }
   .plan .alt { margin: 2px 0 0; opacity: .7; font-size: 14px; }
   .plan ul { margin: 16px 0 0; padding-left: 18px; line-height: 1.8; }
+  .pricing .more { margin: 34px 0 0; }
 </style>
 
 <section class="wrap faq" id="faq">
@@ -521,7 +542,7 @@
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.4 12.6c0-2.4 2-3.6 2.1-3.7-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.1 1-4 2.4-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.1-1.2 2.9-2.4.9-1.4 1.3-2.7 1.3-2.8 0 0-2.5-1-2.5-3.9zM14 5.5c.7-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.5-.6.7-1.2 1.8-1 2.9 1 .1 2.1-.6 2.8-1.4z"/></svg>
       Download for Mac
     </a>
-    <p class="fine"><span data-version>Free · Version 1.38.0</span> · macOS 15 or later · Apple silicon</p>
+    <p class="fine"><span data-version>Free · Version 1.39.0</span> · macOS 15 or later · Apple silicon</p>
   </div>
 </section>
 
@@ -532,7 +553,7 @@
     <nav>
       <a href="https://github.com/AhmedWalid4499/Orbit/releases">Release notes</a>
       <a href="https://github.com/AhmedWalid4499/Orbit">GitHub</a>
-      <a href="https://github.com/AhmedWalid4499/Orbit/releases/latest" data-version-short>v1.38.0</a>
+      <a href="https://github.com/AhmedWalid4499/Orbit/releases/latest" data-version-short>v1.39.0</a>
       <a href="#pricing">Pricing</a>
       <a href="#faq">FAQ</a>
       <a href="privacy/">Privacy</a>
@@ -544,25 +565,39 @@
 <script>
   // The lime dot circles the word, passing behind it on the far side (like the app's splash).
   (() => {
-    const back = document.getElementById("dot-back"), front = document.getElementById("dot-front");
-    const mark = back.parentElement;
+    // The assistant's orb drops in before "joshu", hops over it and lands at the end like a full stop (as in the app).
+    const dot = document.getElementById("dot"), text = document.getElementById("word-text");
+    const mark = dot.parentElement;
     const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const tilt = -10 * Math.PI / 180, lap = 2600;
+    const landing = 1.25, length = 1.55, delay = 0.35;
+    const ease = (v) => v * v * (3 - 2 * v);
+    function pose(t, startX) {
+      if (t < 0.32) { const p = Math.max(t, 0) / 0.32; return [startX, -170 * (1 - p * p), 1, 1, 0]; }
+      if (t < 0.42) { const k = Math.sin((t - 0.32) / 0.1 * Math.PI); return [startX, 0, 1 + 0.22 * k, 1 - 0.25 * k, 0]; }
+      if (t < landing) {
+        const p = (t - 0.42) / (landing - 0.42), st = 0.12 * Math.sin(p * Math.PI);
+        return [startX * (1 - ease(p)), -160 * 4 * p * (1 - p), 1 - st, 1 + st, 360 * ease(p)];
+      }
+      if (t < landing + 0.12) { const k = Math.sin((t - landing) / 0.12 * Math.PI); return [0, 0, 1 + 0.28 * k, 1 - 0.3 * k, 360]; }
+      if (t < length) { const p = (t - landing - 0.12) / (length - landing - 0.12); return [0, -16 * 4 * p * (1 - p), 1, 1, 360]; }
+      return [0, 0, 1, 1, 360];
+    }
     const t0 = performance.now();
     function frame(now) {
-      const w = mark.clientWidth, h = mark.clientHeight;
-      const rx = w * 0.5, ry = h * 0.3;
-      const th = still ? Math.PI * 0.35 : ((now - t0) / lap) * 2 * Math.PI + Math.PI / 4;
-      const depth = Math.sin(th), near = (depth + 1) / 2;
-      const x0 = rx * Math.cos(th), y0 = ry * depth;
-      const x = x0 * Math.cos(tilt) - y0 * Math.sin(tilt), y = x0 * Math.sin(tilt) + y0 * Math.cos(tilt);
-      const t = `translate(${x}px, ${y}px) scale(${0.75 + 0.3 * near})`;
-      back.style.transform = front.style.transform = t;
-      back.style.opacity = depth <= 0 ? 0.8 : 0;
-      front.style.opacity = depth > 0 ? 1 : 0;
-      if (!still) requestAnimationFrame(frame);
+      const m = mark.getBoundingClientRect(), r = text.getBoundingClientRect();
+      const size = parseFloat(getComputedStyle(text).fontSize);
+      // Resting place: just after the "u", sitting on the baseline.
+      const restX = r.right + 6 + 15 - (m.left + m.width / 2);
+      const restY = r.top + size * 0.86 - 15 - (m.top + m.height / 2);
+      const startX = r.left - 26 - (m.left + m.width / 2) - restX;
+      const t = still ? length : (now - t0) / 1000 - delay;
+      const [x, y, sx, sy, spin] = pose(t, startX);
+      dot.style.opacity = t < 0 ? 0 : 1;
+      dot.style.transform = `translate(${restX + x}px, ${restY + y}px) rotate(${spin}deg) scale(${sx}, ${sy})`;
+      if (!still && t < length + 0.1) requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
+    addEventListener("resize", () => requestAnimationFrame(frame));
   })();
 
   // Border under the nav once you scroll.

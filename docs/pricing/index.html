@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pricing · Joshu</title>
+<meta name="description" content="Joshu is free. Joshu Pro adds your own AI assistant, named by you, that plans, writes, searches and gets things done across your Mac and iPhone.">
+<meta property="og:title" content="Joshu Pro">
+<meta property="og:description" content="Your own AI assistant inside Joshu: $7.99 a month or $59.99 a year.">
+<meta property="og:image" content="https://ahmedwalid4499.github.io/Orbit/assets/assistant.jpg">
+<link rel="icon" href="../assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=Nunito:wght@900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --canvas: #ffffff; --card: #f2f2f2; --line: #e6e6e6; --ink: #111111; --ink2: #55555c; --ink3: #8a8a92;
+    --sticker-ink: #111111;
+    --lime: #e6ff1f; --pink: #f7c2ec; --orange: #edaa2f; --purple: #b58cf7; --cyan: #27d3f6; --mint: #8eedbf; --peach: #ffc6a3;
+    --orb: conic-gradient(from 30deg, #c6f432, #3ddc97, #22d3ee, #8b7cf6, #f472b6, #c6f432);
+    --display: "Fraunces", Georgia, serif;
+    --ui: "Inter", system-ui, -apple-system, sans-serif;
+    --logo: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --canvas: #111113; --card: #1e1e21; --line: #2c2c30; --ink: #f4f4f5; --ink2: #b4b4bb; --ink3: #85858d; }
+  }
+  * { box-sizing: border-box; }
+  html, body { overflow-x: clip; }
+  body { margin: 0; background: var(--canvas); color: var(--ink); font: 17px/1.55 var(--ui); -webkit-font-smoothing: antialiased; }
+  a { color: inherit; }
+  .wrap { width: min(1120px, 100% - 32px); margin-inline: auto; }
+
+  nav { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--canvas) 85%, transparent);
+        backdrop-filter: saturate(1.6) blur(14px); -webkit-backdrop-filter: saturate(1.6) blur(14px); border-bottom: 1px solid var(--line); }
+  nav .wrap { display: flex; align-items: center; gap: 24px; height: 64px; }
+  .logo { font-family: var(--logo); font-weight: 900; letter-spacing: -.04em; font-size: 28px; text-decoration: none; display: inline-flex; align-items: baseline; gap: 2px; }
+  .logo img { width: 26px; height: 26px; border-radius: 7px; align-self: center; margin-right: 8px; }
+  .logo i { width: 9px; height: 9px; border-radius: 50%; background: var(--orb); display: inline-block; }
+  nav .links { margin-left: auto; display: flex; gap: 22px; font-size: 15px; font-weight: 500; }
+  nav .links a { text-decoration: none; color: var(--ink2); }
+  nav .links a:hover, nav .links a[aria-current] { color: var(--ink); }
+  @media (max-width: 560px) { nav .links a.hide-s { display: none; } }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; font-weight: 600; font-size: 16px; text-decoration: none;
+         border-radius: 999px; padding: 14px 24px; border: 0; cursor: pointer; transition: transform .15s ease; }
+  .btn:hover { transform: translateY(-1px); }
+  .btn.primary { background: var(--ink); color: var(--canvas); }
+  .btn.soft { background: var(--card); color: var(--ink); }
+
+  header.top { text-align: center; padding: 64px 0 18px; }
+  .orb { width: 64px; height: 64px; border-radius: 50%; margin: 0 auto 18px; background: var(--orb); position: relative;
+         box-shadow: 0 16px 40px -10px rgba(139,124,246,.6); animation: bob 4s ease-in-out infinite; }
+  .orb::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 32% 26%, rgba(255,255,255,.7), rgba(255,255,255,0) 60%); }
+  @keyframes bob { 50% { transform: translateY(-6px); } }
+  h1 { font-family: var(--display); font-weight: 700; font-size: clamp(38px, 6vw, 64px); line-height: 1.04; letter-spacing: -.02em; margin: 0 auto 14px; max-width: 820px; }
+  .lede { font-size: clamp(17px, 2vw, 20px); color: var(--ink2); max-width: 640px; margin: 0 auto; }
+
+  /* Billing switch */
+  .switch { display: inline-flex; background: var(--card); border-radius: 999px; padding: 4px; margin: 30px auto 0; gap: 4px; }
+  .switch button { border: 0; background: none; font: 600 14px var(--ui); color: var(--ink2); padding: 9px 18px; border-radius: 999px; cursor: pointer; }
+  .switch button[aria-pressed="true"] { background: var(--canvas); color: var(--ink); box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  .switch .save { font-size: 11px; font-weight: 700; background: var(--lime); color: var(--sticker-ink); border-radius: 999px; padding: 2px 7px; margin-left: 6px; }
+
+  .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; max-width: 860px; margin: 28px auto 0; }
+  @media (max-width: 760px) { .plans { grid-template-columns: 1fr; } }
+  .plan { background: var(--card); border-radius: 28px; padding: 30px; display: flex; flex-direction: column; }
+  .plan h2 { margin: 0; font-size: 22px; }
+  .plan .for { color: var(--ink2); font-size: 15px; margin: 4px 0 18px; }
+  .plan .amount { font-family: var(--display); font-size: 52px; font-weight: 700; line-height: 1; margin: 0; }
+  .plan .amount small { font: 500 16px var(--ui); opacity: .7; }
+  .plan .alt { margin: 6px 0 0; font-size: 14px; opacity: .7; min-height: 1.5em; }
+  .plan ul { list-style: none; padding: 0; margin: 22px 0 26px; display: grid; gap: 10px; flex: 1; }
+  .plan li { display: flex; gap: 10px; align-items: flex-start; font-size: 15.5px; }
+  .plan li::before { content: ""; flex: none; width: 18px; height: 18px; margin-top: 3px; border-radius: 50%;
+                     background: var(--mint) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 12.5l4 4 8-9' fill='none' stroke='%23111' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px no-repeat; }
+  .plan li.no { opacity: .55; }
+  .plan li.no::before { background: var(--line) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 12h10' stroke='%23777' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") center/12px no-repeat; }
+
+  /* Pro: a ring in the orb's colours that slowly turns, with a soft glow behind it. */
+  @property --halo { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+  .plan.pro { color: #f4f4f5; position: relative; border: 3px solid transparent;
+              background: linear-gradient(#111114, #111114) padding-box,
+                          conic-gradient(from var(--halo), #c6f432, #3ddc97, #22d3ee, #8b7cf6, #f472b6, #c6f432) border-box;
+              animation: halo 6s linear infinite; }
+  .plans { isolation: isolate; }
+  .plan.pro::after { content: ""; position: absolute; inset: -8px; border-radius: 31px; z-index: -1; filter: blur(26px); opacity: .65;
+    background: conic-gradient(from var(--halo), #c6f432, #3ddc97, #22d3ee, #8b7cf6, #f472b6, #c6f432); animation: halo 6s linear infinite; }
+  @keyframes halo { to { --halo: 360deg; } }
+  .plan.pro .btn { background: #f4f4f5; color: #111114; }
+  .plan.pro li::before { background-color: var(--lime); }
+  .plan .badge { display: inline-block; font-size: 12px; font-weight: 700; background: var(--orb); color: #111; border-radius: 999px; padding: 3px 10px; margin-left: 8px; vertical-align: 3px; }
+  @media (prefers-reduced-motion: reduce) { .plan.pro, .plan.pro::after, .orb { animation: none; } }
+  .fine { font-size: 13.5px; color: var(--ink3); text-align: center; margin: 22px auto 0; max-width: 640px; }
+
+  /* What the AI can do */
+  section.ai { padding: 96px 0 24px; }
+  section.ai > .wrap > h2, section.faq h2 { font-family: var(--display); font-size: clamp(32px, 4.5vw, 48px); line-height: 1.08; text-align: center; margin: 0 0 12px; }
+  section.ai .sub { text-align: center; color: var(--ink2); max-width: 640px; margin: 0 auto 40px; }
+  .groups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  @media (max-width: 960px) { .groups { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 620px) { .groups { grid-template-columns: 1fr; } }
+  .group { background: var(--card); border-radius: 24px; padding: 24px; }
+  .group h3 { margin: 12px 0 10px; font-size: 19px; }
+  .group .icon { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; color: var(--sticker-ink); }
+  .group .icon svg { width: 21px; height: 21px; }
+  .group ul { margin: 0; padding-left: 18px; color: var(--ink2); font-size: 15px; display: grid; gap: 6px; }
+  .group ul b { color: var(--ink); font-weight: 600; }
+  .example { margin-top: 14px; font-size: 14px; font-style: italic; color: var(--ink); background: var(--canvas); border-radius: 14px; padding: 10px 12px; }
+
+  section.faq { padding: 80px 0 40px; }
+  .qa { max-width: 760px; margin: 0 auto; }
+  details { border-bottom: 1px solid var(--line); padding: 18px 0; }
+  summary { cursor: pointer; font-weight: 600; font-size: 17px; list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; float: right; color: var(--ink3); font-weight: 400; }
+  details[open] summary::after { content: "–"; }
+  details p { color: var(--ink2); margin: 10px 0 0; }
+
+  .end { text-align: center; padding: 60px 0 90px; }
+  footer { border-top: 1px solid var(--line); padding: 26px 0 40px; font-size: 14px; color: var(--ink3); }
+  footer .wrap { display: flex; gap: 18px; flex-wrap: wrap; }
+  footer a { color: var(--ink2); text-decoration: none; }
+</style>
+</head>
+<body>
+<nav>
+  <div class="wrap">
+    <a class="logo" href="../"><img src="../assets/icon.png" alt="">joshu<i></i></a>
+    <div class="links">
+      <a class="hide-s" href="../#features">Features</a>
+      <a href="./" aria-current="page">Pricing</a>
+      <a class="hide-s" href="../#faq">FAQ</a>
+    </div>
+  </div>
+</nav>
+
+<header class="top wrap">
+  <div class="orb" aria-hidden="true"></div>
+  <h1>Joshu is free. Pro gives you your own AI.</h1>
+  <p class="lede">Everything in Joshu works for free. Pro adds an assistant you name yourself, that knows your day and gets things done on your Mac and iPhone. No API keys, nothing to set up.</p>
+  <div class="switch" role="group" aria-label="Billing">
+    <button type="button" data-plan="yearly" aria-pressed="true">Yearly<span class="save">Save 37%</span></button>
+    <button type="button" data-plan="monthly" aria-pressed="false">Monthly</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="plans">
+    <div class="plan">
+      <h2>Free</h2>
+      <p class="for">Your whole life, organised</p>
+      <p class="amount">$0</p>
+      <p class="alt">Free forever</p>
+      <ul>
+        <li>Today, tasks, calendar and reminders</li>
+        <li>Habits, streaks and goals</li>
+        <li>Money: budgets, bills, subscriptions and bank texts</li>
+        <li>Reading, Goodreads, Kindle and Apple Books</li>
+        <li>Ideas, notes and journal</li>
+        <li>Bucket list, trips and places to go</li>
+        <li>Weather, widgets, Siri and Apple Watch</li>
+        <li>Sync between your Mac and iPhone</li>
+        <li>One email account</li>
+        <li class="no">The AI assistant and smart features</li>
+      </ul>
+      <a class="btn soft" href="https://github.com/AhmedWalid4499/Orbit/releases/latest/download/Joshu.dmg">Download Joshu</a>
+    </div>
+    <div class="plan pro">
+      <h2>Pro <span class="badge">AI</span></h2>
+      <p class="for">Everything in Free, plus your own assistant</p>
+      <p class="amount" id="price">$5.00<small>/month</small></p>
+      <p class="alt" id="billed">$59.99 billed once a year</p>
+      <ul>
+        <li><span><b>Your own AI assistant</b>, named by you, by voice or text</span></li>
+        <li>Hands-free: just say “Hey” and its name</li>
+        <li>Morning brief and a summary of your day</li>
+        <li>Email summaries: what needs a reply, what matters</li>
+        <li>Money coach and spending answers</li>
+        <li>LinkedIn job alerts, sorted for you</li>
+        <li>Writing, reading documents and coding help</li>
+        <li>Web search, places nearby and what to wear</li>
+        <li>As many email accounts as you like</li>
+      </ul>
+      <a class="btn" href="https://github.com/AhmedWalid4499/Orbit/releases/latest/download/Joshu.dmg">Get Joshu, then go Pro in the app</a>
+    </div>
+  </div>
+  <p class="fine">Pro is bought in the app through your Apple ID and works on every device you sign in to with your Joshu account. Cancel any time in your App Store settings. Prices in US dollars; your App Store shows your local price.</p>
+</div>
+
+<section class="ai">
+  <div class="wrap">
+    <h2>Everything your assistant can do</h2>
+    <p class="sub">It doesn't just chat. It reads your day, acts inside Joshu, and goes out to the web for you, then tells you what it did.</p>
+    <div class="groups">
+
+      <div class="group">
+        <div class="icon" style="background:var(--lime)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-2.1a7 7 0 0 0 6-6.9h-2z"/></svg></div>
+        <h3>Talk to it your way</h3>
+        <ul>
+          <li><b>Give it any name</b> you like</li>
+          <li>Type or talk; it <b>speaks as it writes</b></li>
+          <li><b>Hands-free</b>: say “Hey” and its name while Joshu is open</li>
+          <li>Past chats kept, on your Mac and iPhone</li>
+          <li>Ask from Siri, Shortcuts or your Apple Watch</li>
+        </ul>
+        <p class="example">“Hey Joshu, where can I get a good coffee near me?”</p>
+      </div>
+
+      <div class="group">
+        <div class="icon" style="background:var(--cyan)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 4h-1V2h-2v2H8V2H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 16H5V9h14v11zm-8.5-2.5L7 14l1.4-1.4 2.1 2.1 5.1-5.1L17 11l-6.5 6.5z"/></svg></div>
+        <h3>Gets things done in Joshu</h3>
+        <ul>
+          <li>Adds <b>tasks with reminders</b>, events and habits</li>
+          <li>Sets up <b>goals</b> that track themselves</li>
+          <li>Logs spending, bills and subscriptions; changes your budget</li>
+          <li>Adds books, bucket list dreams, places and documents</li>
+          <li>Adds to the lists you share with others</li>
+        </ul>
+        <p class="example">“Gym tomorrow at 7, and remind me to pay rent on Friday.”</p>
+      </div>
+
+      <div class="group">
+        <div class="icon" style="background:var(--peach)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.8 4.8 5.4 3.4 4 4.8l1.4 1.4zM1 11h3v2H1zm11-10h2v3h-2zm7.6 3.8L18.2 3.4l-1.4 1.4 1.4 1.4zM20 11h3v2h-3zm-8-5a6 6 0 1 0 0 12 6 6 0 0 0 0-12zm-1 14h2v3h-2zm-6.6-1.8 1.4 1.4 1.4-1.4-1.4-1.4zm12.4 0 1.4 1.4 1.4-1.4-1.4-1.4z"/></svg></div>
+        <h3>Knows your day</h3>
+        <ul>
+          <li>A <b>morning brief</b> with what matters, read aloud if you like</li>
+          <li>“<b>Your day</b>”, rewritten as you spend, read and tick things off</li>
+          <li><b>Plan tomorrow</b> in a quick chat each evening</li>
+          <li>A gentle check-in that turns into your journal</li>
+          <li>Type anything, “gym 7am, $12 lunch”, and it's filed</li>
+        </ul>
+        <p class="example">“What's my day looking like, and what should I do first?”</p>
+      </div>
+
+      <div class="group">
+        <div class="icon" style="background:var(--pink)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg></div>
+        <h3>Your email, sorted</h3>
+        <ul>
+          <li><b>Summaries</b>: what needs a reply, what's worth knowing, what's routine</li>
+          <li>Writes and sends <b>replies</b> when you ask</li>
+          <li>Finds bookings in your email and adds them to your trips</li>
+          <li><b>LinkedIn job alerts</b>, laid out job by job</li>
+          <li>As many Gmail accounts as you like</li>
+        </ul>
+        <p class="example">“Anything in my inbox I need to deal with today?”</p>
+      </div>
+
+      <div class="group">
+        <div class="icon" style="background:var(--mint)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.8 10.9c-2.3-.6-3-1.2-3-2.1 0-1.1 1-1.9 2.7-1.9 1.8 0 2.4.8 2.5 2.1h2.2c-.1-1.7-1.1-3.3-3.2-3.8V3h-3v2.2c-1.9.4-3.5 1.7-3.5 3.6 0 2.3 1.9 3.5 4.7 4.1 2.5.6 3 1.5 3 2.4 0 .7-.5 1.8-2.7 1.8-2.1 0-2.9-.9-3-2.1H6.3c.1 2.2 1.8 3.5 3.7 3.9V21h3v-2.2c1.9-.4 3.5-1.5 3.5-3.6 0-2.8-2.4-3.8-4.7-4.3z"/></svg></div>
+        <h3>A money coach</h3>
+        <ul>
+          <li>Tips on where your money goes, each month</li>
+          <li>Answers like “how much did I spend on food?”</li>
+          <li>Warns you before a bill or price rise hits</li>
+          <li>Reads <b>paper receipts</b> from a photo</li>
+        </ul>
+        <p class="example">“How can I spend less on food this month?”</p>
+      </div>
+
+      <div class="group">
+        <div class="icon" style="background:var(--orange)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></div>
+        <h3>Out in the world</h3>
+        <ul>
+          <li><b>Searches the web</b> and reads pages for you, then gives you the answer</li>
+          <li>Places near you, with prices, hours and reviews</li>
+          <li>The <b>weather</b> and what to wear for your plans</li>
+          <li>A local guide for any place you name</li>
+          <li>On the Mac, helps with the page open in Chrome</li>
+        </ul>
+        <p class="example">“I'm hungry. Anything good and cheap nearby?”</p>
+      </div>
+
+      <div class="group">
+        <div class="icon" style="background:var(--purple)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.3V21h3.8L17.8 9.9l-3.7-3.7L3 17.3zM20.7 7a1 1 0 0 0 0-1.4l-2.3-2.3a1 1 0 0 0-1.4 0l-1.8 1.8 3.7 3.7L20.7 7z"/></svg></div>
+        <h3>Writing, reading and code</h3>
+        <ul>
+          <li>Keeps <b>ideas for your novels</b> in projects, and helps them grow</li>
+          <li>Writes, edits and rewrites notes and chapters</li>
+          <li><b>Reads documents</b> and files you give it</li>
+          <li>Helps you <b>code</b>, and runs code to check maths and data</li>
+        </ul>
+        <p class="example">“Add this to my novel: the lighthouse keeper knew all along.”</p>
+      </div>
+
+      <div class="group">
+        <div class="icon" style="background:var(--lime)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zM6 4h5v8l-2.5-1.5L6 12V4z"/></svg></div>
+        <h3>Your reading life</h3>
+        <ul>
+          <li>Updates your <b>Goodreads</b> progress for you</li>
+          <li>Posts your <b>reviews</b> and star ratings</li>
+          <li>Adds books to your reading list</li>
+        </ul>
+        <p class="example">“I'm on page 210 of The Pragmatic Programmer.”</p>
+      </div>
+
+      <div class="group">
+        <div class="icon" style="background:var(--cyan)"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.4 10.6 20C5.4 15.4 2 12.3 2 8.5 2 5.4 4.4 3 7.5 3c1.7 0 3.4.8 4.5 2.1C13.1 3.8 14.8 3 16.5 3 19.6 3 22 5.4 22 8.5c0 3.8-3.4 6.9-8.6 11.5L12 21.4z"/></svg></div>
+        <h3>Remembers you</h3>
+        <ul>
+          <li>Learns what matters: your diet, routines, people and birthdays</li>
+          <li>Forgets anything when you ask</li>
+          <li>Ideas for your bucket list and packing lists for trips</li>
+          <li>How your YouTube channel is doing, when you ask</li>
+        </ul>
+        <p class="example">“Remember I'm vegetarian.”</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<section class="faq">
+  <div class="wrap">
+    <h2>Questions</h2>
+    <div class="qa">
+      <details><summary>Do I need my own AI or API key?</summary><p>No. With Pro the AI just works: Joshu takes care of it, on all your devices.</p></details>
+      <details><summary>What does Free leave out?</summary><p>Only the AI: the assistant, morning brief, day summary, email summaries, money coach and LinkedIn job alerts. Free can also connect one email account; Pro connects as many as you like. Everything else is in Free.</p></details>
+      <details><summary>Is there a limit?</summary><p>Pro is for one person's everyday use, with a generous daily fair-use limit that normal use doesn't come close to.</p></details>
+      <details><summary>Does Pro work on my Mac and my iPhone?</summary><p>Yes. Buy it once and it works everywhere you're signed in to your Joshu account.</p></details>
+      <details><summary>How do I cancel?</summary><p>Any time, in your Apple ID's subscription settings. Pro keeps working until the end of the period you paid for, then Joshu goes back to Free. Nothing you made is deleted.</p></details>
+      <details><summary>What happens to my data?</summary><p>When you ask the AI something, what it needs to answer is sent to the AI to make the reply, and isn't used to train it. More in our <a href="../privacy/">privacy policy</a>.</p></details>
+    </div>
+  </div>
+</section>
+
+<div class="end wrap">
+  <a class="btn primary" href="https://github.com/AhmedWalid4499/Orbit/releases/latest/download/Joshu.dmg">Download Joshu for Mac</a>
+</div>
+
+<footer>
+  <div class="wrap">
+    <span>© 2026 Joshu</span>
+    <a href="../">Home</a>
+    <a href="../privacy/">Privacy</a>
+    <a href="../terms/">Terms</a>
+  </div>
+</footer>
+
+<script>
+  // Yearly shows the monthly equivalent; monthly shows the plain price.
+  const price = document.getElementById("price"), billed = document.getElementById("billed");
+  document.querySelectorAll(".switch button").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll(".switch button").forEach((o) => o.setAttribute("aria-pressed", String(o === b)));
+    const yearly = b.dataset.plan === "yearly";
+    price.innerHTML = (yearly ? "$5.00" : "$7.99") + "<small>/month</small>";
+    billed.textContent = yearly ? "$59.99 billed once a year" : "Billed monthly · or $59.99 a year";
+  }));
+</script>
+</body>
+</html>

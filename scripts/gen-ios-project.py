@@ -203,7 +203,7 @@ build_files = (f"\t\t{B_SUPABASE} /* Supabase.json in Resources */ = {{isa = PBX
                f"\t\t{B_SHORTCUTS} /* Shortcuts in Resources */ = {{isa = PBXBuildFile; fileRef = {F_SHORTCUTS}; }};\n"
                f"\t\t{B_TOUR} /* Tour in Resources */ = {{isa = PBXBuildFile; fileRef = {F_TOUR}; }};\n")
 products = f"\t\t\t\t{P_APP} /* Orbit.app */,\n"
-file_refs = (f"\t\t{F_TOUR} /* Tour */ = {{isa = PBXFileReference; lastKnownFileType = folder; name = Tour; path = Support/Tour; sourceTree = SOURCE_ROOT; }};\n"
+file_refs = (f"\t\t{F_TOUR} /* Tour */ = {{isa = PBXFileReference; lastKnownFileType = folder; name = Tour; path = ../Support/Tour; sourceTree = SOURCE_ROOT; }};\n"
              f"\t\t{F_SHORTCUTS} /* Shortcuts */ = {{isa = PBXFileReference; lastKnownFileType = folder; name = Shortcuts; path = Support/Shortcuts; sourceTree = SOURCE_ROOT; }};\n"
              f"\t\t{F_SUPABASE} /* Supabase.json */ = {{isa = PBXFileReference; lastKnownFileType = text.json; name = Supabase.json; path = ../Support/Supabase.json; sourceTree = SOURCE_ROOT; }};\n"
              f"\t\t{P_APP} /* Orbit.app */ = {{isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Orbit.app; sourceTree = BUILT_PRODUCTS_DIR; }};\n")

@@ -20,6 +20,7 @@ struct TourView: View {
         let title: String
         let points: [(symbol: String, text: String)]
         let image: String
+        /// Where the Mac screenshot zooms in (it's too small to read whole), and by how much.
         let focus: UnitPoint
         let zoom: CGFloat
         let color: Color
@@ -37,7 +38,7 @@ struct TourView: View {
                  points: [("sun.max.fill", "Events, tasks, habits, money and reading on one screen"),
                           ("arrow.triangle.2.circlepath", "Always in sync between your Mac and iPhone"),
                           ("lock.fill", "Your data and keys stay yours")],
-                 image: "today", focus: .init(x: 0.5, y: 0.3), zoom: 1.08, color: Theme.lime, accent: Theme.cyan,
+                 image: "today", focus: .init(x: 0, y: 0.1), zoom: 1.6, color: Theme.lime, accent: Theme.cyan,
                  stickers: [.init(symbol: "checkmark.circle.fill", text: "3 of 5 done", color: Theme.lime, at: .init(x: -0.08, y: 0.22)),
                             .init(symbol: "flame.fill", text: "9-day streak", color: Theme.orange, at: .init(x: 1.06, y: 0.42)),
                             .init(symbol: "calendar", text: "Gym · 7:00 PM", color: Theme.cyan, at: .init(x: -0.04, y: 0.78))]),
@@ -45,14 +46,14 @@ struct TourView: View {
                  points: [("sparkles", "A morning brief with what matters today"),
                           ("sun.horizon.fill", "“Your day” rewrites itself as you spend, read and tick things off"),
                           ("lightbulb.fill", "A gentle nudge for the next few hours")],
-                 image: "day", focus: phone ? .init(x: 0.5, y: 0.48) : .init(x: 0.5, y: 0.5), zoom: phone ? 1.4 : 1.0, color: Theme.orange, accent: Theme.pink,
+                 image: "day", focus: .center, zoom: 1, color: Theme.orange, accent: Theme.pink,
                  stickers: [.init(symbol: "creditcard.fill", text: "EGP 350 today", color: Theme.peach, at: .init(x: 1.05, y: 0.25)),
                             .init(symbol: "book.fill", text: "42% · Atomic Habits", color: Theme.purple, at: .init(x: -0.06, y: 0.62))]),
             Page(id: 2, eyebrow: "Meet \(ai)", title: "An assistant that actually does things",
                  points: [("text.bubble.fill", "Chat or talk: it adds tasks, events, notes and expenses"),
                           ("fork.knife", "“I'm hungry”: places nearby, with prices and reviews"),
                           ("doc.text.magnifyingglass", "What to wear, quick maths, and reviews of your documents")],
-                 image: "assistant", focus: phone ? .init(x: 0.5, y: 0.3) : .init(x: 0.85, y: 0.22), zoom: phone ? 1.25 : 2.4, color: Theme.pink, accent: Theme.purple,
+                 image: "assistant", focus: .init(x: 1, y: 0), zoom: 2.3, color: Theme.pink, accent: Theme.purple,
                  stickers: [.init(symbol: "mic.fill", text: "“Move the gym to 8”", color: Theme.lime, at: .init(x: -0.08, y: 0.2)),
                             .init(symbol: "mappin.and.ellipse", text: "Zooba · 2 min away", color: Theme.mint, at: .init(x: 1.06, y: 0.55)),
                             .init(symbol: "cloud.sun.fill", text: "T-shirt + light jacket", color: Theme.cyan, at: .init(x: -0.05, y: 0.85))]),
@@ -60,14 +61,14 @@ struct TourView: View {
                  points: [("calendar", "Apple and Google calendars side by side"),
                           ("location.fill", "“Remind me when I get home” or when you're near a shop"),
                           ("moon.stars.fill", "Plan tomorrow in a minute each evening")],
-                 image: "calendar", focus: phone ? .init(x: 0.5, y: 0.5) : .init(x: 0.92, y: 0.66), zoom: phone ? 1.35 : 2.4, color: Theme.cyan, accent: Theme.lime,
+                 image: "calendar", focus: .init(x: 0.6, y: 1), zoom: 2, color: Theme.cyan, accent: Theme.lime,
                  stickers: [.init(symbol: "location.fill", text: "When you get home", color: Theme.lime, at: .init(x: -0.08, y: 0.3)),
                             .init(symbol: "alarm.fill", text: "Call mom · 6:00 PM", color: Theme.peach, at: .init(x: 1.05, y: 0.7))]),
             Page(id: 4, eyebrow: "Money", title: "Every pound, logged for you",
                  points: [("envelope.fill", "Receipts from email and bank texts land in Money by themselves"),
                           ("doc.viewfinder", "Snap a paper receipt; Joshu reads it"),
                           ("bell.badge.fill", "Budgets per category, with alerts before you overspend")],
-                 image: "money", focus: phone ? .init(x: 0.5, y: 0.25) : .init(x: 0.5, y: 0.55), zoom: phone ? 1.45 : 1.8, color: Theme.peach, accent: Theme.orange,
+                 image: "money", focus: .init(x: 0, y: 0.11), zoom: 1.8, color: Theme.peach, accent: Theme.orange,
                  stickers: [.init(symbol: "message.fill", text: "CIB · EGP 220 logged", color: Theme.cyan, at: .init(x: -0.08, y: 0.25)),
                             .init(symbol: "exclamationmark.triangle.fill", text: "80% of Food budget", color: Theme.orange, at: .init(x: 1.05, y: 0.48)),
                             .init(symbol: "wave.3.right", text: "Apple Pay · Starbucks", color: Theme.lime, at: .init(x: -0.04, y: 0.8))]),
@@ -82,7 +83,7 @@ struct TourView: View {
                  points: [("mountain.2.fill", "Dreams you want to make happen, with trips around them"),
                           ("mappin.and.ellipse", "Save restaurants, shops and museums to Go to"),
                           ("map.fill", "Share straight from Google or Apple Maps")],
-                 image: "goto", focus: phone ? .init(x: 0.5, y: 0.55) : .init(x: 0.5, y: 0.45), zoom: 1.5, color: Theme.mint, accent: Theme.cyan,
+                 image: "goto", focus: .init(x: 0, y: 0.2), zoom: 1.6, color: Theme.mint, accent: Theme.cyan,
                  stickers: [.init(symbol: "fork.knife", text: "Zooba · Food", color: Theme.orange, at: .init(x: -0.08, y: 0.35)),
                             .init(symbol: "building.columns.fill", text: "Grand Egyptian Museum", color: Theme.cyan, at: .init(x: 1.06, y: 0.62))]),
             Page(id: 7, eyebrow: "Everywhere", title: "On your Mac and iPhone, always in sync",
@@ -217,24 +218,30 @@ struct TourView: View {
 
     // MARK: Devices
 
-    /// The device (or both, on the last page), with stickers popping out around it.
+    /// Both devices on every page, with stickers popping out around them. The device you're on is the big one,
+    /// zoomed in on what the page is about so the text reads clearly; the other sits beside it.
     @ViewBuilder private func stage(_ page: Page) -> some View {
+        let macZoom = page.both ? 1 : (zoomed ? page.zoom : 1)
         Group {
-            if page.both {
-                ZStack(alignment: .bottomTrailing) {
-                    MacBookFrame(image: shot("mac-insights")).padding(.trailing, phone ? 40 : 70)
-                    IPhoneFrame(image: shot("phone-money"))
-                        .frame(height: phone ? 230 : 330)
-                        .offset(x: phone ? 6 : 10, y: phone ? 24 : 36)
+            if phone {
+                ZStack(alignment: .bottomLeading) {
+                    IPhoneFrame(image: shot("phone-" + page.image)).padding(.leading, 70)
+                    MacBookFrame(image: shot("mac-" + page.image))
+                        .frame(width: 200, height: 140)
+                        .offset(x: -2, y: 8)
                 }
-                .padding(.horizontal, phone ? 26 : 0)
+                .padding(.horizontal, 26)
                 .overlay { stickers(page) }
-            } else if phone {
-                IPhoneFrame(image: shot("phone-" + page.image))
-                    .overlay { stickers(page) }
             } else {
-                MacBookFrame(image: shot("mac-" + page.image))
-                    .overlay { stickers(page) }
+                ZStack(alignment: .bottomTrailing) {
+                    MacBookFrame(image: shot("mac-" + page.image), zoom: macZoom, focus: page.focus)
+                        .animation(.spring(response: 0.9, dampingFraction: 0.9), value: zoomed)
+                        .padding(.trailing, 70)
+                    IPhoneFrame(image: shot("phone-" + page.image))
+                        .frame(height: 330)
+                        .offset(x: 10, y: 36)
+                }
+                .overlay { stickers(page) }
             }
         }
         .opacity(revealed ? 1 : 0)
@@ -247,9 +254,9 @@ struct TourView: View {
     private func stickers(_ page: Page) -> some View {
         GeometryReader { g in
             ForEach(Array(page.stickers.enumerated()), id: \.offset) { i, s in
-                StickerChip(sticker: s, shown: zoomed || page.both, delay: 0.9 + Double(i) * 0.35, bob: i)
-                    // On the Mac, keep the cards over the laptop's edges so none spill out of the window.
-                    .position(x: g.size.width * (phone ? s.at.x : min(0.9, max(0.1, s.at.x))), y: g.size.height * s.at.y)
+                StickerChip(sticker: s, shown: zoomed, delay: 0.9 + Double(i) * 0.35, bob: i)
+                    // Keep the cards over the devices' edges so none spill off the screen or out of the window.
+                    .position(x: g.size.width * (phone ? min(0.76, max(0.24, s.at.x)) : min(0.9, max(0.1, s.at.x))), y: g.size.height * s.at.y)
             }
         }
         .allowsHitTesting(false)

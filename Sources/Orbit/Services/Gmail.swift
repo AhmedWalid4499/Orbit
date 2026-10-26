@@ -100,6 +100,33 @@ enum GoogleAuth {
         return (refresh, access, tokens["expires_in"] as? Int ?? 3600)
     }
 
+    /// Google's sign-in page for signing in to Joshu itself: just your name and email, no Gmail access. Google
+    /// shows Joshu's name here (going through the sync server instead makes it show the server's address).
+    @MainActor
+    static func signInIDToken() async throws -> String {
+        guard isConfigured else { throw GmailError("Google sign-in isn't set up in this copy of Joshu.") }
+        let verifier = randomURLSafe(64)
+        let server = try LoopbackServer()
+        let port = try await server.start()
+        let redirect = "http://127.0.0.1:\(port)"
+        var comps = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
+        comps.queryItems = [
+            .init(name: "client_id", value: clientID), .init(name: "redirect_uri", value: redirect),
+            .init(name: "response_type", value: "code"), .init(name: "scope", value: "openid email profile"),
+            .init(name: "code_challenge", value: Data(SHA256.hash(data: Data(verifier.utf8))).base64URL),
+            .init(name: "code_challenge_method", value: "S256"), .init(name: "prompt", value: "select_account"),
+        ]
+        let browser = Task { _ = await Platform.webAuth(comps.url!, callbackScheme: nil) }
+        defer { browser.cancel(); Platform.endWebAuth() }
+        let code = try await server.waitForCode()
+        let tokens = try await tokenRequest([
+            "grant_type": "authorization_code", "code": code, "redirect_uri": redirect,
+            "client_id": clientID, "client_secret": clientSecret, "code_verifier": verifier,
+        ])
+        guard let id = tokens["id_token"] as? String else { throw GmailError("Google sign-in didn't finish.") }
+        return id
+    }
+
     /// A fresh access token from a saved refresh token.
     static func refreshAccess(_ refresh: String) async throws -> (token: String, expiresIn: Int) {
         let tokens = try await tokenRequest([

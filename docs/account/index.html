@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Your account · Joshu</title>
+<link rel="icon" href="../assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Inter:wght@400;500;600&family=Nunito:wght@900&display=swap" rel="stylesheet">
+<style>
+  :root { --canvas: #ffffff; --card: #f2f2f2; --ink: #111111; --ink2: #55555c; --line: #e6e6e6; --lime: #e6ff1f; --bad: #d4351c;
+          --orb: conic-gradient(from 30deg, #c6f432, #3ddc97, #22d3ee, #8b7cf6, #f472b6, #c6f432); }
+  @media (prefers-color-scheme: dark) { :root { --canvas: #111113; --card: #1e1e21; --ink: #f4f4f5; --ink2: #b4b4bb; --line: #2c2c30; --bad: #ff7a66; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: var(--canvas); color: var(--ink); font: 17px/1.55 Inter, system-ui, sans-serif;
+         display: grid; place-items: center; padding: 32px 16px; -webkit-font-smoothing: antialiased; }
+  main { width: 100%; max-width: 440px; text-align: center; }
+  .logo { font: 900 34px/1 ui-rounded, "SF Pro Rounded", Nunito, system-ui, sans-serif; letter-spacing: -.04em; text-decoration: none; color: inherit;
+          display: inline-flex; align-items: baseline; gap: 3px; }
+  .logo i { width: 11px; height: 11px; border-radius: 50%; background: var(--orb); }
+  .orb { width: 88px; height: 88px; border-radius: 50%; margin: 36px auto 22px; background: var(--orb); position: relative;
+         box-shadow: 0 18px 50px -10px rgba(139, 124, 246, .55); }
+  .orb::after { content: ""; position: absolute; inset: 0; border-radius: 50%;
+                background: radial-gradient(circle at 32% 26%, rgba(255,255,255,.7), rgba(255,255,255,0) 60%); }
+  .orb.busy { animation: spin 1.4s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  h1 { font: 700 32px/1.15 Fraunces, Georgia, serif; margin: 0 0 10px; }
+  p { color: var(--ink2); margin: 0 0 18px; }
+  form { display: grid; gap: 10px; margin-top: 8px; text-align: left; }
+  label { font-size: 13px; font-weight: 600; color: var(--ink2); }
+  input { width: 100%; font: inherit; color: inherit; padding: 13px 16px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); }
+  button, .btn { display: inline-block; width: 100%; margin-top: 6px; padding: 14px; border: 0; border-radius: 999px; cursor: pointer;
+                 background: var(--ink); color: var(--canvas); font: 600 16px Inter, system-ui, sans-serif; text-decoration: none; text-align: center; }
+  button:disabled { opacity: .5; cursor: default; }
+  .err { color: var(--bad); font-size: 14px; min-height: 1.4em; margin: 4px 0 0; }
+  .foot { margin-top: 36px; font-size: 13px; color: var(--ink2); }
+  .foot a { color: inherit; }
+</style>
+</head>
+<body>
+<main>
+  <a class="logo" href="../">joshu<i></i></a>
+  <div class="orb" id="orb"></div>
+  <div id="view"><h1>One moment…</h1></div>
+  <p class="foot">Questions? <a href="../">joshu</a> · <a href="../privacy/">Privacy</a></p>
+</main>
+<script>
+// Links in Joshu's account emails land here: confirming a new account, or choosing a new password.
+const SUPABASE = "https://qngpfkqupvxeuxzwdeex.supabase.co";
+const KEY = "sb_publishable_89YmEqm9OVBoYLJpkjh-kQ_adxqYFfQ";
+const view = document.getElementById("view");
+const params = new URLSearchParams(location.hash.slice(1) || location.search.slice(1));
+// The sign-in details are in the address; take them out so they aren't left in history or shared by accident.
+history.replaceState(null, "", location.pathname);
+
+function show(title, text, extra = "") {
+  view.innerHTML = `<h1>${title}</h1><p>${text}</p>${extra}`;
+}
+
+const type = params.get("type");
+const token = params.get("access_token");
+const error = params.get("error_description") || params.get("error");
+
+if (error) {
+  const expired = /expired|invalid/i.test(error);
+  show(expired ? "This link has expired" : "That didn't work",
+       expired ? "Links in Joshu's emails work once and for a limited time. Open Joshu and ask for a new one: sign up again, or use “Forgot password”."
+               : error.replace(/\+/g, " "));
+} else if (type === "recovery" && token) {
+  show("Choose a new password", "For your Joshu account. You'll use it to sign in on your Mac and iPhone.",
+       `<form id="f"><label for="pw">New password</label><input id="pw" type="password" minlength="8" autocomplete="new-password" required>
+        <label for="pw2">Again</label><input id="pw2" type="password" minlength="8" autocomplete="new-password" required>
+        <p class="err" id="err"></p><button id="go">Save password</button></form>`);
+  document.getElementById("f").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const pw = document.getElementById("pw").value, err = document.getElementById("err"), go = document.getElementById("go");
+    if (pw !== document.getElementById("pw2").value) { err.textContent = "The two passwords don't match."; return; }
+    go.disabled = true; err.textContent = ""; document.getElementById("orb").classList.add("busy");
+    try {
+      const r = await fetch(`${SUPABASE}/auth/v1/user`, { method: "PUT",
+        headers: { apikey: KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ password: pw }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.msg || j.message || j.error_description || "Couldn't save the password.");
+      show("Password saved", "Go back to Joshu and sign in with your new password.");
+    } catch (x) {
+      err.textContent = x.message; go.disabled = false;
+    } finally { document.getElementById("orb").classList.remove("busy"); }
+  });
+} else if (token || type === "signup" || type === "email_change" || type === "magiclink") {
+  show("You're all set", type === "email_change" ? "Your new email address is confirmed." : "Your email is confirmed. Go back to Joshu and sign in, on your Mac or iPhone.");
+} else {
+  show("Your Joshu account", "This page opens from the links in Joshu's emails. To sign in, open Joshu on your Mac or iPhone.",
+       `<a class="btn" href="../">Get Joshu</a>`);
+}
+</script>
+</body>
+</html>

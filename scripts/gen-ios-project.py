@@ -88,7 +88,7 @@ app = {
     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
     "ENABLE_PREVIEWS": "YES",
     "GENERATE_INFOPLIST_FILE": "YES",
-    "INFOPLIST_FILE": "Support/OrbitPhone-Info.plist",
+    "INFOPLIST_FILE": "Support/OrbitPhone-Info.plist", "ENABLE_USER_SCRIPT_SANDBOXING": "NO",  # the shared Google sign-in step reads from your Library
     "INFOPLIST_KEY_CFBundleDisplayName": "Joshu",
     "INFOPLIST_KEY_LSApplicationCategoryType": "public.app-category.productivity",
     "INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription": "Joshu shows your calendar events alongside your tasks and plans.",
@@ -196,9 +196,14 @@ def cfg_list(lid, comment, a, b):
             "\t\t\t);\n\t\t\tdefaultConfigurationIsVisible = 0;\n\t\t\tdefaultConfigurationName = Release;\n\t\t};\n")
 
 
-app_phases = [oid("app.sources"), oid("app.frameworks"), oid("app.resources")]
+app_phases = [oid("app.sources"), oid("app.frameworks"), oid("app.resources"), oid("app.google")]
 phases_text = (phase("PBXSourcesBuildPhase", app_phases[0]) + phase("PBXFrameworksBuildPhase", app_phases[1])
-               + phase("PBXResourcesBuildPhase", app_phases[2], f"\t\t\t\t{B_SUPABASE} /* Supabase.json in Resources */,\n\t\t\t\t{B_SHORTCUTS} /* Shortcuts in Resources */,\n\t\t\t\t{B_TOUR} /* Tour in Resources */,\n"))
+               + phase("PBXResourcesBuildPhase", app_phases[2], f"\t\t\t\t{B_SUPABASE} /* Supabase.json in Resources */,\n\t\t\t\t{B_SHORTCUTS} /* Shortcuts in Resources */,\n\t\t\t\t{B_TOUR} /* Tour in Resources */,\n")
+               # If the owner chose (in Joshu's Mac Settings) to share their Google setup, build it in, as build-app.sh does on the Mac.
+               + phase("PBXShellScriptBuildPhase", oid("app.google"), "",
+                       "\t\t\talwaysOutOfDate = 1;\n\t\t\tname = \"Shared Google sign-in\";\n\t\t\tshellPath = /bin/sh;\n"
+                       "\t\t\tshellScript = \"F=\\\"$HOME/Library/Application Support/Orbit/shared-google-client.json\\\"; "
+                       "if [ -f \\\"$F\\\" ]; then cp \\\"$F\\\" \\\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/GoogleClient.json\\\"; fi\\n\";\n"))
 build_files = (f"\t\t{B_SUPABASE} /* Supabase.json in Resources */ = {{isa = PBXBuildFile; fileRef = {F_SUPABASE}; }};\n"
                f"\t\t{B_SHORTCUTS} /* Shortcuts in Resources */ = {{isa = PBXBuildFile; fileRef = {F_SHORTCUTS}; }};\n"
                f"\t\t{B_TOUR} /* Tour in Resources */ = {{isa = PBXBuildFile; fileRef = {F_TOUR}; }};\n")

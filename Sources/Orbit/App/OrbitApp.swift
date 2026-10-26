@@ -96,6 +96,12 @@ struct OrbitApp: App {
     init() {
         Snapshot.applyDemoDefaults()
         Keychain.warmUp()
+        // `ORBIT_SHARE_GOOGLE=1`: the owner's "Build my Google setup into copies of Joshu I share", without the UI.
+        if ProcessInfo.processInfo.environment["ORBIT_SHARE_GOOGLE"] != nil {
+            GoogleAuth.setShared(true)
+            print(GoogleAuth.isShared ? "Google setup shared" : "Couldn't share the Google setup")
+            exit(GoogleAuth.isShared ? 0 : 1)
+        }
         // People who used Orbit before the welcome screen existed skip it.
         if UserDefaults.standard.bool(forKey: "didSeedSampleData") || Keychain.apiKey != nil {
             UserDefaults.standard.set(true, forKey: "onboarded")

@@ -132,6 +132,17 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7A468920E80C8D02687579BB = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			alwaysOutOfDate = 1;
+			name = "Shared Google sign-in";
+			shellPath = /bin/sh;
+			shellScript = "F=\"$HOME/Library/Application Support/Orbit/shared-google-client.json\"; if [ -f \"$F\" ]; then cp \"$F\" \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/GoogleClient.json\"; fi\n";
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		85ABE87BC9DAA9495C26E891 = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -271,6 +282,7 @@
 				B3A5E7ECB7F9C64CA38A7960,
 				373BADBBA0722772BA1A53C9,
 				F44E03EA52FB7FD8D73022C2,
+				7A468920E80C8D02687579BB,
 				6AB1A6F5C6A62D1C70CEC284,
 				5CCDAE42D6F5CB99F564AA62,
 			);
@@ -455,7 +467,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.38.0;
+				MARKETING_VERSION = 1.39.0;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -464,6 +476,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Support/OrbitPhone-Info.plist";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_KEY_CFBundleDisplayName = Joshu;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Joshu shows your calendar events alongside your tasks and plans.";
@@ -489,7 +502,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.38.0;
+				MARKETING_VERSION = 1.39.0;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -498,6 +511,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Support/OrbitPhone-Info.plist";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_KEY_CFBundleDisplayName = Joshu;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Joshu shows your calendar events alongside your tasks and plans.";
@@ -523,7 +537,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.38.0;
+				MARKETING_VERSION = 1.39.0;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -545,7 +559,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.38.0;
+				MARKETING_VERSION = 1.39.0;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -567,7 +581,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.38.0;
+				MARKETING_VERSION = 1.39.0;
 				SDKROOT = watchos;
 				SUPPORTED_PLATFORMS = "watchos watchsimulator";
 				TARGETED_DEVICE_FAMILY = 4;
@@ -593,7 +607,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.38.0;
+				MARKETING_VERSION = 1.39.0;
 				SDKROOT = watchos;
 				SUPPORTED_PLATFORMS = "watchos watchsimulator";
 				TARGETED_DEVICE_FAMILY = 4;
@@ -619,7 +633,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.38.0;
+				MARKETING_VERSION = 1.39.0;
 				SDKROOT = watchos;
 				SUPPORTED_PLATFORMS = "watchos watchsimulator";
 				TARGETED_DEVICE_FAMILY = 4;
@@ -642,7 +656,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.38.0;
+				MARKETING_VERSION = 1.39.0;
 				SDKROOT = watchos;
 				SUPPORTED_PLATFORMS = "watchos watchsimulator";
 				TARGETED_DEVICE_FAMILY = 4;

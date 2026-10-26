@@ -11,7 +11,7 @@ struct WatchSnapshot: Codable, Equatable {
 
     var generatedAt: Date = .now
     var greetingName: String = ""
-    var assistantName: String = "Ask"
+    var assistantName: String = "Joshu"
     var currency: String = "USD"
     var events: [Event] = []
     var tasks: [TaskRow] = []

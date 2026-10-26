@@ -18,7 +18,9 @@ final class WeatherStore: ObservableObject {
         let fetchedAt: Date
     }
 
-    @Published private(set) var now: Now?
+    /// Sample weather in demo mode (screenshots), which makes no network calls.
+    @Published private(set) var now: Now? = Snapshot.isDemo
+        ? Now(place: "Cairo", temperature: 27, feelsLike: 28, high: 31, low: 19, code: 1, isDay: true, fetchedAt: .distantFuture) : nil
     @Published private(set) var error: String?
     @AppStorage("weatherCity") var city = ""
 
@@ -162,6 +164,43 @@ struct ClockWeather: View {
         }
         .padding(.horizontal, 16).padding(.vertical, 8)
         .background(Capsule().fill(Theme.card))
+        .task {
+            while !Task.isCancelled {
+                await weather.refreshIfDue()
+                try? await Task.sleep(for: .seconds(600))
+            }
+        }
+    }
+}
+
+/// Compact weather for the iPhone's Today: icon and temperature, with today's high and low. Tap for how it feels.
+struct WeatherChip: View {
+    @ObservedObject private var weather = WeatherStore.shared
+    @State private var detail = false
+
+    var body: some View {
+        Group {
+            if let w = weather.now {
+                let d = WeatherStore.describe(w.code, isDay: w.isDay)
+                Button { withAnimation(.snappy) { detail.toggle() } } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: d.symbol).symbolRenderingMode(.multicolor).font(.system(size: 22))
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text("\(Int(w.temperature.rounded()))° \(detail ? d.label : "")").font(Theme.ui(15, weight: .semibold)).lineLimit(1)
+                            Text(detail ? "Feels \(Int(w.feelsLike.rounded()))° · \(w.place)" : "H \(Int(w.high.rounded()))°  L \(Int(w.low.rounded()))°")
+                                .font(Theme.ui(10)).foregroundStyle(Theme.inkMuted).lineLimit(1)
+                        }
+                    }
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(Capsule().fill(Theme.card))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(Int(w.temperature.rounded())) degrees, \(d.label), in \(w.place)")
+            } else if weather.error != nil {
+                Image(systemName: "cloud.sun").font(.system(size: 18)).foregroundStyle(Theme.inkMuted)
+                    .onTapGesture { Task { await weather.refresh() } }
+            }
+        }
         .task {
             while !Task.isCancelled {
                 await weather.refreshIfDue()

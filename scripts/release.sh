@@ -50,14 +50,16 @@ rm -f "$ZIP"
 ditto -c -k --keepParent --norsrc --noextattr --noqtn build/Orbit.app "$ZIP"
 git push origin HEAD --follow-tags
 
-BODY="$(python3 -c 'import json,sys; print(json.dumps({"tag_name": sys.argv[1], "name": "Orbit " + sys.argv[2], "body": sys.argv[3]}))' "$TAG" "$VERSION" "$NOTES")"
+BODY="$(python3 -c 'import json,sys; print(json.dumps({"tag_name": sys.argv[1], "name": "Joshu " + sys.argv[2], "body": sys.argv[3]}))' "$TAG" "$VERSION" "$NOTES")"
 RELEASE_ID="$(api -X POST "https://api.github.com/repos/$REPO/releases" -d "$BODY" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')"
 api -X POST -H "Content-Type: application/zip" --data-binary @"$ZIP" \
   "https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=Orbit-$VERSION.zip" >/dev/null
-# Installer for new people: always named Orbit.dmg so .../releases/latest/download/Orbit.dmg stays the same link.
+# Installer for new people: the website links .../releases/latest/download/Joshu.dmg; Orbit.dmg keeps older links working.
 scripts/make-dmg.sh
-api -X POST -H "Content-Type: application/x-apple-diskimage" --data-binary @build/Orbit.dmg \
-  "https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=Orbit.dmg" >/dev/null
+for DMG_NAME in Joshu.dmg Orbit.dmg; do
+  api -X POST -H "Content-Type: application/x-apple-diskimage" --data-binary @build/Orbit.dmg \
+    "https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=$DMG_NAME" >/dev/null
+done
 
 # Windows: installer for new people (always Orbit-Setup.exe) plus latest.yml and the blockmap for the in-app updater.
 # ORBIT_SKIP_WINDOWS=1 releases the Mac only: the previous release's Windows files are carried over unchanged,
@@ -89,4 +91,4 @@ else
 fi
 
 echo "Published Orbit $VERSION: https://github.com/$REPO/releases/tag/$TAG"
-echo "Installer: https://github.com/$REPO/releases/latest/download/Orbit.dmg"
+echo "Installer: https://github.com/$REPO/releases/latest/download/Joshu.dmg"

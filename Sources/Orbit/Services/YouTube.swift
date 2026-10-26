@@ -40,9 +40,10 @@ final class YouTubeStore: ObservableObject {
     private let refreshKey = "youtube-refresh"
     private var access: (token: String, expires: Date)?
 
-    var isConnected: Bool { Keychain.read(refreshKey) != nil }
+    var isConnected: Bool { !Snapshot.isDemo && Keychain.read(refreshKey) != nil }
 
     private init() {
+        guard !Snapshot.isDemo else { return }  // screenshots never show your channel
         let d = UserDefaults.standard
         channel = d.data(forKey: "youtube.channel").flatMap { try? JSONDecoder().decode(Channel.self, from: $0) }
         videos = d.data(forKey: "youtube.videos").flatMap { try? JSONDecoder().decode([Video].self, from: $0) } ?? []

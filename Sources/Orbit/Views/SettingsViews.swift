@@ -262,7 +262,7 @@ struct AISettings: View {
             #endif
 
             Section("Your assistant") {
-                TextField("Name", text: Binding(get: { UserDefaults.standard.string(forKey: "assistantName") ?? "Ask" },
+                TextField("Name", text: Binding(get: { UserDefaults.standard.string(forKey: "assistantName") ?? "Joshu" },
                                                 set: { UserDefaults.standard.set($0, forKey: "assistantName") }))
                 Text("What you call your AI around Joshu: the top-bar button, the journal and the morning brief. It's “Ask” unless you rename it.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -331,7 +331,7 @@ struct GmailSettings: View {
                     Text("""
                     1. Open console.cloud.google.com and create a project (e.g. "Joshu").
                     2. APIs & Services › Library › enable "Gmail API".
-                    3. OAuth consent screen: User type External, app name Orbit, your email as support contact. Add the scope gmail.readonly. Add both of your Gmail addresses as test users.
+                    3. OAuth consent screen: User type External, app name Joshu, your email as support contact. Add the scope gmail.readonly. Add both of your Gmail addresses as test users.
                     4. Then click "Publish app" (In production). For your own use, verification isn't needed: Google shows an "unverified app" screen you can continue past. This stops Google from expiring the sign-in every 7 days.
                     5. Credentials › Create credentials › OAuth client ID › Application type "Desktop app".
                     6. Paste the client ID and client secret here.

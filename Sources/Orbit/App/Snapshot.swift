@@ -86,7 +86,7 @@ extension Snapshot {
             }
             renderAlone("review", width: 920, height: 740, ReviewView(startOnInsights: false))
             renderAlone("review-insights", width: 920, height: 740, ReviewView(startOnInsights: true))
-            for (i, a) in [0.6, 2.2, 4.0].enumerated() { renderAlone("splash-\(i)", width: size.width, height: size.height, SplashView(angle: a)) }
+            for (i, t) in [0.2, 0.8, 1.6].enumerated() { renderAlone("splash-\(i)", width: size.width, height: size.height, SplashView(time: t)) }
             renderAlone("plan-tomorrow", width: 1040, height: 720, PlanTomorrowSheet())
             if let acct = try? container.mainContext.fetch(FetchDescriptor<BankAccount>(sortBy: [SortDescriptor(\.createdAt)])).first {
                 renderAlone("account", width: 720, height: 760, AccountPage(account: acct))
@@ -134,7 +134,7 @@ extension Snapshot {
             FocusTimer.shared.start(context: container.mainContext)
             render("today-focus", tab: .today, appearance: .aqua)
             FocusTimer.shared.stop(context: container.mainContext)
-            renderAlone("splash-dark", width: size.width, height: size.height, appearance: .darkAqua, SplashView(angle: 0.9))
+            renderAlone("splash-dark", width: size.width, height: size.height, appearance: .darkAqua, SplashView(time: 1.6))
             NSApp.terminate(nil)
         }
     }

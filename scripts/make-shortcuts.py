@@ -31,7 +31,7 @@ def whole_input():
     }
 
 def action(intent, params):
-    p = {"AppIntentDescriptor": {"AppIntentIdentifier": intent, "BundleIdentifier": BUNDLE, "Name": "Orbit", "TeamIdentifier": TEAM},
+    p = {"AppIntentDescriptor": {"AppIntentIdentifier": intent, "BundleIdentifier": BUNDLE, "Name": "Joshu", "TeamIdentifier": TEAM},
          "UUID": str(uuid.uuid4()).upper()}
     p.update(params)
     return {"WFWorkflowActionIdentifier": f"{BUNDLE}.{intent}", "WFWorkflowActionParameters": p}
@@ -54,11 +54,11 @@ def shortcut(actions, glyph, color, input_class, share_sheet=False):
     }
 
 SHORTCUTS = {
-    "Orbit Go To": shortcut([action("AddPlaceIntent", {"place": whole_input()})], 59825, 4251333119,
+    "Joshu Go To": shortcut([action("AddPlaceIntent", {"place": whole_input()})], 59825, 4251333119,
                             ["WFURLContentItem", "WFMKMapItemContentItem", "WFStringContentItem", "WFRichTextContentItem"], share_sheet=True),
-    "Orbit Bank Message": shortcut([action("LogBankMessageIntent", {
+    "Joshu Bank Message": shortcut([action("LogBankMessageIntent", {
         "message": input_property("Content"), "sender": input_property("Sender"), "fullInput": whole_input()})], 59511, 4282601983, "WFMessageContentItem"),
-    "Orbit Card Payment": shortcut([action("LogCardPaymentIntent", {
+    "Joshu Card Payment": shortcut([action("LogCardPaymentIntent", {
         "amount": input_property("Amount"), "merchant": input_property("Merchant"), "card": input_property("Card or Pass")})], 59446, 431817727, "WFWalletTransactionContentItem"),
 }
 

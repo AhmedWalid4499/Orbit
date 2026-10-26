@@ -59,7 +59,7 @@ final class WatchStore: NSObject, ObservableObject, WCSessionDelegate {
                 }
             })
         } else if action.kind == .ask {
-            onReply?("Your iPhone is out of reach. Keep it nearby to ask \(snapshot?.assistantName ?? "Ask").")
+            onReply?("Your iPhone is out of reach. Keep it nearby to ask \(snapshot?.assistantName ?? "Joshu").")
         } else if action.kind != .refresh {
             session.transferUserInfo([WatchAction.messageKey: data])
             if !quiet { flash("Saved. It'll sync when your iPhone is nearby.") }

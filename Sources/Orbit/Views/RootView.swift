@@ -8,7 +8,7 @@ struct RootView: View {
     @AppStorage("userName") private var userName = NSFullUserName()
     @AppStorage("tourSeen") private var tourSeen = false
     @AppStorage("hiddenTabs") private var hiddenTabs = ""
-    @AppStorage("assistantName") private var assistantName = "Ask"
+    @AppStorage("assistantName") private var assistantName = "Joshu"
     @AppStorage("onboarded") private var onboarded = false
     @ObservedObject private var focus = FocusTimer.shared
     /// In full screen the window has no title bar, so keep the tabs below the camera notch.
@@ -136,7 +136,7 @@ struct RootView: View {
 
 struct TopBar: View {
     @EnvironmentObject private var state: AppState
-    @AppStorage("assistantName") private var assistantName = "Ask"
+    @AppStorage("assistantName") private var assistantName = "Joshu"
     let userName: String
 
     var body: some View {

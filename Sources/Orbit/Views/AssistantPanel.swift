@@ -12,7 +12,7 @@ struct AssistantPanel: View {
     @ObservedObject private var store = AssistantStore.shared
     @ObservedObject private var ai = AIAssistant.shared
 
-    @AppStorage("assistantName") private var assistantName = "Ask"
+    @AppStorage("assistantName") private var assistantName = "Joshu"
     @AppStorage("assistantSpeaks") private var speaks = false
     @ObservedObject private var dictation = Dictation.shared
     @ObservedObject private var speaker = Speaker.shared

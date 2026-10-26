@@ -71,7 +71,14 @@ struct PhoneToday: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("\(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide))) · \(greeting)").font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
+                    HStack(alignment: .center, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(greeting).font(Theme.ui(15, weight: .semibold)).lineLimit(1)
+                            Text(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide))).font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
+                        }
+                        Spacer(minLength: 8)
+                        WeatherChip()
+                    }
                     actions
                 }
                 captureField

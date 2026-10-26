@@ -187,7 +187,7 @@ final class PlanChat: ObservableObject {
                                     google: GoogleCalendarStore.shared.events(from: tomorrow, to: tomorrow.adding(days: 1)))
         let name = (UserDefaults.standard.string(forKey: "userName") ?? "").split(separator: " ").first.map(String.init) ?? "the user"
         return """
-        You are \(AssistantName.current), helping \(name) plan tomorrow (\(tomorrow.formatted(.dateTime.weekday(.wide).day().month(.wide)))) in Orbit's evening planner. They may be typing or talking out loud.
+        You are \(AssistantName.current), helping \(name) plan tomorrow (\(tomorrow.formatted(.dateTime.weekday(.wide).day().month(.wide)))) in Joshu's evening planner. They may be typing or talking out loud.
         Goal, in a short, friendly back-and-forth:
         1. Deal with what's left from today: ask, or act on what they say (update_task done / tomorrow / no_date).
         2. Understand what tomorrow needs, then set up to 3 priorities with set_top3, most important first. Use existing task ids when a priority matches a task; add_task for anything new that should be tracked.

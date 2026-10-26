@@ -74,7 +74,7 @@ struct AskOrbitIntent: AppIntent {
         let context = try orbitContext()
         guard let client = ClaudeClient() else { throw IntentError.message("Get Joshu Pro in the app first.") }
         let system = """
-        You are \(AssistantName.current), the user's assistant in Orbit, answering through Siri or Shortcuts. Reply in 1-3 short, spoken-style sentences, plain text, no lists or markdown.
+        You are \(AssistantName.current), the user's assistant in Joshu, answering through Siri or Shortcuts. Reply in 1-3 short, spoken-style sentences, plain text, no lists or markdown.
         Use the user's data below when it helps.
 
         \(AIAssistant.snapshot(context: context, apple: AppleSync()))
@@ -154,7 +154,7 @@ struct LogCardPaymentIntent: AppIntent {
     }
 }
 
-/// Saves a place to Bucket list › Go to. Shared from Google or Apple Maps through the "Orbit Go To" shortcut, or said to Siri.
+/// Saves a place to Bucket list › Go to. Shared from Google or Apple Maps through the "Joshu Go To" shortcut, or said to Siri.
 struct AddPlaceIntent: AppIntent {
     static let title: LocalizedStringResource = "Add Place to Go To"
     static let description = IntentDescription("Saves a restaurant, café, shop, museum or any place to your Go to list, from its name or a Google or Apple Maps link. Joshu finds it on the map and works out what kind of place it is.")

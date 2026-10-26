@@ -283,7 +283,7 @@ struct AskPage: View {
                 if store.snapshot?.hasAI == false {
                     Text("Get Joshu Pro on your iPhone to ask questions here.").font(.footnote).foregroundStyle(.secondary)
                 }
-                TextField("Ask \(store.snapshot?.assistantName ?? "Ask")…", text: $question)
+                TextField("Ask \(store.snapshot?.assistantName ?? "Joshu")…", text: $question)
                     .submitLabel(.send)
                     .onSubmit(ask)
                 if thinking { HStack { ProgressView(); Text("Thinking…").font(.footnote) } }
@@ -297,7 +297,7 @@ struct AskPage: View {
                 }
             }
         }
-        .navigationTitle(store.snapshot?.assistantName ?? "Ask")
+        .navigationTitle(store.snapshot?.assistantName ?? "Joshu")
     }
 
     private func ask() {

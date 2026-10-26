@@ -345,7 +345,7 @@ enum CardHTML {
         \(card.bio.isEmpty ? "" : "<p class=\"bio\">\(esc(card.bio))</p>")
         <div class="links">\(rows)</div>
         <a class="save" href="\(vcf)" download="\(esc(card.name.isEmpty ? "contact" : card.name)).vcf">Save contact</a>
-        <footer>Made with Orbit</footer>
+        <footer>Made with Joshu</footer>
         </div></div></body></html>
         """
     }

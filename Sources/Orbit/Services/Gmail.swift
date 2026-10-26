@@ -233,7 +233,7 @@ private final class LoopbackServer: @unchecked Sendable {
             let html = """
             <html><body style="font-family:-apple-system;background:#111;color:#f4f4f5;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
             <div style="text-align:center"><h1 style="font-family:ui-serif">\(ok ? "You're connected." : "Sign-in was cancelled.")</h1>
-            <p>You can close this tab and go back to Orbit.</p></div></body></html>
+            <p>You can close this tab and go back to Joshu.</p></div></body></html>
             """
             let response = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: \(html.utf8.count)\r\nConnection: close\r\n\r\n\(html)"
             conn.send(content: response.data(using: .utf8), completion: .contentProcessed { _ in conn.cancel() })

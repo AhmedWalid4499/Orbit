@@ -46,7 +46,7 @@ struct GoToSection: View {
             }
 
             if places.contains(where: \.hasLocation) { map }
-            if Platform.isPhone, let file = Bundle.main.url(forResource: "Orbit Go To", withExtension: "shortcut", subdirectory: "Shortcuts") {
+            if Platform.isPhone, let file = Bundle.main.url(forResource: "Joshu Go To", withExtension: "shortcut", subdirectory: "Shortcuts") {
                 HStack(spacing: 12) {
                     Image(systemName: "square.and.arrow.up").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.stickerInk)
                         .frame(width: 34, height: 34).background(Circle().fill(Theme.mint))

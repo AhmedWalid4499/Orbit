@@ -45,7 +45,7 @@ struct TourView: View {
                  points: [("sparkles", "A morning brief with what matters today"),
                           ("sun.horizon.fill", "“Your day” rewrites itself as you spend, read and tick things off"),
                           ("lightbulb.fill", "A gentle nudge for the next few hours")],
-                 image: "day", focus: phone ? .init(x: 0.5, y: 0.42) : .init(x: 0.17, y: 0.36), zoom: phone ? 1.65 : 2.3, color: Theme.orange, accent: Theme.pink,
+                 image: "day", focus: phone ? .init(x: 0.5, y: 0.48) : .init(x: 0.5, y: 0.5), zoom: phone ? 1.4 : 1.0, color: Theme.orange, accent: Theme.pink,
                  stickers: [.init(symbol: "creditcard.fill", text: "EGP 350 today", color: Theme.peach, at: .init(x: 1.05, y: 0.25)),
                             .init(symbol: "book.fill", text: "42% · Atomic Habits", color: Theme.purple, at: .init(x: -0.06, y: 0.62))]),
             Page(id: 2, eyebrow: "Meet \(ai)", title: "An assistant that actually does things",

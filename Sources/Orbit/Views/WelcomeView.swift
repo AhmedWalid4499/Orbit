@@ -8,7 +8,7 @@ struct WelcomeView: View {
     @ObservedObject private var ai = AIAssistant.shared
 
     @AppStorage("userName") private var userName = NSFullUserName()
-    @AppStorage("assistantName") private var assistantName = "Ask"
+    @AppStorage("assistantName") private var assistantName = "Joshu"
     @AppStorage("currencyCode") private var currency = Locale.current.currency?.identifier ?? "USD"
     @AppStorage("weatherCity") private var city = ""
     @AppStorage("onboarded") private var onboarded = false
@@ -62,7 +62,7 @@ struct WelcomeView: View {
                 }
                 GridRow {
                     Text("Call your AI").foregroundStyle(Theme.inkSecondary)
-                    TextField("Ask", text: $assistantName).textFieldStyle(.roundedBorder)
+                    TextField("Joshu", text: $assistantName).textFieldStyle(.roundedBorder)
                 }
                 GridRow {
                     Text("Currency").foregroundStyle(Theme.inkSecondary)
@@ -92,7 +92,7 @@ struct WelcomeView: View {
                 HStack(spacing: 10) {
                     AssistantAvatar(size: 24)
                     if ai.hasKey {
-                        Text("\(assistantName.isEmpty ? "Ask" : assistantName) is ready").font(Theme.ui(13, weight: .medium))
+                        Text("\(assistantName.isEmpty ? "Joshu" : assistantName) is ready").font(Theme.ui(13, weight: .medium))
                         Spacer()
                         Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.good)
                     } else {

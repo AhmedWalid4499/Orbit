@@ -407,7 +407,7 @@ final class AssistantStore: ObservableObject {
     static func systemPrompt(context: ModelContext, apple: AppleSync) -> String {
         let name = (Platform.userName).split(separator: " ").first.map(String.init) ?? "the user"
         return """
-        You are \(AssistantName.current), \(name)'s personal assistant inside Orbit (you're built on Claude, by Anthropic), their life-organizer app (on \(Platform.isPhone ? "their iPhone" : "the Mac")). You can talk things through and you can act in the app with tools: create tasks, events, habits, notes and transactions, add books to their reading list, set the monthly budget, and look up their data.
+        You are \(AssistantName.current), \(name)'s personal assistant inside Joshu (you're built on Claude, by Anthropic), their life-organizer app (on \(Platform.isPhone ? "their iPhone" : "the Mac")). You can talk things through and you can act in the app with tools: create tasks, events, habits, notes and transactions, add books to their reading list, set the monthly budget, and look up their data.
 
         How to work:
         - When \(name) wants something done, or clearly would benefit from it, just do it with the tools; no need to ask permission for creating things (each action shows an Undo button). Then say briefly what you did.
@@ -426,7 +426,7 @@ final class AssistantStore: ObservableObject {
         - Places: when they mention a restaurant, café, shop, museum or any spot they liked or want to try, save it with add_place (Go to list).
         - Notes: when they ask you to write notes, a summary, a plan, a study sheet or a list, write the real, useful content yourself and save it with create_note; then tell them in a line or two what's in it. Don't save their request as the note. To add to or change an existing note, use list_notes, then update_note.
         - Use get_overview or get_money_summary when you need their current data instead of guessing.
-        - Memory: when \(name) tells you something lasting about themselves (diet, allergies, routines, where they live or work, people in their life and their birthdays, likes and dislikes, how they want you to talk), save it with remember in one short line, without making a fuss about it. When they say something you remembered is wrong or ask you to forget it, use forget. Don't save one-off requests or things already in their Orbit data.
+        - Memory: when \(name) tells you something lasting about themselves (diet, allergies, routines, where they live or work, people in their life and their birthdays, likes and dislikes, how they want you to talk), save it with remember in one short line, without making a fuss about it. When they say something you remembered is wrong or ask you to forget it, use forget. Don't save one-off requests or things already in their Joshu data.
         - Bills and goals: "my internet is due on the 5th" → add_bill. "I want to read 30 books this year", "save 20k for a laptop by March", "go to the gym 50 times" → create_goal; for a dream with steps, list the steps. Progress then fills in by itself.
         - Shared lists: when they want to add things to a list they share with someone (groceries, a trip list), use add_to_shared_list.
         - Coding: help write, explain, debug and review code in any language, like a senior engineer pairing with them. Put code in fenced blocks with the language (```swift). Keep changes focused and say what you changed. Use code_execution to actually run and test code, do exact maths, and analyse data files they send (CSV, Excel, JSON); it has no internet. Files made there stay in this chat for the next question.
@@ -444,11 +444,11 @@ final class AssistantStore: ObservableObject {
     }
 }
 
-/// What the user calls their AI ("Ask" unless they rename it in Settings › AI).
+/// What the user calls their AI ("Joshu" unless they rename it in Settings › AI).
 enum AssistantName {
     static var current: String {
         let n = (UserDefaults.standard.string(forKey: "assistantName") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        return n.isEmpty ? "Ask" : n
+        return n.isEmpty ? "Joshu" : n
     }
 }
 
@@ -539,7 +539,7 @@ enum AssistantTools {
                 ]],
             ]),
             tool("create_note", """
-                Save a note in Orbit's Notes. You write the body: when the user asks you to write, draft or make notes about something, \
+                Save a note in Joshu's Notes. You write the body: when the user asks you to write, draft or make notes about something, \
                 compose the real content yourself (explanations, key facts, steps, examples, pros and cons, a checklist — whatever fits), \
                 organised with short headings on their own line and "•" bullets. Never just save their request or repeat their words back. \
                 When they dictate their own notes, keep their meaning but fix spelling and grammar and organise it. \

@@ -33,7 +33,8 @@ final class AIAssistant: ObservableObject {
 
     enum BriefState: Equatable { case idle, loading, failed(String) }
 
-    @Published private(set) var hasKey = Keychain.apiKey != nil
+    /// The AI can be used: your own key, or Joshu Pro through Joshu's server.
+    @Published private(set) var hasKey = Keychain.apiKey != nil || Pro.serverAI
     @Published private(set) var brief: MorningBrief?
     @Published private(set) var briefState: BriefState = .idle
 
@@ -70,7 +71,7 @@ final class AIAssistant: ObservableObject {
         return ok
     }
 
-    func reloadKey() { hasKey = Keychain.apiKey != nil }
+    func reloadKey() { hasKey = Keychain.apiKey != nil || Pro.serverAI }
 
     func removeKey() {
         Keychain.delete()

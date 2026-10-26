@@ -94,7 +94,8 @@ final class WakeListener: ObservableObject {
     }
 
     private func tick() async {
-        guard (enabled || inConversation), appActive, !Snapshot.isActive else { if listening { stop() }; return }
+        // Talking to Yuki is part of Joshu Pro.
+        guard (enabled || inConversation), appActive, AIAssistant.shared.hasKey, !Snapshot.isActive else { if listening { stop() }; return }
         if busy {
             if listening { stop() }
             return
@@ -246,8 +247,8 @@ final class WakeListener: ObservableObject {
         let speech = await withCheckedContinuation { (c: CheckedContinuation<SFSpeechRecognizerAuthorizationStatus, Never>) in
             SFSpeechRecognizer.requestAuthorization { c.resume(returning: $0) }
         }
-        guard speech == .authorized else { error = "Allow Speech Recognition for Orbit in Settings › Privacy & Security."; enabledOff(); return false }
-        guard await AVCaptureDevice.requestAccess(for: .audio) else { error = "Allow the microphone for Orbit in Settings › Privacy & Security."; enabledOff(); return false }
+        guard speech == .authorized else { error = "Allow Speech Recognition for Joshu in Settings › Privacy & Security."; enabledOff(); return false }
+        guard await AVCaptureDevice.requestAccess(for: .audio) else { error = "Allow the microphone for Joshu in Settings › Privacy & Security."; enabledOff(); return false }
         allowed = true
         return true
     }

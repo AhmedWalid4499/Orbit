@@ -394,7 +394,7 @@ struct TodayView: View {
                 }
                 if !inbox.isConnected {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Connect Gmail\(ai.hasKey ? "" : " and add an API key") and \(AssistantName.current) sums up your inbox: what needs a reply, what matters, what can wait. You choose how far back it reads.")
+                        Text("Connect Gmail and \(AssistantName.current) sums up your inbox: what needs a reply, what matters, what can wait. You choose how far back it reads.")
                             .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
                         OpenSettingsLink { Text("Connect Gmail") }.buttonStyle(SoftButtonStyle())
                     }
@@ -409,7 +409,7 @@ struct TodayView: View {
                                 InboxSummary(digest: d, multi: inbox.accounts.count > 1)
                                 Text("Last \(inbox.windowLabel) · change in Settings › Connections").font(Theme.ui(10)).foregroundStyle(Theme.inkMuted)
                             } else if !inbox.loading {
-                                EmptyHint(symbol: "envelope", text: ai.hasKey ? "Refresh to summarise your inbox." : "Add your Anthropic API key to get summaries.")
+                                if ai.hasKey { EmptyHint(symbol: "envelope", text: "Refresh to summarise your inbox.") } else { ProUpsell(title: "Email summaries", detail: "What needs a reply, what matters, what can wait.", compact: true) }
                             }
                         }
                     }
@@ -803,18 +803,7 @@ struct BriefCard: View {
     }
 
     private var setupCard: some View {
-        HStack(spacing: 14) {
-            AssistantAvatar(size: 40)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Get a morning brief from \(AssistantName.current)").font(Theme.ui(15, weight: .semibold))
-                Text("Add your Anthropic API key in Settings › AI to turn on the daily brief and smart capture.")
-                    .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
-            }
-            Spacer()
-            OpenSettingsLink { Text("Set up") }.buttonStyle(SoftButtonStyle())
-        }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous).strokeBorder(Theme.line, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])))
+        ProUpsell(title: "Get a morning brief from \(AssistantName.current)", detail: "Your day, what matters and what could slip, every morning. Part of Joshu Pro.")
     }
 
     private var briefCard: some View {

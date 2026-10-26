@@ -89,7 +89,7 @@ app = {
     "ENABLE_PREVIEWS": "YES",
     "GENERATE_INFOPLIST_FILE": "YES",
     "INFOPLIST_FILE": "Support/OrbitPhone-Info.plist",
-    "INFOPLIST_KEY_CFBundleDisplayName": "Orbit",
+    "INFOPLIST_KEY_CFBundleDisplayName": "Joshu",
     "INFOPLIST_KEY_LSApplicationCategoryType": "public.app-category.productivity",
     "INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription": "Orbit shows your calendar events alongside your tasks and plans.",
     "INFOPLIST_KEY_NSRemindersFullAccessUsageDescription": "Orbit shows and completes your Apple Reminders next to your tasks.",
@@ -115,7 +115,7 @@ widgets = {
     **common_target,
     "GENERATE_INFOPLIST_FILE": "YES",
     "INFOPLIST_FILE": "Support/OrbitWidgets-Info.plist",
-    "INFOPLIST_KEY_CFBundleDisplayName": "Orbit",
+    "INFOPLIST_KEY_CFBundleDisplayName": "Joshu",
     "CODE_SIGN_ENTITLEMENTS": "Support/OrbitWidgets.entitlements",
     "LD_RUNPATH_SEARCH_PATHS": "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks",
     "PRODUCT_BUNDLE_IDENTIFIER": BUNDLE_ID + ".widgets",
@@ -135,7 +135,7 @@ watch_common = {
     "CODE_SIGN_STYLE": "Automatic", "CURRENT_PROJECT_VERSION": "1", "DEVELOPMENT_TEAM": TEAM, "MARKETING_VERSION": VERSION,
     "SDKROOT": "watchos", "SUPPORTED_PLATFORMS": "watchos watchsimulator", "TARGETED_DEVICE_FAMILY": "4",
     "WATCHOS_DEPLOYMENT_TARGET": "10.0", "SWIFT_EMIT_LOC_STRINGS": "NO", "GENERATE_INFOPLIST_FILE": "YES",
-    "INFOPLIST_KEY_CFBundleDisplayName": "Orbit", "SKIP_INSTALL": "YES",
+    "INFOPLIST_KEY_CFBundleDisplayName": "Joshu", "SKIP_INSTALL": "YES",
 }
 watch_app = {
     **watch_common,

@@ -144,10 +144,10 @@ struct GoogleCalendarBanner: View {
 
     var body: some View {
         if store.apiDisabled {
-            banner("Turn on Google Calendar for your Orbit project (one click), then come back.",
+            banner("Turn on Google Calendar for your Joshu project (one click), then come back.",
                    action: "Enable Calendar API") { Platform.open(GoogleCalendarStore.enableAPIURL) }
         } else if let account = store.needsConsent.sorted().first {
-            banner("Allow Orbit to read the calendar of \(account). You'll approve it once in your browser.",
+            banner("Allow Joshu to read the calendar of \(account). You'll approve it once in your browser.",
                    action: "Connect Google Calendar") { Task { await store.reconnect(account) } }
         }
     }

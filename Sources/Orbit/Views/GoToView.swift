@@ -46,13 +46,13 @@ struct GoToSection: View {
             }
 
             if places.contains(where: \.hasLocation) { map }
-            if Platform.isPhone, let file = Bundle.main.url(forResource: "Orbit Go To", withExtension: "shortcut", subdirectory: "Shortcuts") {
+            if Platform.isPhone, let file = Bundle.main.url(forResource: "Joshu Go To", withExtension: "shortcut", subdirectory: "Shortcuts") {
                 HStack(spacing: 12) {
                     Image(systemName: "square.and.arrow.up").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.stickerInk)
                         .frame(width: 34, height: 34).background(Circle().fill(Theme.mint))
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Save from Google or Apple Maps").font(Theme.ui(14, weight: .semibold))
-                        Text("Add the Orbit Go To shortcut once. Then in Maps, open a place › Share › Orbit Go To.")
+                        Text("Add the Joshu Go To shortcut once. Then in Maps, open a place › Share › Joshu Go To.")
                             .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 0)

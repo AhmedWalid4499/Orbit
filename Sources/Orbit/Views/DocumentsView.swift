@@ -18,7 +18,7 @@ struct DocumentsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 PageHeader(title: "Documents", size: 38, isPage: true) {
-                    Text("Orbit reminds you before anything expires. Keep numbers short (e.g. the last 4 digits).")
+                    Text("Joshu reminds you before anything expires. Keep numbers short (e.g. the last 4 digits).")
                         .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
                 } actions: {
                     Button { adding = true } label: { Label("Add document", systemImage: "plus") }.buttonStyle(SoftButtonStyle())

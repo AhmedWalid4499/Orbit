@@ -194,9 +194,9 @@ final class Dictation: ObservableObject {
         let speech = await withCheckedContinuation { (c: CheckedContinuation<SFSpeechRecognizerAuthorizationStatus, Never>) in
             SFSpeechRecognizer.requestAuthorization { c.resume(returning: $0) }
         }
-        guard speech == .authorized else { error = "Allow Speech Recognition for Orbit in System Settings › Privacy & Security."; return false }
+        guard speech == .authorized else { error = "Allow Speech Recognition for Joshu in System Settings › Privacy & Security."; return false }
         guard await AVCaptureDevice.requestAccess(for: .audio) else {
-            error = "Allow the microphone for Orbit in System Settings › Privacy & Security."; return false
+            error = "Allow the microphone for Joshu in System Settings › Privacy & Security."; return false
         }
         return true
     }

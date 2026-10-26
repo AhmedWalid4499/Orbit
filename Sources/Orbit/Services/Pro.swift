@@ -1,0 +1,139 @@
+import Foundation
+import StoreKit
+import SwiftUI
+
+/// Joshu Pro: the subscription that unlocks Yuki and everything built on it.
+///
+/// Free: everything except the AI. That means no assistant, morning brief, email summaries, day summary, money coach,
+/// LinkedIn tab (it's the AI reading your Gmail) or AI extras, and one email account.
+/// Pro ($7.99 a month or $59.99 a year): all of it, with the AI paid for by Joshu through its own server, so there's
+/// no key to set up.
+///
+/// You're Pro when the App Store says so (StoreKit), when the Joshu server has a grant for your account (a purchase
+/// made on another device, or one given by hand), or when you use your own Anthropic key (the owner's setup).
+@MainActor
+final class Pro: ObservableObject {
+    static let shared = Pro()
+
+    static let monthlyID = "joshu.pro.monthly"
+    static let yearlyID = "joshu.pro.yearly"
+    static let productIDs = [monthlyID, yearlyID]
+
+    @Published private(set) var products: [Product] = []
+    @Published private(set) var storeActive = false
+    @Published private(set) var serverActive = UserDefaults.standard.bool(forKey: "pro.server")
+    @Published private(set) var busy = false
+    @Published var message: String?
+
+    private var updates: Task<Void, Never>?
+
+    private init() {
+        updates = Task { [weak self] in
+            for await result in StoreKit.Transaction.updates {
+                if case .verified(let t) = result { await t.finish() }
+                await self?.refresh()
+            }
+        }
+    }
+
+    /// Your own Anthropic key: the AI works on it directly (no subscription needed for you).
+    var ownKey: Bool { Keychain.apiKey != nil }
+    var isPro: Bool { storeActive || serverActive || ownKey || Snapshot.isDemo }
+
+    /// The AI through Joshu's server (Pro without your own key). Read by the AI client, so it's kept in UserDefaults.
+    nonisolated static var serverAI: Bool { UserDefaults.standard.bool(forKey: "pro.serverAI") }
+
+    /// Free accounts connect one email; Pro, as many as they like.
+    func canAddEmail(existing: Int) -> Bool { isPro || existing == 0 }
+
+    // MARK: Status
+
+    /// Checks the App Store and the Joshu server, and loads prices.
+    func refresh() async {
+        if products.isEmpty { products = ((try? await Product.products(for: Self.productIDs)) ?? []).sorted { $0.price < $1.price } }
+        var active = false
+        for await result in StoreKit.Transaction.currentEntitlements {
+            guard case .verified(let t) = result, Self.productIDs.contains(t.productID), t.revocationDate == nil else { continue }
+            if (t.expirationDate ?? .distantFuture) > .now {
+                active = true
+                await report(result)
+            }
+        }
+        storeActive = active
+        await checkServer()
+        UserDefaults.standard.set((storeActive || serverActive) && CloudAuth.session != nil, forKey: "pro.serverAI")
+        AIAssistant.shared.reloadKey()
+    }
+
+    /// The Joshu server's record for this account (purchases from other devices, or a grant).
+    private func checkServer() async {
+        guard let session = CloudAuth.session, !Snapshot.isActive,
+              var c = URLComponents(string: "\(SupabaseConfig.url)/rest/v1/entitlements") else { return }
+        c.queryItems = [.init(name: "select", value: "pro_until"), .init(name: "user_id", value: "eq.\(session.userID)")]
+        guard let url = c.url, let token = try? await CloudAuth.accessToken() else { return }
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue(SupabaseConfig.key, forHTTPHeaderField: "apikey")
+        guard let (data, response) = try? await URLSession.shared.data(for: req),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let rows = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] else { return }
+        let until = rows.first.flatMap { J.date($0["pro_until"]) }
+        serverActive = (until ?? .distantPast) > .now
+        UserDefaults.standard.set(serverActive, forKey: "pro.server")
+    }
+
+    /// Tells the Joshu server about an App Store purchase (signed by Apple), so the AI server knows you're Pro
+    /// and your other devices do too.
+    private func report(_ result: VerificationResult<StoreKit.Transaction>) async {
+        guard CloudAuth.session != nil, let token = try? await CloudAuth.accessToken(),
+              let url = URL(string: "\(SupabaseConfig.url)/functions/v1/subscription") else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue(SupabaseConfig.key, forHTTPHeaderField: "apikey")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["signedTransaction": result.jwsRepresentation])
+        _ = try? await URLSession.shared.data(for: req)
+    }
+
+    // MARK: Buying
+
+    func buy(_ id: String) async {
+        message = nil
+        guard let product = products.first(where: { $0.id == id }) else {
+            message = "Subscriptions open once Joshu is on the App Store."
+            return
+        }
+        busy = true
+        defer { busy = false }
+        do {
+            // Ties the purchase to your Joshu account, so renewals and refunds reach the right account.
+            let options: Set<Product.PurchaseOption> = CloudAuth.session.flatMap { UUID(uuidString: $0.userID) }.map { [.appAccountToken($0)] } ?? []
+            switch try await product.purchase(options: options) {
+            case .success(let result):
+                if case .verified(let t) = result { await t.finish() }
+                await refresh()
+                message = isPro ? "Welcome to Joshu Pro." : nil
+            case .pending: message = "Your purchase is waiting for approval."
+            case .userCancelled: break
+            @unknown default: break
+            }
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
+    func restore() async {
+        busy = true
+        defer { busy = false }
+        try? await AppStore.sync()
+        await refresh()
+        message = isPro ? "Your Pro subscription is back." : "No Pro subscription found for this Apple ID."
+    }
+
+    /// Price shown on a plan button: the App Store's (in your currency), or the list price before launch.
+    func price(_ id: String) -> String {
+        if let p = products.first(where: { $0.id == id }) { return p.displayPrice }
+        return id == Self.yearlyID ? "$59.99" : "$7.99"
+    }
+}

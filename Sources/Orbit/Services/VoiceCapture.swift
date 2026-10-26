@@ -132,9 +132,9 @@ final class VoiceCapture: ObservableObject {
         let speech = await withCheckedContinuation { (c: CheckedContinuation<SFSpeechRecognizerAuthorizationStatus, Never>) in
             SFSpeechRecognizer.requestAuthorization { c.resume(returning: $0) }
         }
-        guard speech == .authorized else { show(.failed("Allow Speech Recognition for Orbit in System Settings › Privacy & Security.")); return false }
+        guard speech == .authorized else { show(.failed("Allow Speech Recognition for Joshu in System Settings › Privacy & Security.")); return false }
         let mic = await AVCaptureDevice.requestAccess(for: .audio)
-        guard mic else { show(.failed("Allow the microphone for Orbit in System Settings › Privacy & Security.")); return false }
+        guard mic else { show(.failed("Allow the microphone for Joshu in System Settings › Privacy & Security.")); return false }
         return true
     }
 

@@ -52,7 +52,7 @@ struct CardFace: View {
         VStack(spacing: 18) {
             HStack {
                 HStack(spacing: 2) {
-                    Text("orbit").font(.system(size: 15, weight: .black, design: .rounded))
+                    Text("joshu").font(.system(size: 15, weight: .black, design: .rounded))
                     Circle().fill(card.color).frame(width: 5, height: 5).offset(y: 4)
                 }
                 .opacity(0.85)
@@ -102,7 +102,7 @@ struct CardFace: View {
         return VStack(alignment: .leading, spacing: 0) {
             HStack {
                 HStack(spacing: 2) {
-                    Text("orbit").font(.system(size: 15, weight: .black, design: .rounded))
+                    Text("joshu").font(.system(size: 15, weight: .black, design: .rounded))
                     Circle().fill(accent).frame(width: 5, height: 5).offset(y: 4)
                 }
                 .shadow(color: .black.opacity(0.4), radius: 6)
@@ -220,7 +220,7 @@ struct CardFace: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(card.qrTarget == "contact" ? "Scan to save my contact" : "Scan to open").font(.system(size: 12, weight: .semibold))
                     HStack(spacing: 2) {
-                        Text("orbit").font(.system(size: 13, weight: .black, design: .rounded))
+                        Text("joshu").font(.system(size: 13, weight: .black, design: .rounded))
                         Circle().fill(card.isDark ? Theme.lime : ink).frame(width: 4, height: 4).offset(y: 3)
                     }
                     .opacity(0.5)

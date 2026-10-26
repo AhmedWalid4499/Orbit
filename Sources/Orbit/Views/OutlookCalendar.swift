@@ -15,7 +15,7 @@ struct OutlookCalendarRow: View {
                     .frame(width: 28, height: 28).background(RoundedRectangle(cornerRadius: 7).fill(Color(hex: 0x0F6CBD)))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Outlook calendar").font(.headline)
-                    Text(apple.calendarEnabled ? "Your Outlook meetings show in Orbit once Outlook is in the Calendar app." : "Turn on Apple Calendar first (above); Outlook meetings come in through it.")
+                    Text(apple.calendarEnabled ? "Your Outlook meetings show in Joshu once Outlook is in the Calendar app." : "Turn on Apple Calendar first (above); Outlook meetings come in through it.")
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -24,12 +24,12 @@ struct OutlookCalendarRow: View {
                     #if os(iOS)
                     Text("1. Open Settings › Apps › Calendar › Calendar Accounts › Add Account.")
                     Text("2. Choose Microsoft Exchange (work or school) or Outlook.com, and sign in.")
-                    Text("3. Make sure Calendars is switched on. Orbit picks the meetings up by itself.")
+                    Text("3. Make sure Calendars is switched on. Joshu picks the meetings up by itself.")
                     Button("Open Settings") { Platform.open(URL(string: UIApplication.openSettingsURLString)!) }.padding(.top, 4)
                     #else
                     Text("1. Open System Settings › Internet Accounts › Add Account.")
                     Text("2. Choose Microsoft Exchange or Outlook.com, and sign in.")
-                    Text("3. Make sure Calendars is switched on. Orbit picks the meetings up by itself.")
+                    Text("3. Make sure Calendars is switched on. Joshu picks the meetings up by itself.")
                     Button("Open Internet Accounts") { Platform.open(URL(string: "x-apple.systempreferences:com.apple.Internet-Accounts-Settings.extension")!) }.padding(.top, 4)
                     #endif
                 }
@@ -60,7 +60,7 @@ struct OutlookCalendarRow: View {
         for p in ["https://", "http://", "webcals://", "webcal://"] where s.lowercased().hasPrefix(p) { s = String(s.dropFirst(p.count)) }
         guard let url = URL(string: "webcal://" + s) else { note = "Couldn't read that link."; return }
         Platform.open(url)
-        note = "Confirm “Subscribe” in Calendar. Your Outlook meetings then show in Orbit within a few minutes."
+        note = "Confirm “Subscribe” in Calendar. Your Outlook meetings then show in Joshu within a few minutes."
         link = ""
     }
 }

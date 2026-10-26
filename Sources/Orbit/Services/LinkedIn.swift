@@ -52,7 +52,7 @@ final class LinkedInStore: ObservableObject {
     }
 
     func refreshIfDue() async {
-        guard enabled, InboxStore.shared.isConnected, !Snapshot.isActive else { return }
+        guard enabled, AIAssistant.shared.hasKey, InboxStore.shared.isConnected, !Snapshot.isActive else { return }
         if Date.now.timeIntervalSince1970 - lastSync > 3600 { await refresh() }
     }
 
@@ -270,12 +270,17 @@ struct LinkedInView: View {
     @State private var selected: String?
     @State private var savedJob: String?
 
+    @ObservedObject private var ai = AIAssistant.shared
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
                 LinkedInAccountCard()
-                if !inbox.isConnected && !Snapshot.isDemo {
+                if !ai.hasKey {
+                    // The job alerts are read from your email by the AI, so this is part of Pro.
+                    ProUpsell(title: "LinkedIn job alerts", detail: "\(AssistantName.current) reads LinkedIn's job alert emails and lists every job by the day it came. Part of Joshu Pro.")
+                } else if !inbox.isConnected && !Snapshot.isDemo {
                     empty
                 } else {
                     tiles
@@ -309,7 +314,7 @@ struct LinkedInView: View {
         VStack(alignment: .leading, spacing: 12) {
             BrandLogo(brand: .linkedin, size: 56)
             Text("Your job alerts, in one place").font(Theme.display(26))
-            Text("Orbit reads the job alert emails LinkedIn sends you and lists every job, by the day the email came. Connect the Gmail account LinkedIn emails in Settings › Connections.")
+            Text("Joshu reads the job alert emails LinkedIn sends you and lists every job, by the day the email came. Connect the Gmail account LinkedIn emails in Settings › Connections.")
                 .font(Theme.ui(14)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
             Text("No alerts yet? On LinkedIn, search for a job and turn on “Set alert”.")
                 .font(Theme.ui(12)).foregroundStyle(Theme.inkMuted).fixedSize(horizontal: false, vertical: true)

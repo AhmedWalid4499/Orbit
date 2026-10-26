@@ -37,7 +37,7 @@ struct SharedList: Identifiable, Equatable {
     var openCount: Int { items.filter { !$0.done }.count }
 
     var inviteText: String {
-        "Join my Orbit list “\(title)”: in Orbit open Tasks › Shared lists › Join and enter \(code)."
+        "Join my Joshu list “\(title)”: in Joshu open Tasks › Shared lists › Join and enter \(code)."
     }
 }
 

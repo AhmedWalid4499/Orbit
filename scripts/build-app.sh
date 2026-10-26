@@ -20,6 +20,7 @@ VERSION="$(cat VERSION | tr -d '[:space:]')"
 BUILD="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" -c "Set :CFBundleVersion $BUILD" "$APP/Contents/Info.plist"
 [[ -f Support/AppIcon.icns ]] && cp Support/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+mkdir -p "$APP/Contents/Resources/en.lproj" && cp Support/en.lproj/InfoPlist.strings "$APP/Contents/Resources/en.lproj/" # shown name: Joshu
 cp Support/Supabase.json "$APP/Contents/Resources/Supabase.json" # sync project (publishable key only)
 mkdir -p "$APP/Contents/Resources/Tour" && cp Support/Tour/*.jpg "$APP/Contents/Resources/Tour/" # first-launch tour screenshots
 

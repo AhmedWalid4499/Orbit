@@ -23,7 +23,7 @@ struct PhoneBankSetup: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    Text("Card and Apple Pay spending never reaches your inbox. Orbit's shortcuts send it here as it happens. iPhone only lets you, not apps, turn on automations, so it takes one minute in the Shortcuts app.")
+                    Text("Card and Apple Pay spending never reaches your inbox. Joshu's shortcuts send it here as it happens. iPhone only lets you, not apps, turn on automations, so it takes one minute in the Shortcuts app.")
                         .font(Theme.ui(14)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
 
                     if !logged.isEmpty {
@@ -40,18 +40,18 @@ struct PhoneBankSetup: View {
                         "In Shortcuts: **Automation** tab › **+** › **Message**.",
                         "Tap **Message Contains**, type just a full stop **.** and tap **Done**. Leave Sender empty. Every payment text has one in its amount (350**.**00), however your bank writes the currency.",
                         "Choose **Run Immediately**. Switch on **Notify When Run** for now, so you can see it work. Tap **Next**.",
-                        "Tap the red **Orbit Bank Message** tile in the top row (swipe the row sideways if you don't see it).",
-                        "Once a bank text shows up under Recent activity, turn **Notify When Run** off again: the automation runs for most texts, and Orbit quietly ignores the ones that aren't from your banks, on your iPhone.",
+                        "Tap the red **Joshu Bank Message** tile in the top row (swipe the row sideways if you don't see it).",
+                        "Once a bank text shows up under Recent activity, turn **Notify When Run** off again: the automation runs for most texts, and Joshu quietly ignores the ones that aren't from your banks, on your iPhone.",
                         "Already made automations for EGP or other words? Delete them, so the same text isn't sent twice.",
-                    ], file: "Orbit Bank Message")
+                    ], file: "Joshu Bank Message")
 
                     guide("Apple Pay", symbol: "wave.3.right", color: Theme.lime, steps: [
                         "First open the **Wallet** app and tap your card. If your recent Apple Pay purchases aren't listed there, your bank doesn't share them with iPhone and this automation can never run: use bank texts above instead.",
                         "Tap **Add to Shortcuts** below, choose **Shortcuts** in the share sheet, then **Add Shortcut**.",
                         "In Shortcuts: **Automation** tab › **+** › **Wallet** (called **Transaction** on some iPhones).",
                         "Pick your cards, choose **Run Immediately** and switch on **Notify When Run**. Tap **Next**.",
-                        "Tap the green **Orbit Card Payment** tile in the top row. That's it.",
-                    ], file: "Orbit Card Payment")
+                        "Tap the green **Joshu Card Payment** tile in the top row. That's it.",
+                    ], file: "Joshu Card Payment")
 
                     Button { Platform.open(URL(string: "shortcuts://")!) } label: {
                         Label("Open Shortcuts", systemImage: "square.2.layers.3d").frame(maxWidth: .infinity)
@@ -81,11 +81,11 @@ struct PhoneBankSetup: View {
         return VStack(alignment: .leading, spacing: 12) {
             Text("Status").font(Theme.display(20))
             statusRow("Bank texts", ok: sms != nil,
-                      sms.map { "Last one reached Orbit \($0.date.formatted(.relative(presentation: .named)))." }
-                        ?? (tested ? "The test reached Orbit, so the shortcut works, but no real bank text has started the automation yet. Set its trigger to Message Contains “.” (steps below): a currency word like EGP misses texts that write LE or ج.م."
+                      sms.map { "Last one reached Joshu \($0.date.formatted(.relative(presentation: .named)))." }
+                        ?? (tested ? "The test reached Joshu, so the shortcut works, but no real bank text has started the automation yet. Set its trigger to Message Contains “.” (steps below): a currency word like EGP misses texts that write LE or ج.م."
                                    : "Nothing yet. Tap “Test the bank shortcut” below first, to check the shortcut itself works."))
             statusRow("Apple Pay", ok: wallet != nil,
-                      wallet.map { "Last tap reached Orbit \($0.date.formatted(.relative(presentation: .named)))." }
+                      wallet.map { "Last tap reached Joshu \($0.date.formatted(.relative(presentation: .named)))." }
                         ?? "Nothing yet. If your purchases don't show in the Wallet app, your bank doesn't share them and the Wallet automation won't run.")
             Text("Automations only run while they're switched on in Shortcuts › Automation. With Notify When Run on, a banner shows every time one runs.")
                 .font(Theme.ui(11)).foregroundStyle(Theme.inkMuted).fixedSize(horizontal: false, vertical: true)
@@ -119,7 +119,7 @@ struct PhoneBankSetup: View {
                 Button(names.isEmpty ? "Choose" : "Edit") { picking = true }.buttonStyle(SoftButtonStyle())
             }
             if names.isEmpty {
-                Text("Pick the banks and wallets that text you, so Orbit only reads their messages.")
+                Text("Pick the banks and wallets that text you, so Joshu only reads their messages.")
                     .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
             } else {
                 FlowLayout(spacing: 6) {
@@ -189,17 +189,17 @@ struct PhoneBankSetup: View {
             Button {
                 let text = "\(BankMessages.testPrefix) Your card was charged EGP 25.00 at Cafe"
                 var c = URLComponents(string: "shortcuts://run-shortcut")!
-                c.queryItems = [.init(name: "name", value: "Orbit Bank Message"), .init(name: "input", value: "text"), .init(name: "text", value: text)]
+                c.queryItems = [.init(name: "name", value: "Joshu Bank Message"), .init(name: "input", value: "text"), .init(name: "text", value: text)]
                 UserDefaults.standard.set(Date.now.timeIntervalSince1970, forKey: "bankSMS.testStarted")
                 if let url = c.url { Platform.open(url) }
             } label: {
                 Label("Test the bank shortcut", systemImage: "play.fill").frame(maxWidth: .infinity)
             }
             .buttonStyle(SoftButtonStyle())
-            Text("Runs Orbit Bank Message with a sample text, then come back here: a “Test worked” line means Shortcuts can reach Orbit. Nothing is saved.")
+            Text("Runs Joshu Bank Message with a sample text, then come back here: a “Test worked” line means Shortcuts can reach Joshu. Nothing is saved.")
                 .font(Theme.ui(11)).foregroundStyle(Theme.inkMuted).fixedSize(horizontal: false, vertical: true)
             if entries.isEmpty {
-                Text("Nothing has reached Orbit from Shortcuts yet. Each time an automation runs, it appears here with what Orbit did with it.")
+                Text("Nothing has reached Joshu from Shortcuts yet. Each time an automation runs, it appears here with what Joshu did with it.")
                     .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
                 Text("Testing? iPhone may not run Message automations for texts you send yourself. Ask someone to text you “Your card was charged EGP 25.00 at Cafe”, or wait for your next bank text.")
                     .font(Theme.ui(12)).foregroundStyle(Theme.inkMuted).fixedSize(horizontal: false, vertical: true)
@@ -228,7 +228,7 @@ struct PhoneBankSetup: View {
     private var tryIt: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Try a message").font(Theme.display(20))
-            Text("Paste a text from your bank to see what Orbit reads.").font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
+            Text("Paste a text from your bank to see what Joshu reads.").font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
             TextField("e.g. Your card ending 1234 was charged EGP 350.00 at CARREFOUR MAADI", text: $sample, axis: .vertical)
                 .font(Theme.ui(14)).lineLimit(2...6)
                 .padding(12).background(RoundedRectangle(cornerRadius: 12).fill(Theme.card))

@@ -33,7 +33,7 @@ struct TourView: View {
     private var pages: [Page] {
         let ai = AssistantName.current
         return [
-            Page(id: 0, eyebrow: "Welcome to Orbit", title: "Your whole life, in one calm place",
+            Page(id: 0, eyebrow: "Welcome to Joshu", title: "Your whole life, in one calm place",
                  points: [("sun.max.fill", "Events, tasks, habits, money and reading on one screen"),
                           ("arrow.triangle.2.circlepath", "Always in sync between your Mac and iPhone"),
                           ("lock.fill", "Your data and keys stay yours")],
@@ -65,7 +65,7 @@ struct TourView: View {
                             .init(symbol: "alarm.fill", text: "Call mom · 6:00 PM", color: Theme.peach, at: .init(x: 1.05, y: 0.7))]),
             Page(id: 4, eyebrow: "Money", title: "Every pound, logged for you",
                  points: [("envelope.fill", "Receipts from email and bank texts land in Money by themselves"),
-                          ("doc.viewfinder", "Snap a paper receipt; Orbit reads it"),
+                          ("doc.viewfinder", "Snap a paper receipt; Joshu reads it"),
                           ("bell.badge.fill", "Budgets per category, with alerts before you overspend")],
                  image: "money", focus: phone ? .init(x: 0.5, y: 0.25) : .init(x: 0.5, y: 0.55), zoom: phone ? 1.45 : 1.8, color: Theme.peach, accent: Theme.orange,
                  stickers: [.init(symbol: "message.fill", text: "CIB · EGP 220 logged", color: Theme.cyan, at: .init(x: -0.08, y: 0.25)),

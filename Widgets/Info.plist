@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleDevelopmentRegion</key><string>en</string>
-    <key>CFBundleDisplayName</key><string>Orbit</string>
+    <key>CFBundleDisplayName</key><string>Joshu</string>
     <key>CFBundleExecutable</key><string>OrbitWidgets</string>
     <key>CFBundleIdentifier</key><string>com.personal.orbit.widgets</string>
     <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>

@@ -59,6 +59,8 @@ struct RootView: View {
         .sheet(isPresented: $state.searchOpen) { SearchView() }
         .sheet(isPresented: $state.reviewOpen) { ReviewView() }
         .sheet(isPresented: $state.cardOpen) { ProfileCardSheet() }
+        .sheet(isPresented: $state.proOpen) { ProSheet() }
+        .task { await Pro.shared.refresh() }
         .sheet(isPresented: $state.planOpen) { PlanTomorrowSheet() }
         // First launch: the tour, then a few quick settings.
         .sheet(isPresented: Binding(get: { !onboarded && !Snapshot.isActive }, set: { if !$0 { onboarded = true } })) {
@@ -140,7 +142,7 @@ struct TopBar: View {
     var body: some View {
         HStack {
             HStack(spacing: 2) {
-                Text("orbit")
+                Text("joshu")
                     .font(.system(size: 34, weight: .black, design: .rounded))
                     .tracking(-1)
                 Circle().fill(Theme.lime).frame(width: 9, height: 9).offset(y: 9)

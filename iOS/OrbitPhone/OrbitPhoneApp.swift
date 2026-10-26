@@ -23,7 +23,7 @@ struct OrbitPhoneApp: App {
         if Snapshot.isActive {
             container = Snapshot.demoContainer()
         } else {
-            let url = URL.applicationSupportDirectory.appending(path: "Orbit", directoryHint: .isDirectory)
+            let url = URL.applicationSupportDirectory.appending(path: "Joshu", directoryHint: .isDirectory)
             try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
             let schema = OrbitSchema.schema
             do {

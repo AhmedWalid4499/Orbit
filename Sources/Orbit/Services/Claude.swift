@@ -51,7 +51,7 @@ enum Keychain {
         SecItemDelete(query(vaultAccount) as CFDictionary)
         var q = query(vaultAccount)
         q[kSecValueData as String] = (try? JSONEncoder().encode(dict)) ?? Data()
-        q[kSecAttrLabel as String] = "Orbit secrets"
+        q[kSecAttrLabel as String] = "Joshu secrets"
         SecItemAdd(q as CFDictionary, nil)
     }
 
@@ -111,11 +111,11 @@ struct ClaudeClient {
     static let model = "claude-opus-5-5"
 
     enum Failure: LocalizedError {
-        case noKey, badKey, rateLimited, overloaded, refused, server(Int, String), network(String), badResponse
+        case noKey, badKey, rateLimited, overloaded, refused, server(Int, String), network(String), badResponse, joshu(String)
 
         var errorDescription: String? {
             switch self {
-            case .noKey: "Add your Anthropic API key in Settings › AI."
+            case .noKey: "This needs Joshu Pro."
             case .badKey: "The API key was rejected. Check it in Settings › AI."
             case .rateLimited: "Rate limited by the API. Try again in a minute."
             case .overloaded: "\(AssistantName.current) is busy right now. Try again shortly."
@@ -123,15 +123,32 @@ struct ClaudeClient {
             case .server(let code, let msg): "API error \(code): \(msg)"
             case .network(let msg): "Network problem: \(msg)"
             case .badResponse: "Unexpected response from the API."
+            case .joshu(let msg): msg
             }
         }
     }
 
-    let apiKey: String
+    /// Your own key, or nil to go through Joshu's server (Joshu Pro), which adds its key after checking your plan.
+    let apiKey: String?
 
     init?(apiKey: String? = Keychain.apiKey) {
-        guard let apiKey else { return nil }
+        guard apiKey != nil || Pro.serverAI else { return nil }
         self.apiKey = apiKey
+    }
+
+    /// The Messages endpoint: Anthropic directly with your key, or Joshu's AI server with your Joshu sign-in.
+    private func messagesRequest() async throws -> URLRequest {
+        if let apiKey {
+            var req = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!)
+            req.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+            return req
+        }
+        guard let url = URL(string: "\(SupabaseConfig.url)/functions/v1/claude") else { throw Failure.noKey }
+        let token = try await CloudAuth.accessToken()
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue(SupabaseConfig.key, forHTTPHeaderField: "apikey")
+        return req
     }
 
     /// Sends one request with a JSON-schema constrained answer and decodes it.
@@ -171,11 +188,10 @@ struct ClaudeClient {
             "fallbacks": "default",
         ]
 
-        var req = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!)
+        var req = try await messagesRequest()
         req.httpMethod = "POST"
         req.timeoutInterval = 180
         req.setValue("application/json", forHTTPHeaderField: "content-type")
-        req.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         req.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         req.setValue("server-side-fallback-2026-07-01", forHTTPHeaderField: "anthropic-beta")
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -189,6 +205,7 @@ struct ClaudeClient {
         guard let http = response as? HTTPURLResponse else { throw Failure.badResponse }
 
         let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        if apiKey == nil, http.statusCode != 200, let msg = (json?["error"] as? [String: Any])?["message"] as? String { throw Failure.joshu(msg) }
         switch http.statusCode {
         case 200: break
         case 401, 403: throw Failure.badKey
@@ -253,11 +270,10 @@ struct ClaudeClient {
         ]
         if let tools, !tools.isEmpty { body["tools"] = tools }
         if let container { body["container"] = container }
-        var req = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!)
+        var req = try await messagesRequest()
         req.httpMethod = "POST"
         req.timeoutInterval = 600
         req.setValue("application/json", forHTTPHeaderField: "content-type")
-        req.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         req.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         req.setValue("server-side-fallback-2026-07-01", forHTTPHeaderField: "anthropic-beta")
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -271,6 +287,8 @@ struct ClaudeClient {
             var raw = Data()
             for try await byte in bytes { raw.append(byte); if raw.count > 4000 { break } }
             let msg = (((try? JSONSerialization.jsonObject(with: raw)) as? [String: Any])?["error"] as? [String: Any])?["message"] as? String
+            // Joshu's AI server explains itself (sign in, needs Pro, today's limit): show its words.
+            if apiKey == nil, let msg { throw Failure.joshu(msg) }
             switch http.statusCode {
             case 401, 403: throw Failure.badKey
             case 429: throw Failure.rateLimited

@@ -72,7 +72,7 @@ enum CloudAuth {
     /// The same Google account signs in to the same Orbit account on any device, and is linked
     /// automatically to an email/password account with the same address.
     static func signInWithGoogle() async throws {
-        guard SupabaseConfig.isConfigured else { throw CloudError("Sync isn't set up in this copy of Orbit.") }
+        guard SupabaseConfig.isConfigured else { throw CloudError("Sync isn't set up in this copy of Joshu.") }
         pending?.continuation.resume(throwing: CancellationError())
         var bytes = [UInt8](repeating: 0, count: 48)
         _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
@@ -138,14 +138,14 @@ enum CloudAuth {
         guard var s = session else { throw CloudError("Not signed in.") }
         if s.expiresAt.timeIntervalSinceNow > 60 { return s.accessToken }
         let json = try await auth("token?grant_type=refresh_token", body: ["refresh_token": s.refreshToken])
-        guard let fresh = parseSession(json) else { session = nil; throw CloudError("Your Orbit sign-in expired. Sign in again in Settings › Account.") }
+        guard let fresh = parseSession(json) else { session = nil; throw CloudError("Your Joshu sign-in expired. Sign in again in Settings › Account.") }
         s = fresh
         session = s
         return s.accessToken
     }
 
     private static func auth(_ path: String, body: [String: String]) async throws -> [String: Any] {
-        guard SupabaseConfig.isConfigured else { throw CloudError("Sync isn't set up in this copy of Orbit.") }
+        guard SupabaseConfig.isConfigured else { throw CloudError("Sync isn't set up in this copy of Joshu.") }
         var req = URLRequest(url: URL(string: "\(SupabaseConfig.url)/auth/v1/\(path)")!)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -509,6 +509,13 @@ final class CloudSync: ObservableObject {
         return result
     }
 
+    /// Deletes the Joshu account and everything synced for it (data on this device stays), then signs out.
+    func deleteAccount() async throws {
+        guard let url = URL(string: "\(SupabaseConfig.url)/rest/v1/rpc/delete_my_account") else { return }
+        _ = try await rest(url, method: "POST", body: [String: Any]())
+        signOut()
+    }
+
     func signOut() {
         CloudAuth.signOut()
         email = nil
@@ -722,9 +729,9 @@ final class CloudSync: ObservableObject {
                 throw CloudError("This needs a one-time setup in Supabase: run supabase/\(file) in your project's SQL Editor.")
             }
             if status == 404 || (msg ?? "").contains("orbit_records") {
-                throw CloudError("The Orbit tables aren't set up in Supabase yet (run supabase/schema.sql).")
+                throw CloudError("The Joshu tables aren't set up in Supabase yet (run supabase/schema.sql).")
             }
-            if status == 401 { throw CloudError("Your Orbit sign-in expired. Sign in again in Settings › Account.") }
+            if status == 401 { throw CloudError("Your Joshu sign-in expired. Sign in again in Settings › Account.") }
             throw CloudError("Sync error \(status)\(msg.map { ": \($0)" } ?? "")")
         }
         return data.isEmpty ? nil : try? JSONSerialization.jsonObject(with: data)

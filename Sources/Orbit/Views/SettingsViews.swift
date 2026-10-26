@@ -59,7 +59,7 @@ struct GeneralSettings: View {
                     .frame(width: 30, height: 30).background(RoundedRectangle(cornerRadius: 8).fill(Theme.lime))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Tour").font(Theme.ui(14, weight: .medium))
-                    Text("A quick look at what Orbit can do.").font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
+                    Text("A quick look at what Joshu can do.").font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
                 }
                 Spacer()
                 Button("Take the tour") {
@@ -76,7 +76,7 @@ struct GeneralSettings: View {
                     .frame(width: 30, height: 30).background(RoundedRectangle(cornerRadius: 8).fill(Theme.critical))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Delete all data").font(Theme.ui(14, weight: .medium))
-                    Text("Removes everything in Orbit, here and in your account.").font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
+                    Text("Removes everything in Joshu, here and in your account.").font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
                 }
                 Spacer()
                 Button("Delete…", role: .destructive) { confirmClear = true }
@@ -85,10 +85,10 @@ struct GeneralSettings: View {
         }
     }
         .savedPlaceSearch($placeEditing) { placesVersion += 1 }
-        .confirmationDialog("Delete everything in Orbit?", isPresented: $confirmClear) {
+        .confirmationDialog("Delete everything in Joshu?", isPresented: $confirmClear) {
             Button("Delete all data", role: .destructive) { DataReset.clearAll(context) }
         } message: {
-            Text("Tasks, events, habits, transactions, notes, books and bucket list stored in Orbit will be removed, including from your Orbit account if you're signed in. Apple Calendar and Reminders are not touched.")
+            Text("Tasks, events, habits, transactions, notes, books and bucket list stored in Joshu will be removed, including from your Joshu account if you're signed in. Apple Calendar and Reminders are not touched.")
         }
     }
 }
@@ -175,7 +175,7 @@ struct ConnectionRow: View {
             if let brand { BrandLogo(brand: brand, size: 28) } else { Image(systemName: symbol).frame(width: 28) }
             VStack(alignment: .leading, spacing: 2) {
                 Text(name).font(.headline)
-                Text(denied ? "Access denied — allow Orbit in System Settings › Privacy & Security." : detail)
+                Text(denied ? "Access denied — allow Joshu in System Settings › Privacy & Security." : detail)
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
@@ -219,8 +219,10 @@ struct AISettings: View {
 
     var body: some View {
         Form {
+            Section { ProSettingsRow() }
+            #if os(macOS)
             Section {
-                if ai.hasKey {
+                if Keychain.apiKey != nil {
                     LabeledContent("Anthropic API key") {
                         Label("Saved in Keychain", systemImage: "lock.fill").foregroundStyle(Theme.good)
                     }
@@ -253,15 +255,16 @@ struct AISettings: View {
                 }
                 if let status { Text(status).font(.caption).foregroundStyle(.secondary) }
             } header: {
-                Text("Claude")
+                Text("Your own Anthropic key (advanced)")
             } footer: {
-                Text("Uses \(ClaudeClient.model). The key is stored in your \(Platform.isPhone ? "iPhone's" : "Mac's") Keychain, never in a file.")
+                Text("Optional: use your own key instead of Joshu's AI. Uses \(ClaudeClient.model); the key stays in your Mac's Keychain, never in a file.")
             }
+            #endif
 
             Section("Your assistant") {
                 TextField("Name", text: Binding(get: { UserDefaults.standard.string(forKey: "assistantName") ?? "Ask" },
                                                 set: { UserDefaults.standard.set($0, forKey: "assistantName") }))
-                Text("What you call your AI around Orbit: the top-bar button, the journal and the morning brief. It's “Ask” unless you rename it.")
+                Text("What you call your AI around Joshu: the top-bar button, the journal and the morning brief. It's “Ask” unless you rename it.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             MemorySection()
@@ -283,7 +286,7 @@ struct AISettings: View {
             }
 
             Section("Privacy") {
-                Text("When these are on, Orbit sends Anthropic what it needs: the text you capture, and for the brief today's events, tasks, habits, this month's spending total and yesterday's journal entry. Nothing is sent while no key is saved.")
+                Text("When these are on, Joshu sends Anthropic what it needs: the text you capture, and for the brief today's events, tasks, habits, this month's spending total and yesterday's journal entry. Nothing is sent while no key is saved.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -316,7 +319,7 @@ struct GmailSettings: View {
                     Spacer()
                     Button(showSetup ? "Hide setup" : "Google client settings") { showSetup.toggle() }
                 }
-                Text("Sign in once per account in your browser. Orbit keeps a read-only token in your Keychain and won't ask again.")
+                Text("Sign in once per account in your browser. Joshu keeps a read-only token in your Keychain and won't ask again.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             if let error = inbox.error { Text(error).font(.caption).foregroundStyle(Theme.critical) }
@@ -326,7 +329,7 @@ struct GmailSettings: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("One-time setup (about 5 minutes)").font(.subheadline.weight(.semibold))
                     Text("""
-                    1. Open console.cloud.google.com and create a project (e.g. "Orbit").
+                    1. Open console.cloud.google.com and create a project (e.g. "Joshu").
                     2. APIs & Services › Library › enable "Gmail API".
                     3. OAuth consent screen: User type External, app name Orbit, your email as support contact. Add the scope gmail.readonly. Add both of your Gmail addresses as test users.
                     4. Then click "Publish app" (In production). For your own use, verification isn't needed: Google shows an "unverified app" screen you can continue past. This stops Google from expiring the sign-in every 7 days.
@@ -370,13 +373,13 @@ struct GmailSettings: View {
                 }
             }
             if !GoogleAuth.usingBuiltIn && GoogleAuth.isConfigured {
-                Toggle("Build my Google setup into copies of Orbit I share", isOn: Binding(
+                Toggle("Build my Google setup into copies of Joshu I share", isOn: Binding(
                     get: { GoogleAuth.isShared }, set: { GoogleAuth.setShared($0) }))
                     .font(.callout)
-                Text("People you give Orbit to can then just click “Add Gmail account”, with no Google Cloud setup. They'll see Google's “unverified app” notice, and Google allows up to 100 people.")
+                Text("People you give Joshu to can then just click “Add Gmail account”, with no Google Cloud setup. They'll see Google's “unverified app” notice, and Google allows up to 100 people.")
                     .font(.caption).foregroundStyle(.secondary)
             } else if GoogleAuth.usingBuiltIn {
-                Text("Using the Google connection built into this copy of Orbit.").font(.caption).foregroundStyle(.secondary)
+                Text("Using the Google connection built into this copy of Joshu.").font(.caption).foregroundStyle(.secondary)
             }
             Toggle("Add payments and receipts from email to Money", isOn: Binding(
                 get: { EmailExpenses.shared.enabled }, set: { EmailExpenses.shared.enabled = $0 }))
@@ -392,13 +395,16 @@ struct GmailSettings: View {
 struct AccountSettings: View {
     @Environment(\.modelContext) private var context
     @ObservedObject private var cloud = CloudSync.shared
+    @State private var confirmDelete = false
+    @State private var deleteError: String?
 
     var body: some View {
         Form {
             if !SupabaseConfig.isConfigured {
-                Section { Text("Sync isn't set up in this copy of Orbit yet.").foregroundStyle(.secondary) }
+                Section { Text("Sync isn't set up in this copy of Joshu yet.").foregroundStyle(.secondary) }
             } else if let signedIn = cloud.email {
-                Section("Orbit account") {
+                Section("Plan") { ProSettingsRow() }
+                Section("Joshu account") {
                     LabeledContent("Signed in as", value: signedIn)
                     HStack {
                         if cloud.syncing { ProgressView().controlSize(.small) }
@@ -410,10 +416,19 @@ struct AccountSettings: View {
                         Text("Last synced \(last.formatted(.relative(presentation: .named)))").font(.caption).foregroundStyle(.secondary)
                     }
                     Button("Sign Out", role: .destructive) { cloud.signOut() }
+                    Button("Delete Account…", role: .destructive) { confirmDelete = true }
+                        .confirmationDialog("Delete your Joshu account?", isPresented: $confirmDelete, titleVisibility: .visible) {
+                            Button("Delete Account", role: .destructive) {
+                                Task { do { try await cloud.deleteAccount() } catch { deleteError = error.localizedDescription } }
+                            }
+                        } message: {
+                            Text("This deletes your account and everything synced to it, on all your devices. What's on this device stays until you reset it. A Pro subscription is cancelled in your Apple ID settings, not here.")
+                        }
+                    if let deleteError { Text(deleteError).font(.caption).foregroundStyle(Theme.orange) }
                 }
                 KeySyncSection()
                 Section {
-                    Text("Your tasks, calendar events you made in Orbit, habits, money, notes and journal, books and bucket list sync to your account every couple of minutes. Sign in with the same account on another device to get everything there.")
+                    Text("Your tasks, calendar events you made in Joshu, habits, money, notes and journal, books and bucket list sync to your account every couple of minutes. Sign in with the same account on another device to get everything there.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             } else {
@@ -438,9 +453,9 @@ struct KeySyncSection: View {
             if cloud.syncSecrets {
                 switch cloud.vaultState {
                 case .on:
-                    Label("Synced with your Orbit account", systemImage: "lock.shield.fill").foregroundStyle(Theme.good)
+                    Label("Synced with your Joshu account", systemImage: "lock.shield.fill").foregroundStyle(Theme.good)
                 case .waiting:
-                    Label("Open Orbit on your Mac once to bring your keys here.", systemImage: "hourglass").font(.caption)
+                    Label("Open Joshu on your Mac once to bring your keys here.", systemImage: "hourglass").font(.caption)
                 case .error(let e):
                     Label(e, systemImage: "exclamationmark.triangle.fill").foregroundStyle(Theme.orange).font(.caption)
                 case .off:
@@ -475,10 +490,10 @@ struct VoiceSection: View {
     var body: some View {
         Section {
             Toggle("Read replies aloud", isOn: $speaks)
-            Toggle("Welcome me with the brief out loud when I open Orbit", isOn: $welcome)
+            Toggle("Welcome me with the brief out loud when I open Joshu", isOn: $welcome)
             VStack(alignment: .leading, spacing: 4) {
                 Toggle("Hands-free: answer when I say “Hey \(AssistantName.current)”", isOn: $wake.enabled)
-                Text("While Orbit is open it listens for “Hey \(AssistantName.current)”, then answers out loud. Listening happens on this device; only your question goes to \(AssistantName.current). Right after an answer you can just keep talking.")
+                Text("While Joshu is open it listens for “Hey \(AssistantName.current)”, then answers out loud. Listening happens on this device; only your question goes to \(AssistantName.current). Right after an answer you can just keep talking.")
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 if let e = wake.error { Text(e).font(.caption).foregroundStyle(Theme.orange) }
             }
@@ -566,7 +581,7 @@ struct InboxWindowControls: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Inbox summary").font(.subheadline.weight(.semibold))
             if !ai.hasKey {
-                Label("Add your Anthropic API key in Settings › AI and \(AssistantName.current) summarises your inbox: who's waiting on you, bills, deliveries and alerts.",
+                Label("With Joshu Pro, \(AssistantName.current) summarises your inbox: who's waiting on you, bills, deliveries and alerts.",
                       systemImage: "sparkles").font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             } else if inbox.accounts.isEmpty {
                 Text("Add a Gmail account above and \(AssistantName.current) summarises it on Today.").font(.caption).foregroundStyle(.secondary)

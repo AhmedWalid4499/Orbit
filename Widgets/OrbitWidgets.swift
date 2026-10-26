@@ -87,8 +87,8 @@ struct TodayWidgetView: View {
             }
         } else {
             VStack(alignment: .leading, spacing: 6) {
-                Text("orbit").font(.system(size: 20, weight: .black, design: .rounded))
-                Text("Open Orbit once to fill this widget.").font(.caption).foregroundStyle(.secondary)
+                Text("joshu").font(.system(size: 20, weight: .black, design: .rounded))
+                Text("Open Joshu once to fill this widget.").font(.caption).foregroundStyle(.secondary)
             }
         }
     }
@@ -210,7 +210,7 @@ struct HabitsWidgetView: View {
                 Spacer()
                 Text("\(habits.filter(\.done).count)/\(habits.count)").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
             }
-            if habits.isEmpty { Text("Add habits in Orbit.").font(.caption).foregroundStyle(.secondary) }
+            if habits.isEmpty { Text("Add habits in Joshu.").font(.caption).foregroundStyle(.secondary) }
             ForEach(Array(habits.prefix(family == .systemSmall ? 4 : 6).enumerated()), id: \.offset) { _, h in
                 HStack(spacing: 8) {
                     Image(systemName: h.done ? "checkmark.circle.fill" : "circle")
@@ -245,7 +245,7 @@ struct CountdownWidgetView: View {
         } else {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Looking forward to").font(.system(size: 11, weight: .semibold))
-                Text("Give a bucket-list dream a date in Orbit to count down to it.").font(.caption)
+                Text("Give a bucket-list dream a date in Joshu to count down to it.").font(.caption)
             }
             .foregroundStyle(W.ink)
         }
@@ -521,7 +521,7 @@ struct BookshelfWidgetView: View {
             ZStack {
                 LinearGradient(colors: Wood.frame, startPoint: .top, endPoint: .bottom)
                 WoodPanel().clipShape(RoundedRectangle(cornerRadius: 4)).padding(9)
-                Text("Add books in Orbit › Reading and they'll stand here.").font(.system(size: 13, weight: .semibold, design: .serif))
+                Text("Add books in Joshu › Reading and they'll stand here.").font(.system(size: 13, weight: .semibold, design: .serif))
                     .foregroundStyle(.white).multilineTextAlignment(.center).padding(24)
             }
         } else {
@@ -538,7 +538,7 @@ struct TodayWidget: Widget {
             TodayWidgetView(entry: entry).containerBackground(.background, for: .widget)
                 .widgetURL(URL(string: "com.personal.orbit://open/today"))
         }
-        .configurationDisplayName("Orbit Today")
+        .configurationDisplayName("Joshu Today")
         .description("Your next events, what's due and your habits.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
@@ -550,7 +550,7 @@ struct HabitsWidget: Widget {
             HabitsWidgetView(entry: entry).containerBackground(.background, for: .widget)
                 .widgetURL(URL(string: "com.personal.orbit://open/habits"))
         }
-        .configurationDisplayName("Orbit Habits")
+        .configurationDisplayName("Joshu Habits")
         .description("Today's habits and streaks.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }

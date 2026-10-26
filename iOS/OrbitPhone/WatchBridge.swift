@@ -75,7 +75,7 @@ final class WatchBridge: NSObject, WCSessionDelegate {
     // MARK: Actions from the watch
 
     private func handle(_ action: WatchAction) async -> String {
-        guard let container = OrbitStore.container else { return "Orbit isn't ready on your iPhone yet." }
+        guard let container = OrbitStore.container else { return "Joshu isn't ready on your iPhone yet." }
         let context = container.mainContext
         let apple = AppleSync()
         var reply = "Done."
@@ -112,7 +112,7 @@ final class WatchBridge: NSObject, WCSessionDelegate {
 
     /// Your assistant, answering from the wrist: it can act (add tasks, events, places…) and the chat continues on the phone.
     private static func ask(_ question: String, context: ModelContext, apple: AppleSync) async -> String {
-        guard AIAssistant.shared.hasKey else { return "Add your API key in Orbit on your iPhone first." }
+        guard AIAssistant.shared.hasKey else { return "Get Joshu Pro on your iPhone first." }
         let store = AssistantStore.shared
         let before = store.items.count
         await store.send(question + "\n\n(Asked from Apple Watch: answer in 1-3 short spoken sentences, no lists or links.)", context: context, apple: apple)

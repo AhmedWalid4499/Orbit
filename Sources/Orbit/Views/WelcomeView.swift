@@ -28,7 +28,7 @@ struct WelcomeView: View {
             HStack(spacing: 14) {
                 OrbitMark(size: 56)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Welcome to Orbit").font(Theme.display(30))
+                    Text("Welcome to Joshu").font(Theme.display(30))
                     Text("Create an account to keep everything in sync and backed up.").font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
                 }
             }
@@ -50,7 +50,7 @@ struct WelcomeView: View {
             HStack(spacing: 14) {
                 OrbitMark(size: 56)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Welcome to Orbit").font(Theme.display(30))
+                    Text("Welcome to Joshu").font(Theme.display(30))
                     Text("Your day, plans, money, reading and dreams in one place.").font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
                 }
             }
@@ -96,9 +96,8 @@ struct WelcomeView: View {
                         Spacer()
                         Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.good)
                     } else {
-                        SecureField("Anthropic API key for \(assistantName.isEmpty ? "Ask" : assistantName) (optional)", text: $apiKey)
-                            .textFieldStyle(.roundedBorder)
-                        Link("Get a key", destination: URL(string: "https://console.anthropic.com/settings/keys")!).font(Theme.ui(12))
+                        Text("\(assistantName.isEmpty ? "Your AI" : assistantName) comes with Joshu Pro. You can start free and upgrade any time.")
+                            .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }

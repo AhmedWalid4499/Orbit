@@ -49,7 +49,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
-        NSApp.applicationIconImage = AppIcon.make()
+        // The bundled icon (the j); the drawn one only when running outside the app bundle.
+        NSApp.applicationIconImage = Bundle.main.url(forResource: "AppIcon", withExtension: "icns").flatMap(NSImage.init(contentsOf:)) ?? AppIcon.make()
         // ⌥Space: a quick tap opens quick capture; holding it records your voice and Ask files what you said.
         hotKey = HotKey(onPress: { VoiceCapture.shared.keyDown() }, onRelease: { VoiceCapture.shared.keyUp() })
         _ = Reminders.shared // become the notification delegate before any notification is tapped
@@ -111,7 +112,7 @@ struct OrbitApp: App {
             UserDefaults.standard.set(NSFullUserName(), forKey: "userName")
         }
         let schema = OrbitSchema.schema
-        let url = URL.applicationSupportDirectory.appending(path: "Orbit", directoryHint: .isDirectory)
+        let url = URL.applicationSupportDirectory.appending(path: "Joshu", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         let config = ModelConfiguration(schema: schema, url: url.appending(path: "Orbit.store"))
         if Snapshot.isDemo {
@@ -130,7 +131,7 @@ struct OrbitApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("Orbit", id: "main") {
+        WindowGroup("Joshu", id: "main") {
             RootView()
                 .environmentObject(state)
                 .environmentObject(apple)

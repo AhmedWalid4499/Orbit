@@ -225,7 +225,7 @@ struct YouTubeCard: View {
                         .chartYScale(domain: .automatic(includesZero: false))
                         .frame(height: 120)
                     } else {
-                        Text("Subscriber growth fills in as Orbit checks your channel each day.").font(Theme.ui(12)).foregroundStyle(Theme.inkMuted)
+                        Text("Subscriber growth fills in as Joshu checks your channel each day.").font(Theme.ui(12)).foregroundStyle(Theme.inkMuted)
                     }
                     if !yt.videos.isEmpty {
                         Text("Latest videos").font(Theme.ui(14, weight: .semibold))
@@ -308,8 +308,8 @@ struct YouTubeView: View {
                 } else {
                     VStack(alignment: .leading, spacing: 12) {
                         BrandLogo(brand: .youtube, size: 56)
-                        Text("Your channel, in Orbit").font(Theme.display(26))
-                        Text("Connect your YouTube channel to see subscribers, views and how your latest videos are doing, with growth over time. Orbit only reads; it never posts.")
+                        Text("Your channel, in Joshu").font(Theme.display(26))
+                        Text("Connect your YouTube channel to see subscribers, views and how your latest videos are doing, with growth over time. Joshu only reads; it never posts.")
                             .font(Theme.ui(14)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
                         if let e = yt.error { Text(e).font(Theme.ui(12)).foregroundStyle(Theme.orange) }
                         Button { Task { await yt.connect() } } label: {

@@ -27,7 +27,7 @@ final class NearbyFinder: NSObject, CLLocationManagerDelegate {
         let city = WeatherStore.shared.effectiveCity
         if let p = try? await CLGeocoder().geocodeAddressString(city).first, let loc = p.location { return .city(loc, city) }
         return .unknown(manager.authorizationStatus == .denied || manager.authorizationStatus == .restricted
-                        ? "Location is off for Orbit" : "Couldn't get your location")
+                        ? "Location is off for Joshu" : "Couldn't get your location")
     }
 
     private func currentLocation() async -> CLLocation? {
@@ -160,7 +160,7 @@ final class NearbyFinder: NSObject, CLLocationManagerDelegate {
         let place = await locate()
         switch place {
         case .here(let l): loc = l; whereText = "near the user's current location"
-        case .city(let l, let city): loc = l; whereText = "in \(city) (the user's location is off, so this is around the centre of their weather city; mention that and that they can allow location for Orbit)"
+        case .city(let l, let city): loc = l; whereText = "in \(city) (the user's location is off, so this is around the centre of their weather city; mention that and that they can allow location for Joshu)"
         case .unknown(let why): return ("\(why). Ask the user which area they're in, then search again with that area in the query.", true)
         }
         let results = await search(query, near: loc, radius: max(300, min(radius, 15000)), limit: 10, context: context)

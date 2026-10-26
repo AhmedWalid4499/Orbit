@@ -72,7 +72,7 @@ struct ReceiptScanSheet: View {
                 Text(items.joined(separator: " · ")).font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
             }
             if !usedAI {
-                Text(ClaudeClient() == nil ? "Read on this device. Add your API key in Settings › AI for sharper reading of crumpled or Arabic receipts."
+                Text(ClaudeClient() == nil ? "Read on this device. Joshu Pro reads crumpled or Arabic receipts better."
                                            : "Read on this device. Check the total before adding.")
                     .font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
             }

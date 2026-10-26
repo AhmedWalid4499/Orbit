@@ -38,6 +38,7 @@ struct PhoneRoot: View {
         .sheet(isPresented: $state.settingsOpen) { PhoneSettings() }
         .sheet(isPresented: $state.reviewOpen) { ReviewView() }
         .sheet(isPresented: $state.cardOpen) { PhoneCardSheet() }
+        .sheet(isPresented: $state.proOpen) { ProSheet() }
         .sheet(isPresented: $state.planOpen) { PlanTomorrowSheet() }
         .sheet(isPresented: $state.captureOpen) { PhoneCapture().presentationDetents([.medium, .large]) }
         .sheet(isPresented: $state.newTaskOpen) {
@@ -83,6 +84,7 @@ struct PhoneRoot: View {
                 case "card": state.cardOpen = true
                 case "assistant": state.assistantOpen = true
                 case "settings": state.settingsOpen = true
+                case "pro": state.proOpen = true
                 case "tour": state.tourOpen = true
                 case "capture": state.captureOpen = true
                 case "search": state.searchOpen = true

@@ -157,7 +157,7 @@ struct MoneyCoachCard: View {
                 }
             }
             if !ai.hasKey {
-                Text("Add your Anthropic API key in Settings › AI to get savings advice.").font(Theme.ui(13)).opacity(0.8)
+                ProUpsell(title: "Money coach", detail: "Where your money goes and how to keep more of it. Part of Joshu Pro.", compact: true)
             } else if let a = coach.advice {
                 Text(a.headline).font(Theme.display(20)).fixedSize(horizontal: false, vertical: true)
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 12, alignment: .top)], spacing: 12) {

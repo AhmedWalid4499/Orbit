@@ -49,7 +49,7 @@ final class EmailExpenses: ObservableObject {
 
     func sync(context: ModelContext) async {
         guard !running, !Snapshot.isActive else { return }
-        guard let claude = ClaudeClient() else { status = "Add your Anthropic API key in Settings › AI first."; return }
+        guard let claude = ClaudeClient() else { status = "This is part of Joshu Pro."; return }
         let accounts = InboxStore.shared.accounts
         guard !accounts.isEmpty else { status = "Connect Gmail in Settings › Connections first."; return }
 

@@ -301,7 +301,7 @@ struct GitHubConnectCard: View {
     @State private var connecting = false
 
     /// A classic token with exactly what Orbit needs, filled in on GitHub's page.
-    private let tokenURL = URL(string: "https://github.com/settings/tokens/new?description=Orbit&scopes=repo,read:user")!
+    private let tokenURL = URL(string: "https://github.com/settings/tokens/new?description=Joshu&scopes=repo,read:user")!
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -361,9 +361,9 @@ struct GitHubConnectCard: View {
     private var tokenStep: some View {
         VStack(alignment: .leading, spacing: 12) {
             stepTitle(2, "Private repos (optional)")
-            Text("With just your username, Orbit shows your public work. To include private repos and your contribution graph, give it a token:")
+            Text("With just your username, Joshu shows your public work. To include private repos and your contribution graph, give it a token:")
                 .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
-            instruction(1, "Tap **Open GitHub** below and sign in. The token is already filled in for Orbit.")
+            instruction(1, "Tap **Open GitHub** below and sign in. The token is already filled in for Joshu.")
             instruction(2, "Pick how long it lasts under **Expiration** (e.g. 90 days).")
             instruction(3, "Scroll down and click **Generate token**.")
             instruction(4, "Copy the token (it starts with **ghp_**) and paste it here.")

@@ -178,7 +178,7 @@ enum SyncTest {
             $0.bundleIdentifier == Bundle.main.bundleIdentifier && $0.processIdentifier != ProcessInfo.processInfo.processIdentifier
         }) {
             // The test borrows the keychain the real app uses; running both could leave the real app signed out.
-            print("FAIL  Quit Orbit before running the sync test.")
+            print("FAIL  Quit Joshu before running the sync test.")
             fflush(stdout)
             NSApp.terminate(nil)
             return

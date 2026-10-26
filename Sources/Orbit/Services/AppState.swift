@@ -116,6 +116,8 @@ final class AppState: ObservableObject {
     @Published var assistantOpen = false
     @Published var reviewOpen = false
     @Published var cardOpen = false
+    /// The Joshu Pro page.
+    @Published var proOpen = false
     @Published var planOpen = false
     /// iPhone: the quick-add sheet.
     @Published var captureOpen = false

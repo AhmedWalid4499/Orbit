@@ -26,9 +26,10 @@ struct PhoneSettings: View {
                     }
                     .padding(.vertical, 4)
                 }
+                Section { ProSettingsRow() }
                 Section {
                     page("Account & sync", "person.crop.circle.fill", Theme.cyan, detail: cloud.email ?? "Not signed in") { AccountSettings() }
-                    page("AI", "sparkles", Theme.lime, detail: ai.hasKey ? AssistantName.current : "Add your API key") { AISettings() }
+                    page("AI", "sparkles", Theme.lime, detail: ai.hasKey ? AssistantName.current : "Joshu Pro") { AISettings() }
                     page("Connections", "link", Theme.purple, detail: nil) { PhoneConnections() }
                     page("Notifications", "bell.fill", Theme.orange, detail: nil) { NotificationSettingsView() }
                     page("General", "gearshape.fill", Theme.silver, detail: nil) { GeneralSettings() }
@@ -36,7 +37,7 @@ struct PhoneSettings: View {
                 Section {
                     LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")
                 } footer: {
-                    Text("Orbit on iPhone shares everything with Orbit on your Mac through your Orbit account. Sign in with the same account on both.")
+                    Text("Joshu on iPhone shares everything with Joshu on your Mac through your Joshu account. Sign in with the same account on both.")
                 }
             }
             .navigationTitle("Settings")
@@ -84,7 +85,7 @@ struct PhoneWelcome: View {
             VStack(alignment: .leading, spacing: 22) {
                 OrbitMark(size: 72).padding(.top, 40)
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Orbit on your iPhone").font(Theme.display(34))
+                    Text("Joshu on your iPhone").font(Theme.display(34))
                     Text("Sign in with the account you use on your Mac and everything comes across: tasks, calendar, habits, money, notes, books, trips and your assistant.")
                         .font(Theme.ui(15)).foregroundStyle(Theme.inkSecondary)
                 }
@@ -96,7 +97,7 @@ struct PhoneWelcome: View {
                         if cloud.syncing { Label("Bringing everything over from your Mac…", systemImage: "arrow.triangle.2.circlepath").font(Theme.ui(13)) }
                         else if let s = cloud.status { Text(s).font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary) }
                         if cloud.vaultState == .waiting {
-                            Text("Open Orbit on your Mac once so your API key and Google and GitHub sign-ins come across.").font(Theme.ui(13))
+                            Text("Open Joshu on your Mac once so your API key and Google and GitHub sign-ins come across.").font(Theme.ui(13))
                         }
                         Button("Start", action: onDone).buttonStyle(PrimaryButtonStyle())
                     }
@@ -104,7 +105,7 @@ struct PhoneWelcome: View {
                 if busy { ProgressView() }
                 if let error { Label(error, systemImage: "exclamationmark.triangle.fill").font(Theme.ui(13)).foregroundStyle(Theme.orange) }
                 if !cloud.isSignedIn {
-                    Button("Use Orbit without an account", action: onDone).buttonStyle(.borderless).font(Theme.ui(14))
+                    Button("Use Joshu without an account", action: onDone).buttonStyle(.borderless).font(Theme.ui(14))
                 }
             }
             .padding(24)

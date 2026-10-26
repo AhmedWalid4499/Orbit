@@ -106,7 +106,7 @@ final class AssistantStore: ObservableObject {
         var text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty || !attachments.isEmpty, !busy else { return }
         if text.isEmpty { text = attachments.count == 1 ? "Here's a file. What's in it, and is there anything I should do about it?" : "Here are some files. What's in them, and is there anything I should do about them?" }
-        guard let client = ClaudeClient() else { error = "Add your Anthropic API key in Settings › AI first."; return }
+        guard let client = ClaudeClient() else { error = "This is part of Joshu Pro."; return }
         if system.isEmpty { system = Self.systemPrompt(context: context, apple: apple) }
 
         items.append(ChatItem(role: .user, text: text, files: attachments.isEmpty ? nil : attachments.map(\.name)))
@@ -524,10 +524,10 @@ enum AssistantTools {
             tool("get_ideas", "The user's writing projects and the ideas in each (with what grew from them). project: one project's name, or empty for all. Use before adding to or developing an idea, or when they ask what ideas they have.", [
                 "project": ["type": "string"],
             ]),
-            tool("goodreads_review", "Post the user's review (and star rating) of a book to their Goodreads, and save it as the book's notes in Orbit. Use their words; only polish them if they ask. rating 1-5, or 0 to leave stars as they are.", [
+            tool("goodreads_review", "Post the user's review (and star rating) of a book to their Goodreads, and save it as the book's notes in Joshu. Use their words; only polish them if they ask. rating 1-5, or 0 to leave stars as they are.", [
                 "book": ["type": "string", "description": "the book's title"], "review": ["type": "string"], "rating": ["type": "integer"],
             ]),
-            tool("goodreads_progress", "Update how far the user is in a book, in Orbit and on Goodreads. percent 0-100 (100 = finished), or page with the page they're on (0 if not given).", [
+            tool("goodreads_progress", "Update how far the user is in a book, in Joshu and on Goodreads. percent 0-100 (100 = finished), or page with the page they're on (0 if not given).", [
                 "book": ["type": "string"], "percent": ["type": "integer"], "page": ["type": "integer"],
             ]),
             tool("add_books", "Add books to the reading list. category is optional (empty string for none) and is created if missing.", [
@@ -556,11 +556,11 @@ enum AssistantTools {
             tool("find_nearby", "Find any kind of place near the user right now with Apple Maps (uses their location): food, coffee, a gym, a pharmacy, a barber, a phone repair shop, a mall, a bookshop, a park, somewhere to buy a specific thing… query is what they want (\"food\" when they're just hungry). near: a place, address, area or maps link to search around instead of the user's location (\"Zamalek\", \"Cairo Festival City\", \"the Four Seasons Nile Plaza\", a Google Maps link), or empty for where they are. radius_meters: 1500 for walking distance, up to 8000 if they'll drive or nothing is close.", [
                 "query": ["type": "string"], "near": ["type": "string"], "radius_meters": ["type": "integer"],
             ]),
-            tool("add_place", "Save a place to the Go to list in the bucket list (a restaurant, café, shop, museum… the user liked or wants to try). place is its name with the area or city, or a Google/Apple Maps link. Orbit finds it on the map.", [
+            tool("add_place", "Save a place to the Go to list in the bucket list (a restaurant, café, shop, museum… the user liked or wants to try). place is its name with the area or city, or a Google/Apple Maps link. Joshu finds it on the map.", [
                 "place": ["type": "string"], "notes": ["type": "string", "description": "what they liked or want to try there, or empty"],
-                "category": ["type": "string", "enum": [""] + PlaceCategory.allCases.map(\.rawValue), "description": "empty to let Orbit decide"],
+                "category": ["type": "string", "enum": [""] + PlaceCategory.allCases.map(\.rawValue), "description": "empty to let Joshu decide"],
             ]),
-            tool("add_document", "Track a document or warranty with an expiry date so Orbit reminds the user. expires yyyy-MM-dd or empty.", [
+            tool("add_document", "Track a document or warranty with an expiry date so Joshu reminds the user. expires yyyy-MM-dd or empty.", [
                 "title": ["type": "string"], "kind": ["type": "string", "enum": DocKind.allCases.map(\.rawValue)], "expires": ["type": "string"],
             ]),
             tool("add_subscription", "Track a subscription. amount per charge in the home currency; next_date yyyy-MM-dd or empty.", [
@@ -584,7 +584,7 @@ enum AssistantTools {
                 "fact": ["type": "string"],
             ]),
             tool("forget", "Forget something remembered earlier, found by a word or phrase in it.", ["text": ["type": "string"]]),
-            tool("add_bill", "Track a bill due every month so Orbit reminds the user and marks it paid when the payment shows up. amount 0 if it varies. match: words in the bank text that mean it's paid, comma separated, or empty for the name.", [
+            tool("add_bill", "Track a bill due every month so Joshu reminds the user and marks it paid when the payment shows up. amount 0 if it varies. match: words in the bank text that mean it's paid, comma separated, or empty for the name.", [
                 "name": ["type": "string"], "amount": ["type": "number"], "due_day": ["type": "integer", "description": "1-31"],
                 "remind_days": ["type": "integer", "description": "days before to remind, usually 3"], "match": ["type": "string"],
             ]),
@@ -865,7 +865,7 @@ enum AssistantTools {
             else { return Outcome(result: "Give percent or page.", isError: true) }
             if book.progress >= 1 { book.status = .read; book.finishedAt = book.finishedAt ?? .now } else if book.status == .toRead { book.status = .reading }
             try? context.save()
-            let msg = GoodreadsSync.shared.signedIn ? await GoodreadsSync.shared.pushProgress(book, force: true) : "Saved in Orbit. (Not signed in to Goodreads, so it wasn't sent there.)"
+            let msg = GoodreadsSync.shared.signedIn ? await GoodreadsSync.shared.pushProgress(book, force: true) : "Saved in Joshu. (Not signed in to Goodreads, so it wasn't sent there.)"
             return Outcome(result: msg, action: ChatItem(role: .action, text: "“\(book.title)” → \(Int(book.progress * 100))%", symbol: "book.fill"))
 
         case "read_browser_tab":

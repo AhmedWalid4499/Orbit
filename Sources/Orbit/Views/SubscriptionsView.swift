@@ -53,7 +53,7 @@ struct SubscriptionsView: View {
                 Button { adding = true } label: { Label("Add", systemImage: "plus") }.buttonStyle(SoftButtonStyle())
             }
             if active.isEmpty {
-                EmptyHint(symbol: "repeat", text: "No subscriptions yet. Orbit finds them in your transactions and email receipts, or add one yourself.")
+                EmptyHint(symbol: "repeat", text: "No subscriptions yet. Joshu finds them in your transactions and email receipts, or add one yourself.")
             }
             VStack(spacing: 8) { ForEach(active) { row($0) } }
 

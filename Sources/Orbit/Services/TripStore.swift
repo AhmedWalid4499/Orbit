@@ -60,7 +60,7 @@ enum TripStore {
 
     /// Asks Claude for a packing list for the trip; returns items not on the list yet.
     static func suggestPacking(for trip: Trip) async throws -> [String] {
-        guard let claude = ClaudeClient() else { throw CloudError("Add your Anthropic API key in Settings › AI first.") }
+        guard let claude = ClaudeClient() else { throw CloudError("This is part of Joshu Pro.") }
         let when = [trip.start, trip.end].compactMap { $0?.formatted(.dateTime.day().month(.wide).year()) }.joined(separator: " to ")
         let user = """
         Trip: \(trip.title). Destination: \(trip.destination.isEmpty ? "not set" : trip.destination). Dates: \(when.isEmpty ? "not set" : when)\(trip.nights.map { " (\($0) nights)" } ?? "").

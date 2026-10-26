@@ -28,7 +28,7 @@ enum BookImportError: LocalizedError {
         switch self {
         case .notFound(let s), .unreadable(let s), .network(let s): s
         case .noAccess(let app):
-            "macOS blocked access to \(app)'s library. Turn on Orbit under Full Disk Access (button below), then try again."
+            "macOS blocked access to \(app)'s library. Turn on Joshu under Full Disk Access (button below), then try again."
         }
     }
 }
@@ -502,7 +502,7 @@ enum KindleMac {
                                   forKey: "kindleDiagnostics")
         throw BookImportError.notFound(dbs.isEmpty
             ? "The Kindle app hasn't stored a library on this Mac yet. Open Kindle for Mac, sign in and let it sync, then try again."
-            : "Orbit could open Kindle's data but didn't recognise the book list. Use “Copy details” and share them so it can be fixed.")
+            : "Joshu could open Kindle's data but didn't recognise the book list. Use “Copy details” and share them so it can be fixed.")
     }
 }
 

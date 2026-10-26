@@ -46,7 +46,7 @@ struct MoneyRulesSheet: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Learned from you").font(Theme.display(20))
                     if rules.isEmpty {
-                        Text("Change an expense's category (\(Platform.isPhone ? "long-press it" : "right-click it") › Category) and Orbit files that shop the same way from then on, including email, bank texts and receipts.")
+                        Text("Change an expense's category (\(Platform.isPhone ? "long-press it" : "right-click it") › Category) and Joshu files that shop the same way from then on, including email, bank texts and receipts.")
                             .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
                     }
                     ForEach(rules.keys.sorted(), id: \.self) { merchant in

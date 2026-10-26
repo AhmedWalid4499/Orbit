@@ -88,7 +88,7 @@ struct DayView: View {
                 Text(e.allDay ? "All day" : e.start.formatted(date: .omitted, time: .shortened)).font(.caption2).foregroundStyle(.secondary)
                 Text(e.title).font(.headline).lineLimit(1)
             } else {
-                Text("Orbit").font(.caption2).foregroundStyle(.secondary)
+                Text("Joshu").font(.caption2).foregroundStyle(.secondary)
                 Text("No more events").font(.headline).lineLimit(1)
             }
             let s = entry.snap

@@ -120,7 +120,7 @@ final class Reminders: NSObject, ObservableObject, UNUserNotificationCenterDeleg
                     add("billsoon-\(id)", "\(b.name) is due in \(b.remindDays) day\(b.remindDays == 1 ? "" : "s")",
                         "Due \(c.due.formatted(.dateTime.weekday(.wide).day().month()))\(amount).", at: at(c.due.adding(days: -b.remindDays), 10), route: "money")
                 }
-                add("billday-\(id)", "\(b.name) is due today", "Pay it today\(amount). Orbit marks it paid when the payment shows up.",
+                add("billday-\(id)", "\(b.name) is due today", "Pay it today\(amount). Joshu marks it paid when the payment shows up.",
                     at: at(c.due, 9), route: "money")
             }
         }
@@ -297,7 +297,7 @@ struct NotificationSettingsView: View {
         Form {
             if r.authorized == false {
                 Section {
-                    Label("Notifications are off for Orbit.", systemImage: "bell.slash")
+                    Label("Notifications are off for Joshu.", systemImage: "bell.slash")
                     HStack {
                         Button("Allow notifications") { Task { await r.requestAuthorization() } }
                         Button("Open System Settings") {
@@ -331,13 +331,13 @@ struct NotificationSettingsView: View {
             }
             #if os(macOS)
             Section {
-                Toggle("Open Orbit when I log in", isOn: Binding(get: { r.openAtLogin }, set: { r.openAtLogin = $0 }))
-                Text("Orbit schedules the next two days of reminders ahead, so they arrive even when it's closed. Opening it at login keeps them up to date.")
+                Toggle("Open Joshu when I log in", isOn: Binding(get: { r.openAtLogin }, set: { r.openAtLogin = $0 }))
+                Text("Joshu schedules the next two days of reminders ahead, so they arrive even when it's closed. Opening it at login keeps them up to date.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             #endif
             Section {
-                Toggle("Play a little chime when Orbit opens", isOn: $launchSound)
+                Toggle("Play a little chime when Joshu opens", isOn: $launchSound)
             }
         }
         .formStyle(.grouped)

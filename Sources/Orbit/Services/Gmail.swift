@@ -95,7 +95,7 @@ enum GoogleAuth {
             "client_id": clientID, "client_secret": clientSecret, "code_verifier": verifier,
         ])
         guard let refresh = tokens["refresh_token"] as? String, let access = tokens["access_token"] as? String else {
-            throw GmailError("Google didn't return a refresh token. Remove Orbit from your Google account's third-party access and try again.")
+            throw GmailError("Google didn't return a refresh token. Remove Joshu from your Google account's third-party access and try again.")
         }
         return (refresh, access, tokens["expires_in"] as? Int ?? 3600)
     }
@@ -304,6 +304,12 @@ final class InboxStore: ObservableObject {
     func reloadAccounts() { accounts = UserDefaults.standard.stringArray(forKey: "gmailAccounts") ?? [] }
 
     func addAccount(hint: String? = nil) async {
+        // Joshu Free connects one email account; more is part of Pro.
+        if hint == nil, !Pro.shared.canAddEmail(existing: accounts.count) {
+            error = "Joshu Free connects one email account. Get Joshu Pro to add more."
+            AppState.current?.proOpen = true
+            return
+        }
         signingIn = true
         error = nil
         defer { signingIn = false }
@@ -340,7 +346,7 @@ final class InboxStore: ObservableObject {
 
     func refresh() async {
         guard isConnected, !loading, !Snapshot.isActive else { return }
-        guard let claude = ClaudeClient() else { error = "Add your Anthropic API key in Settings › AI to get inbox summaries."; return }
+        guard let claude = ClaudeClient() else { error = "Get Joshu Pro to get inbox summaries."; return }
         loading = true
         error = nil
         defer { loading = false }

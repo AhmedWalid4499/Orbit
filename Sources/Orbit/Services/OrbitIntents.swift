@@ -3,11 +3,11 @@ import SwiftData
 import Foundation
 
 // Siri and Shortcuts. These run inside Orbit; the build script extracts their metadata
-// (Metadata.appintents) so macOS knows about them. Phrases say the app's name, e.g. "Add to Orbit".
+// (Metadata.appintents) so macOS knows about them. Phrases say the app's name, e.g. "Add to Joshu".
 
 @MainActor
 private func orbitContext() throws -> ModelContext {
-    guard let container = OrbitStore.container else { throw IntentError.message("Orbit isn't ready yet. Try again in a moment.") }
+    guard let container = OrbitStore.container else { throw IntentError.message("Joshu isn't ready yet. Try again in a moment.") }
     return container.mainContext
 }
 
@@ -19,13 +19,13 @@ enum IntentError: Error, CustomLocalizedStringResourceConvertible {
 }
 
 struct AddToOrbitIntent: AppIntent {
-    static let title: LocalizedStringResource = "Add to Orbit"
-    static let description = IntentDescription("Add a task, event, expense, note or journal line. Orbit works out which from what you say, e.g. “dentist Thursday at 3” or “$12 lunch”.")
+    static let title: LocalizedStringResource = "Add to Joshu"
+    static let description = IntentDescription("Add a task, event, expense, note or journal line. Joshu works out which from what you say, e.g. “dentist Thursday at 3” or “$12 lunch”.")
 
     @Parameter(title: "What", requestValueDialog: "What should I add?")
     var text: String
 
-    static var parameterSummary: some ParameterSummary { Summary("Add \(\.$text) to Orbit") }
+    static var parameterSummary: some ParameterSummary { Summary("Add \(\.$text) to Joshu") }
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
@@ -63,8 +63,8 @@ struct TodayIntent: AppIntent {
 }
 
 struct AskOrbitIntent: AppIntent {
-    static let title: LocalizedStringResource = "Ask Orbit"
-    static let description = IntentDescription("Ask your Orbit assistant a question about your day, money, plans or anything else.")
+    static let title: LocalizedStringResource = "Ask Joshu"
+    static let description = IntentDescription("Ask your Joshu assistant a question about your day, money, plans or anything else.")
 
     @Parameter(title: "Question", requestValueDialog: "What would you like to ask?")
     var question: String
@@ -72,7 +72,7 @@ struct AskOrbitIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
         let context = try orbitContext()
-        guard let client = ClaudeClient() else { throw IntentError.message("Add your Anthropic API key in Orbit's Settings first.") }
+        guard let client = ClaudeClient() else { throw IntentError.message("Get Joshu Pro in the app first.") }
         let system = """
         You are \(AssistantName.current), the user's assistant in Orbit, answering through Siri or Shortcuts. Reply in 1-3 short, spoken-style sentences, plain text, no lists or markdown.
         Use the user's data below when it helps.
@@ -86,7 +86,7 @@ struct AskOrbitIntent: AppIntent {
 
 struct LogExpenseIntent: AppIntent {
     static let title: LocalizedStringResource = "Log an Expense"
-    static let description = IntentDescription("Add money you spent to Orbit.")
+    static let description = IntentDescription("Add money you spent to Joshu.")
 
     @Parameter(title: "Amount") var amount: Double
     @Parameter(title: "What for", default: "Expense") var what: String
@@ -113,7 +113,7 @@ struct LogBankMessageIntent: AppIntent {
     /// The whole Shortcut Input, used when the message's Content comes through empty (plain text, a shared note, a test).
     @Parameter(title: "Whole input", default: "") var fullInput: String
 
-    static var parameterSummary: some ParameterSummary { Summary("Log \(\.$message) from \(\.$sender) in Orbit") }
+    static var parameterSummary: some ParameterSummary { Summary("Log \(\.$message) from \(\.$sender) in Joshu") }
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
@@ -122,7 +122,7 @@ struct LogBankMessageIntent: AppIntent {
         let from = sender.count > 40 || sender == message ? "" : sender
         let result: String
         do { result = await BankMessages.log(message: message, sender: from, context: try orbitContext()) }
-        catch { AutoLogActivity.record(.sms, sender: from, text: message, result: "Orbit wasn't ready: \(error.localizedDescription)"); throw error }
+        catch { AutoLogActivity.record(.sms, sender: from, text: message, result: "Joshu wasn't ready: \(error.localizedDescription)"); throw error }
         // Ordinary texts (from friends, OTPs…) also reach Orbit when the automation runs on every message: they're
         // ignored here and kept out of the activity list, so it only shows bank texts.
         if !result.hasPrefix("Not from one of your banks") {
@@ -148,16 +148,16 @@ struct LogCardPaymentIntent: AppIntent {
         let what = "\(amount) · \(merchant)"
         let result: String
         do { result = await BankMessages.logCardTap(amount: amount, merchant: merchant, card: card, context: try orbitContext()) }
-        catch { AutoLogActivity.record(.wallet, sender: card, text: what, result: "Orbit wasn't ready: \(error.localizedDescription)"); throw error }
+        catch { AutoLogActivity.record(.wallet, sender: card, text: what, result: "Joshu wasn't ready: \(error.localizedDescription)"); throw error }
         AutoLogActivity.record(.wallet, sender: card, text: what, result: result)
         return .result(value: result, dialog: IntentDialog(stringLiteral: result))
     }
 }
 
-/// Saves a place to Bucket list › Go to. Shared from Google or Apple Maps through the "Orbit Go To" shortcut, or said to Siri.
+/// Saves a place to Bucket list › Go to. Shared from Google or Apple Maps through the "Joshu Go To" shortcut, or said to Siri.
 struct AddPlaceIntent: AppIntent {
     static let title: LocalizedStringResource = "Add Place to Go To"
-    static let description = IntentDescription("Saves a restaurant, café, shop, museum or any place to your Go to list, from its name or a Google or Apple Maps link. Orbit finds it on the map and works out what kind of place it is.")
+    static let description = IntentDescription("Saves a restaurant, café, shop, museum or any place to your Go to list, from its name or a Google or Apple Maps link. Joshu finds it on the map and works out what kind of place it is.")
 
     @Parameter(title: "Place", requestValueDialog: "Which place?") var place: String
     @Parameter(title: "Notes", default: "") var notes: String
@@ -178,13 +178,13 @@ struct OrbitShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(intent: AddToOrbitIntent(), phrases: [
             "Add to \(.applicationName)", "Add something to \(.applicationName)", "Capture in \(.applicationName)",
-        ], shortTitle: "Add to Orbit", systemImageName: "plus.circle")
+        ], shortTitle: "Add to Joshu", systemImageName: "plus.circle")
         AppShortcut(intent: TodayIntent(), phrases: [
             "What's on today in \(.applicationName)", "What's my day in \(.applicationName)", "\(.applicationName) today",
         ], shortTitle: "What's on today", systemImageName: "sun.max")
         AppShortcut(intent: AskOrbitIntent(), phrases: [
             "Ask \(.applicationName)", "Ask \(.applicationName) a question",
-        ], shortTitle: "Ask Orbit", systemImageName: "sparkles")
+        ], shortTitle: "Ask Joshu", systemImageName: "sparkles")
         AppShortcut(intent: LogExpenseIntent(), phrases: [
             "Log an expense in \(.applicationName)", "Add an expense to \(.applicationName)",
         ], shortTitle: "Log expense", systemImageName: "creditcard")

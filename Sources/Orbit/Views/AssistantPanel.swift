@@ -52,8 +52,9 @@ struct AssistantPanel: View {
                 VStack(spacing: 12) {
                     Spacer()
                     AssistantAvatar(size: 56)
-                    Text("Add your Anthropic API key to chat with \(assistantName).").font(Theme.ui(13)).multilineTextAlignment(.center)
-                    OpenSettingsLink { Text("Open Settings") }.buttonStyle(SoftButtonStyle())
+                    Text("\(assistantName) comes with Joshu Pro").font(Theme.display(22)).foregroundStyle(Theme.ink)
+                    Text("Ask anything, plan your week, write and code with \(assistantName), by voice or text.").font(Theme.ui(13)).multilineTextAlignment(.center)
+                    Button("See Joshu Pro") { state.proOpen = true }.buttonStyle(PrimaryButtonStyle()).fixedSize()
                     Spacer()
                 }
                 .foregroundStyle(Theme.inkSecondary)

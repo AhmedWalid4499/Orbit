@@ -42,7 +42,7 @@ struct WaitingView: View {
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: "iphone.radiowaves.left.and.right").font(.title2).foregroundStyle(WatchTheme.lime)
-            Text("Open Orbit on your iPhone once").font(.headline).multilineTextAlignment(.center)
+            Text("Open Joshu on your iPhone once").font(.headline).multilineTextAlignment(.center)
             Text("Your day appears here as soon as they connect.").font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
         }
     }
@@ -96,7 +96,7 @@ struct TodayPage: View {
                 WaitingView()
             }
         }
-        .navigationTitle("Orbit")
+        .navigationTitle("Joshu")
         .refreshable { store.refresh() }
     }
 
@@ -187,7 +187,7 @@ struct HabitsPage: View {
     var body: some View {
         ScrollView {
             if let s = store.snapshot {
-                if s.habits.isEmpty { Text("No habits yet. Add them in Orbit on your iPhone.").font(.footnote).foregroundStyle(.secondary) }
+                if s.habits.isEmpty { Text("No habits yet. Add them in Joshu on your iPhone.").font(.footnote).foregroundStyle(.secondary) }
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)], spacing: 6) {
                     ForEach(Array(s.habits.enumerated()), id: \.element.id) { i, h in
                         let done = h.done != store.pendingHabits.contains(h.id)
@@ -281,7 +281,7 @@ struct AskPage: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 8) {
                 if store.snapshot?.hasAI == false {
-                    Text("Add your API key in Orbit on your iPhone to ask questions here.").font(.footnote).foregroundStyle(.secondary)
+                    Text("Get Joshu Pro on your iPhone to ask questions here.").font(.footnote).foregroundStyle(.secondary)
                 }
                 TextField("Ask \(store.snapshot?.assistantName ?? "Ask")…", text: $question)
                     .submitLabel(.send)

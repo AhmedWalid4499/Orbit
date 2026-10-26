@@ -8,7 +8,7 @@ import Security
 @MainActor
 final class Updater: ObservableObject {
     static let shared = Updater()
-    static let repo = "AhmedWalid4499/Orbit"
+    static let repo = "AhmedWalid4499/Joshu"
 
     struct Release: Equatable {
         let version: String
@@ -80,14 +80,14 @@ final class Updater: ObservableObject {
         let alert = NSAlert()
         switch state {
         case .available(let r):
-            alert.messageText = "A new version of Orbit is available"
-            alert.informativeText = (r.notes.isEmpty ? "" : r.notes + "\n\n") + "Orbit will restart to finish."
+            alert.messageText = "A new version of Joshu is available"
+            alert.informativeText = (r.notes.isEmpty ? "" : r.notes + "\n\n") + "Joshu will restart to finish."
             alert.addButton(withTitle: "Install Now")
             alert.addButton(withTitle: "Later")
             if alert.runModal() == .alertFirstButtonReturn { await install() }
         case .upToDate:
             alert.messageText = "You're up to date"
-            alert.informativeText = "You have the latest version of Orbit."
+            alert.informativeText = "You have the latest version of Joshu."
             alert.runModal()
         case .failed(let message):
             alert.messageText = "Couldn't check for updates"
@@ -269,7 +269,7 @@ struct UpdatePanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(updater.available == nil ? "Orbit" : "A new version is available").font(.headline)
+                Text(updater.available == nil ? "Joshu" : "A new version is available").font(.headline)
                 Spacer()
                 switch updater.state {
                 case .checking:

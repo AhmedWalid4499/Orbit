@@ -102,8 +102,8 @@ final class GoodreadsSync: NSObject, ObservableObject, WKNavigationDelegate {
         case "ok":
             status = "Posted your review of “\(book.title)” to Goodreads."
             return status ?? ""
-        case "noform": return "Goodreads' review page has changed, so Orbit couldn't post it. Your review is saved in Orbit."
-        default: return "Goodreads didn't accept the review (\(out ?? "no answer")). It's saved in Orbit."
+        case "noform": return "Goodreads' review page has changed, so Joshu couldn't post it. Your review is saved in Joshu."
+        default: return "Goodreads didn't accept the review (\(out ?? "no answer")). It's saved in Joshu."
         }
     }
 
@@ -259,7 +259,7 @@ struct GoodreadsSyncRow: View {
                 BrandLogo(brand: .goodreads, size: 28)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Goodreads updates").font(.headline)
-                    Text(sync.signedIn ? "Orbit sends your progress and reviews to Goodreads." : "Sign in once so Orbit can update your progress and post your reviews.")
+                    Text(sync.signedIn ? "Joshu sends your progress and reviews to Goodreads." : "Sign in once so Joshu can update your progress and post your reviews.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()

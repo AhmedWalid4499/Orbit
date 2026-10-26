@@ -18,7 +18,7 @@ struct PhoneConnections: View {
         List {
             if cloud.vaultState == .waiting {
                 Section {
-                    Label("Waiting for your Mac to share your sign-ins. Open Orbit on the Mac once (signed in) and they'll appear here.",
+                    Label("Waiting for your Mac to share your sign-ins. Open Joshu on the Mac once (signed in) and they'll appear here.",
                           systemImage: "hourglass").font(Theme.ui(14))
                 }
             }
@@ -97,7 +97,7 @@ struct PhoneConnections: View {
                     Spacer()
                     Button(goodreadsUser.isEmpty ? "Connect" : "Options") { readingSources = true }.buttonStyle(SoftButtonStyle())
                 }
-                Text("Apple Books and Kindle are imported by Orbit on your Mac, and the books then appear here on their own.").font(Theme.ui(12)).foregroundStyle(Theme.inkMuted)
+                Text("Apple Books and Kindle are imported by Joshu on your Mac, and the books then appear here on their own.").font(Theme.ui(12)).foregroundStyle(Theme.inkMuted)
             }
             OtherConnections()
         }

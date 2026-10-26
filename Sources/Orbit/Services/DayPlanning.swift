@@ -76,7 +76,7 @@ final class PlanChat: ObservableObject {
     func send(_ text: String, draft: PlanDraft, context: ModelContext, apple: AppleSync) async {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !busy else { return }
-        guard let client = ClaudeClient() else { error = "Add your Anthropic API key in Settings › AI to plan with \(AssistantName.current)."; return }
+        guard let client = ClaudeClient() else { error = "Get Joshu Pro to plan with \(AssistantName.current)."; return }
         items.append(ChatItem(role: .user, text: text))
         messages.append(["role": "user", "content": text])
         busy = true

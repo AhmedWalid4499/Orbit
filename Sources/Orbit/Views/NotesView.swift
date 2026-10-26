@@ -296,9 +296,7 @@ struct JournalEditor: View {
             if !ai.hasKey {
                 VStack(spacing: 12) {
                     Spacer()
-                    Text("Add your Anthropic API key to chat about your day.").font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
-                        .multilineTextAlignment(.center)
-                    OpenSettingsLink { Text("Open Settings") }.buttonStyle(SoftButtonStyle())
+                    ProUpsell(title: "Chat about your day", detail: "Journal with \(AssistantName.current). Part of Joshu Pro.").frame(maxWidth: 460)
                     Spacer()
                 }
                 .padding(24)

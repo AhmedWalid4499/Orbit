@@ -46,7 +46,7 @@ struct SplashView: View {
             .offset(x: x, y: y)
         return ZStack {
             if depth <= 0 { dot }
-            Text("orbit")
+            Text("joshu")
                 .font(.system(size: 104, weight: .black, design: .rounded))
                 .tracking(-3)
                 .foregroundStyle(Theme.ink)

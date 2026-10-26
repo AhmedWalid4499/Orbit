@@ -80,7 +80,7 @@ struct KeepImportButton: View {
             Button("Choose the Keep folder…") { picking = true }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Google doesn't let apps sign in to Keep for personal accounts, so Orbit reads Google's export instead.\n\n1. Open Google Takeout, keep only Keep selected and export.\n2. Download and unzip it.\n3. Choose its Takeout › Keep folder here.\n\nYou can do it again any time; notes already imported are skipped.")
+            Text("Google doesn't let apps sign in to Keep for personal accounts, so Joshu reads Google's export instead.\n\n1. Open Google Takeout, keep only Keep selected and export.\n2. Download and unzip it.\n3. Choose its Takeout › Keep folder here.\n\nYou can do it again any time; notes already imported are skipped.")
         }
         .fileImporter(isPresented: $picking, allowedContentTypes: [.folder, .json], allowsMultipleSelection: true) { result in
             guard case .success(let urls) = result else { return }

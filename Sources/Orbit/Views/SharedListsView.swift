@@ -16,7 +16,7 @@ struct SharedListsView: View {
                 Card {
                     VStack(alignment: .leading, spacing: 8) {
                         Label("Sign in to share lists", systemImage: "person.2.fill").font(Theme.ui(15, weight: .semibold))
-                        Text("Shared lists go through your Orbit account. Sign in under Settings › Account, then make a list and send its code to anyone with Orbit.")
+                        Text("Shared lists go through your Joshu account. Sign in under Settings › Account, then make a list and send its code to anyone with Joshu.")
                             .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
                     }
                 }

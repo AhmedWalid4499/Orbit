@@ -135,7 +135,7 @@ struct MenuBarView: View {
             HStack {
                 Button("Quick capture") { CapturePanel.shared.show() }.buttonStyle(SoftButtonStyle())
                 Spacer()
-                Button("Open Orbit") {
+                Button("Open Joshu") {
                     NSApp.activate(ignoringOtherApps: true)
                     openWindow(id: "main")
                 }

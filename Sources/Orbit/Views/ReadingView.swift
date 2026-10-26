@@ -282,7 +282,7 @@ struct ReadingView: View {
                     Text("Bring in your Kindle highlights and notes:").font(Theme.ui(14, weight: .semibold))
                     Text("• **Kindle e-reader:** plug it in with USB, open it in Finder, and import **documents › My Clippings.txt**.")
                     Text("• **Kindle app on iPhone, iPad or Android:** open a book › Notebook › Share › **Export notebook**, send the file to your Mac, and import it.")
-                    Text("Orbit matches highlights to the books in your library and skips ones it already has.").foregroundStyle(Theme.inkMuted)
+                    Text("Joshu matches highlights to the books in your library and skips ones it already has.").foregroundStyle(Theme.inkMuted)
                 }
                 .font(Theme.ui(13)).padding(18).frame(maxWidth: .infinity, alignment: .leading)
                 .background(RoundedRectangle(cornerRadius: 16).fill(Theme.card))
@@ -994,7 +994,7 @@ struct ReadingSourcesSheet: View {
                     confirmDisconnect = nil
                 }
             } message: {
-                Text("Books that came only from \(confirmDisconnect == "apple" ? "Apple Books" : "Kindle") are deleted from Orbit, on all your devices. Books also on Goodreads or added by you stay.")
+                Text("Books that came only from \(confirmDisconnect == "apple" ? "Apple Books" : "Kindle") are deleted from Joshu, on all your devices. Books also on Goodreads or added by you stay.")
             }
     }
 
@@ -1002,7 +1002,7 @@ struct ReadingSourcesSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Connect & import").font(Theme.display(28))
-                Text("Books are matched by title and author, so syncing again never creates duplicates, and shelves you set in Orbit are never moved backwards.")
+                Text("Books are matched by title and author, so syncing again never creates duplicates, and shelves you set in Joshu are never moved backwards.")
                     .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
 
                 if Platform.isPhone {
@@ -1036,7 +1036,7 @@ struct ReadingSourcesSheet: View {
                 }
 
                 source("Goodreads", symbol: "g.circle.fill", color: Theme.peach, key: "goodreads", linked: Goodreads.userID(from: sync.goodreadsUser) != nil) {
-                    Text("Orbit reads your public Goodreads shelves. Paste your profile link or user ID (goodreads.com/user/show/12345-yourname).")
+                    Text("Joshu reads your public Goodreads shelves. Paste your profile link or user ID (goodreads.com/user/show/12345-yourname).")
                     HStack {
                         TextField("Profile link or user ID", text: $sync.goodreadsUser).textFieldStyle(.roundedBorder)
                         Button("Sync") {
@@ -1118,7 +1118,7 @@ struct ReadingSourcesSheet: View {
                 .frame(width: 34, height: 34).background(RoundedRectangle(cornerRadius: 10).fill(Theme.cyan))
             VStack(alignment: .leading, spacing: 4) {
                 Text("Apple Books and Kindle").font(Theme.ui(15, weight: .semibold))
-                Text("iPhone doesn't let apps read these libraries, so Orbit on your Mac imports them and the books appear here on their own.")
+                Text("iPhone doesn't let apps read these libraries, so Joshu on your Mac imports them and the books appear here on their own.")
                     .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
                 let counts = (apple: books.filter { $0.sources.contains("apple-books") || $0.source == "apple-books" }.count,
                               kindle: books.filter { $0.sources.contains("kindle") || $0.source == "kindle" }.count)
@@ -1139,13 +1139,13 @@ struct ReadingSourcesSheet: View {
                 Image(systemName: "lock.shield.fill").foregroundStyle(Theme.orange)
                 Text("One step to connect Apple Books and Kindle").font(Theme.ui(15, weight: .semibold))
             }
-            Text("macOS keeps those libraries private until you let Orbit read them with Full Disk Access.")
+            Text("macOS keeps those libraries private until you let Joshu read them with Full Disk Access.")
                 .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
             VStack(alignment: .leading, spacing: 6) {
                 step(1, "Click **Open Full Disk Access** below.")
-                step(2, "Click **+** under the list, then pick **Orbit** in Applications and click **Open**. (Or drag Orbit from the Finder window into the list.)")
-                step(3, "Make sure the switch next to Orbit is **on**.")
-                step(4, "Click **Relaunch Orbit**. Your Apple Books and Kindle books are imported right after.")
+                step(2, "Click **+** under the list, then pick **Joshu** in Applications and click **Open**. (Or drag Joshu from the Finder window into the list.)")
+                step(3, "Make sure the switch next to Joshu is **on**.")
+                step(4, "Click **Relaunch Joshu**. Your Apple Books and Kindle books are imported right after.")
             }
             #if os(macOS)
             HStack(spacing: 8) {
@@ -1153,9 +1153,9 @@ struct ReadingSourcesSheet: View {
                     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
                 }
                 .buttonStyle(.borderedProminent)
-                Button("Show Orbit in Finder") { NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL]) }
+                Button("Show Joshu in Finder") { NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL]) }
                 Spacer()
-                Button("Relaunch Orbit") { Updater.relaunch() }
+                Button("Relaunch Joshu") { Updater.relaunch() }
             }
             #endif
         }

@@ -25,7 +25,7 @@ enum Browser {
             ? "tell application \"Google Chrome\" to if (count of windows) > 0 then return (title of active tab of front window) & \"\n\" & (URL of active tab of front window)"
             : "tell application \"Safari\" to if (count of windows) > 0 then return (name of current tab of front window) & \"\n\" & (URL of current tab of front window)"
         guard let head = await run(info) else {
-            return .failure(BrowserError("Orbit isn't allowed to see \(app) yet. Allow it in System Settings › Privacy & Security › Automation › Orbit › \(app)."))
+            return .failure(BrowserError("Joshu isn't allowed to see \(app) yet. Allow it in System Settings › Privacy & Security › Automation › Joshu › \(app)."))
         }
         let parts = head.components(separatedBy: "\n")
         guard parts.count >= 2 else { return .failure(BrowserError("\(app) has no window open.")) }

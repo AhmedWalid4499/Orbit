@@ -173,7 +173,7 @@ enum StatementImport {
         guard text.trimmingCharacters(in: .whitespacesAndNewlines).count > 40 else {
             throw CloudError("This PDF has no text (it's probably scanned). Download the CSV version from your bank instead.")
         }
-        guard let claude = ClaudeClient() else { throw CloudError("Reading PDF statements needs your Anthropic API key (Settings › AI). CSV files work without it.") }
+        guard let claude = ClaudeClient() else { throw CloudError("Reading PDF statements needs Joshu Pro. CSV files work without it.") }
         let system = """
         You read bank and card statements. Return every transaction line as {date (yyyy-MM-dd), description, amount}.
         amount is negative for money out (purchases, withdrawals, fees, transfers out) and positive for money in (salary, deposits, refunds).
@@ -363,7 +363,7 @@ struct StatementImportSheet: View {
             chip("\(rows.count) transactions", Theme.cyan)
             chip("\(Fmt.money(out)) out", Theme.peach)
             chip("\(Fmt.money(into)) in", Theme.mint)
-            if dups > 0 { chip("\(dups) already in Orbit", Theme.card) }
+            if dups > 0 { chip("\(dups) already in Joshu", Theme.card) }
             Spacer()
         }
     }
@@ -387,7 +387,7 @@ struct StatementImportSheet: View {
                             .frame(width: 80, alignment: .leading)
                         Text(r.text).font(Theme.ui(13)).lineLimit(1)
                         if r.duplicate {
-                            Text("Already in Orbit").font(Theme.ui(10, weight: .semibold)).foregroundStyle(Theme.inkMuted)
+                            Text("Already in Joshu").font(Theme.ui(10, weight: .semibold)).foregroundStyle(Theme.inkMuted)
                                 .padding(.horizontal, 6).padding(.vertical, 2).background(Capsule().fill(Theme.canvas))
                         }
                         Spacer()

@@ -75,8 +75,7 @@ struct ReviewView: View {
             moodStrip(s)
 
             if ai.hasKey { reflectionCard(s) } else {
-                Text("Add your Anthropic API key in Settings › AI and \(AssistantName.current) will write your review and suggest next week's focus.")
-                    .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
+                ProUpsell(title: "Your week, reviewed", detail: "\(AssistantName.current) writes your review and suggests next week's focus. Part of Joshu Pro.")
             }
 
             AdaptiveStack(spacing: 16) {

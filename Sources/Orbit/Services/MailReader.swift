@@ -35,7 +35,7 @@ struct MailListItem: Identifiable, Equatable {
 enum MailReader {
     struct NeedsPermission: LocalizedError {
         let account: String
-        var errorDescription: String? { "Orbit needs your OK to send from \(account). Tap “Allow sending” and approve it once." }
+        var errorDescription: String? { "Joshu needs your OK to send from \(account). Tap “Allow sending” and approve it once." }
     }
 
     static func message(_ id: String, account: String) async throws -> MailMessage {

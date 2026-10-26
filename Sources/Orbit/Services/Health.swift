@@ -284,8 +284,8 @@ struct HealthConnectionRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Apple Health").font(.headline)
                     Text(Platform.isPhone
-                         ? (health.connected ? "Steps, sleep, workouts and heart rate, in Insights. Workout habits tick themselves off." : "Read steps, sleep, workouts and heart rate. Orbit never writes to Health.")
-                         : (health.hasData ? "Synced from your iPhone." : "Connect it in Orbit on your iPhone; the summary then shows here too."))
+                         ? (health.connected ? "Steps, sleep, workouts and heart rate, in Insights. Workout habits tick themselves off." : "Read steps, sleep, workouts and heart rate. Joshu never writes to Health.")
+                         : (health.hasData ? "Synced from your iPhone." : "Connect it in Joshu on your iPhone; the summary then shows here too."))
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -300,7 +300,7 @@ struct HealthConnectionRow: View {
             if let e = health.error { Text(e).font(.caption).foregroundStyle(Theme.orange) }
             #if os(iOS)
             if health.connected {
-                Text("To stop sharing completely, also turn Orbit off in the Health app › Sharing › Apps.").font(.caption2).foregroundStyle(.secondary)
+                Text("To stop sharing completely, also turn Joshu off in the Health app › Sharing › Apps.").font(.caption2).foregroundStyle(.secondary)
             }
             #endif
         }

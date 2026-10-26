@@ -22,7 +22,7 @@ struct BillsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Bills").font(Theme.display(24))
                     let left = BillTracker.leftThisMonth(bills, transactions: transactions)
-                    Text(bills.isEmpty ? "Add the bills you pay every month. Orbit reminds you before each one."
+                    Text(bills.isEmpty ? "Add the bills you pay every month. Joshu reminds you before each one."
                          : left > 0 ? "\(Fmt.money(left)) still to pay this month" : "All paid this month")
                         .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
                 }
@@ -33,7 +33,7 @@ struct BillsView: View {
                 Card {
                     VStack(alignment: .leading, spacing: 10) {
                         EmptyHint(symbol: "doc.text", text: "No bills yet.")
-                        Text("When a bank text or receipt with the bill's name comes in near the due date, Orbit marks it paid for you.")
+                        Text("When a bank text or receipt with the bill's name comes in near the due date, Joshu marks it paid for you.")
                             .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
                         HStack {
                             ForEach(["Rent", "Internet", "Phone", "Electricity"], id: \.self) { n in

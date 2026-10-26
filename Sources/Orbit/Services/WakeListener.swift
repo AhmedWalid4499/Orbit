@@ -94,7 +94,7 @@ final class WakeListener: ObservableObject {
     }
 
     private func tick() async {
-        // Talking to Yuki is part of Joshu Pro.
+        // Talking to the assistant is part of Joshu Pro.
         guard (enabled || inConversation), appActive, AIAssistant.shared.hasKey, !Snapshot.isActive else { if listening { stop() }; return }
         if busy {
             if listening { stop() }

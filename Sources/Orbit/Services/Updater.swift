@@ -8,7 +8,7 @@ import Security
 @MainActor
 final class Updater: ObservableObject {
     static let shared = Updater()
-    static let repo = "AhmedWalid4499/Joshu"
+    static let repo = "AhmedWalid4499/Orbit"  // where releases live (internal, not the app name)
 
     struct Release: Equatable {
         let version: String

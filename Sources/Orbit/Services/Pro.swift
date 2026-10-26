@@ -2,7 +2,7 @@ import Foundation
 import StoreKit
 import SwiftUI
 
-/// Joshu Pro: the subscription that unlocks Yuki and everything built on it.
+/// Joshu Pro: the subscription that unlocks the AI assistant (named by you) and everything built on it.
 ///
 /// Free: everything except the AI. That means no assistant, morning brief, email summaries, day summary, money coach,
 /// LinkedIn tab (it's the AI reading your Gmail) or AI extras, and one email account.

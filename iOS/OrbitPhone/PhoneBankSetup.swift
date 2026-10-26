@@ -43,7 +43,7 @@ struct PhoneBankSetup: View {
                         "Tap the red **Joshu Bank Message** tile in the top row (swipe the row sideways if you don't see it).",
                         "Once a bank text shows up under Recent activity, turn **Notify When Run** off again: the automation runs for most texts, and Joshu quietly ignores the ones that aren't from your banks, on your iPhone.",
                         "Already made automations for EGP or other words? Delete them, so the same text isn't sent twice.",
-                    ], file: "Joshu Bank Message")
+                    ], file: "Orbit Bank Message")
 
                     guide("Apple Pay", symbol: "wave.3.right", color: Theme.lime, steps: [
                         "First open the **Wallet** app and tap your card. If your recent Apple Pay purchases aren't listed there, your bank doesn't share them with iPhone and this automation can never run: use bank texts above instead.",
@@ -51,7 +51,7 @@ struct PhoneBankSetup: View {
                         "In Shortcuts: **Automation** tab › **+** › **Wallet** (called **Transaction** on some iPhones).",
                         "Pick your cards, choose **Run Immediately** and switch on **Notify When Run**. Tap **Next**.",
                         "Tap the green **Joshu Card Payment** tile in the top row. That's it.",
-                    ], file: "Joshu Card Payment")
+                    ], file: "Orbit Card Payment")
 
                     Button { Platform.open(URL(string: "shortcuts://")!) } label: {
                         Label("Open Shortcuts", systemImage: "square.2.layers.3d").frame(maxWidth: .infinity)
@@ -189,7 +189,7 @@ struct PhoneBankSetup: View {
             Button {
                 let text = "\(BankMessages.testPrefix) Your card was charged EGP 25.00 at Cafe"
                 var c = URLComponents(string: "shortcuts://run-shortcut")!
-                c.queryItems = [.init(name: "name", value: "Joshu Bank Message"), .init(name: "input", value: "text"), .init(name: "text", value: text)]
+                c.queryItems = [.init(name: "name", value: "Orbit Bank Message"), .init(name: "input", value: "text"), .init(name: "text", value: text)]
                 UserDefaults.standard.set(Date.now.timeIntervalSince1970, forKey: "bankSMS.testStarted")
                 if let url = c.url { Platform.open(url) }
             } label: {

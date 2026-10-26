@@ -540,7 +540,12 @@ final class CloudSync: ObservableObject {
         do {
             assignMissingIDs(context: context)
             AssistantStore.shared.shareChats(context: context)
-            let pulled = try await pull(context: context)
+            // One-time repair after 1.37.0, which opened an empty data folder and told the server everything was
+            // deleted: this device ignores those deletions and uploads its own copy of everything again.
+            let repairKey = "sync.repair137"
+            let repairing = !UserDefaults.standard.bool(forKey: repairKey) && !state.cursor.isEmpty
+            if repairing { state.known = state.known.filter { $0.value.kind == "setting" } }
+            let pulled = try await pull(context: context, ignoreDeletes: repairing)
             if pulled > 0 { AssistantStore.shared.adoptSharedChats(context: context) }
             let pushed = try await push(context: context, userID: session.userID)
             do { try await syncVault(userID: session.userID) } catch { vaultState = .error(error.localizedDescription) }
@@ -548,6 +553,7 @@ final class CloudSync: ObservableObject {
             saveState()
             SpendingAlerts.check(context: context)
             lastSync = .now
+            UserDefaults.standard.set(true, forKey: repairKey)
             status = pulled + pushed == 0 ? "Up to date" : "Synced \(pulled) down, \(pushed) up"
         } catch {
             status = error.localizedDescription
@@ -606,7 +612,7 @@ final class CloudSync: ObservableObject {
         ["key": key, "value": UserDefaults.standard.object(forKey: key) ?? NSNull()]
     }
 
-    private func pull(context: ModelContext) async throws -> Int {
+    private func pull(context: ModelContext, ignoreDeletes: Bool = false) async throws -> Int {
         var index: [String: [String: any PersistentModel]] = [:]
         for k in syncKinds { index[k.kind] = Dictionary(k.fetch(context).map { (k.uuid($0), $0) }, uniquingKeysWith: { a, _ in a }) }
         var applied = 0
@@ -624,6 +630,7 @@ final class CloudSync: ObservableObject {
                 let deleted = J.bool(row["deleted"])
                 let data = row["data"] as? [String: Any] ?? [:]
                 if let ts = row["updated_at"] as? String { state.cursor = ts }
+                if deleted && ignoreDeletes { continue }
 
                 if kindName == "vault" || kindName == "vaultkey" { continue } // handled by syncVault
                 if kindName == "setting" {

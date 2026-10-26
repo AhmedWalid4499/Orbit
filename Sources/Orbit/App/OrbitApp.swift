@@ -112,7 +112,7 @@ struct OrbitApp: App {
             UserDefaults.standard.set(NSFullUserName(), forKey: "userName")
         }
         let schema = OrbitSchema.schema
-        let url = URL.applicationSupportDirectory.appending(path: "Joshu", directoryHint: .isDirectory)
+        let url = URL.applicationSupportDirectory.appending(path: "Orbit", directoryHint: .isDirectory)  // the data folder keeps its old name
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         let config = ModelConfiguration(schema: schema, url: url.appending(path: "Orbit.store"))
         if Snapshot.isDemo {

@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
   if (!ent?.pro_until || new Date(ent.pro_until) < new Date()) return fail(402, "This needs Joshu Pro.");
 
   const { data: used } = await admin.rpc("bump_ai_usage", { uid: user.id });
-  if ((used ?? 0) > DAILY_LIMIT) return fail(429, "You've reached today's fair-use limit for Yuki. It resets tomorrow.");
+  if ((used ?? 0) > DAILY_LIMIT) return fail(429, "You've reached today's fair-use limit for your assistant. It resets tomorrow.");
 
   // Only Joshu's model, with a sane ceiling on output.
   let body: Record<string, unknown>;

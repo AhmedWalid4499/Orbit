@@ -5,7 +5,8 @@
 #   supabase secrets set --project-ref <ref> ANTHROPIC_API_KEY=sk-ant-…
 set -e
 cd "$(dirname "$0")/.."
-command -v supabase >/dev/null || { echo "Install the Supabase CLI first: brew install supabase/tap/supabase"; exit 1; }
+# Uses the Supabase CLI if it's installed, otherwise runs it through npx (Node), so Homebrew isn't needed.
+if command -v supabase >/dev/null; then supabase() { command supabase "$@"; }; else supabase() { npx --yes supabase@2 "$@"; }; fi
 REF=$(python3 -c "import json,re;print(re.search(r'https://([a-z0-9]+)\.supabase', json.load(open('Support/Supabase.json'))['url']).group(1))")
 supabase functions deploy claude --project-ref "$REF"
 # Apple's server notifications carry no Joshu sign-in, so this one checks Apple's signature itself instead.

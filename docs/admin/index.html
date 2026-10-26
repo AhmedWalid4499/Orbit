@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Admin · Joshu</title>
+<link rel="icon" href="../assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Inter:wght@400;500;600;700&family=Nunito:wght@900&display=swap" rel="stylesheet">
+<style>
+  :root { --canvas: #ffffff; --card: #f2f2f2; --line: #e6e6e6; --ink: #111111; --ink2: #55555c; --ink3: #8a8a92;
+          --lime: #e6ff1f; --pink: #f7c2ec; --orange: #edaa2f; --purple: #b58cf7; --cyan: #27d3f6; --mint: #8eedbf; --peach: #ffc6a3; --bad: #d4351c;
+          --orb: conic-gradient(from 30deg, #c6f432, #3ddc97, #22d3ee, #8b7cf6, #f472b6, #c6f432); }
+  @media (prefers-color-scheme: dark) { :root { --canvas: #111113; --card: #1e1e21; --line: #2c2c30; --ink: #f4f4f5; --ink2: #b4b4bb; --ink3: #85858d; --bad: #ff7a66; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--canvas); color: var(--ink); font: 15px/1.5 Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  .wrap { width: min(1240px, 100% - 32px); margin-inline: auto; }
+  header { display: flex; align-items: center; gap: 14px; height: 64px; border-bottom: 1px solid var(--line); }
+  .logo { font: 900 26px/1 ui-rounded, "SF Pro Rounded", Nunito, system-ui, sans-serif; letter-spacing: -.04em; text-decoration: none; color: inherit;
+          display: inline-flex; align-items: baseline; gap: 2px; }
+  .logo i { width: 8px; height: 8px; border-radius: 50%; background: var(--orb); }
+  .tag { font-size: 12px; font-weight: 700; background: var(--ink); color: var(--canvas); border-radius: 999px; padding: 3px 9px; }
+  header .me { margin-left: auto; color: var(--ink2); font-size: 13px; display: flex; gap: 12px; align-items: center; }
+  button, .btn { font: 600 14px Inter, system-ui, sans-serif; border: 0; border-radius: 999px; padding: 9px 16px; cursor: pointer;
+                 background: var(--ink); color: var(--canvas); }
+  button.soft { background: var(--card); color: var(--ink); }
+  button.small { padding: 6px 12px; font-size: 13px; }
+  button.danger { background: none; color: var(--bad); padding: 6px 8px; }
+  button:disabled { opacity: .5; cursor: default; }
+  h1 { font: 700 34px/1.1 Fraunces, Georgia, serif; margin: 28px 0 4px; }
+  .sub { color: var(--ink2); margin: 0 0 22px; }
+
+  /* Sign in */
+  .signin { max-width: 380px; margin: 70px auto; text-align: center; }
+  .signin .orb { width: 64px; height: 64px; border-radius: 50%; background: var(--orb); margin: 0 auto 18px; box-shadow: 0 14px 36px -10px rgba(139,124,246,.6); }
+  .signin form { display: grid; gap: 10px; margin-top: 18px; text-align: left; }
+  input, select { font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 11px 14px; width: 100%; }
+  .google { background: #fff; color: #1f1f1f; border: 1px solid #747775; display: flex; gap: 10px; justify-content: center; align-items: center; width: 100%; padding: 11px; border-radius: 12px; }
+  .or { display: flex; align-items: center; gap: 10px; color: var(--ink3); font-size: 12px; margin: 14px 0 4px; }
+  .or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .err { color: var(--bad); font-size: 14px; min-height: 1.4em; }
+
+  /* Totals */
+  .tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  @media (max-width: 860px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+  .tile { border-radius: 18px; padding: 16px 18px; color: #111; }
+  .tile b { display: block; font: 700 30px/1.1 Fraunces, Georgia, serif; }
+  .tile span { font-size: 13px; font-weight: 600; opacity: .75; }
+
+  /* Filters */
+  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 24px 0 12px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { background: var(--card); color: var(--ink); border-radius: 999px; padding: 7px 13px; font-size: 13px; font-weight: 600; }
+  .chip[aria-pressed="true"] { background: var(--ink); color: var(--canvas); }
+  .bar input { max-width: 280px; margin-left: auto; padding: 9px 14px; border-radius: 999px; }
+
+  /* Accounts */
+  .table { border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
+  .row { display: grid; grid-template-columns: minmax(220px, 2.2fr) 1.6fr .8fr .9fr .8fr 1.2fr; gap: 14px; align-items: center; padding: 13px 18px; border-top: 1px solid var(--line); }
+  .row.head { border-top: 0; background: var(--card); font-size: 12px; font-weight: 700; color: var(--ink2); text-transform: uppercase; letter-spacing: .04em; }
+  .who b { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .who small, .muted { color: var(--ink3); font-size: 12.5px; }
+  .badge { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 3px 9px; color: #111; }
+  .b-paying { background: var(--mint); } .b-tester { background: var(--lime); } .b-owner { background: var(--purple); }
+  .b-free { background: var(--card); color: var(--ink2); } .b-lapsed { background: var(--peach); }
+  .num { font-variant-numeric: tabular-nums; }
+  .actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+  .empty { padding: 40px; text-align: center; color: var(--ink3); }
+  @media (max-width: 900px) {
+    .row.head { display: none; }
+    .row { grid-template-columns: 1fr auto; }
+    .row > .c-joined, .row > .c-data { display: none; }
+    .row > .c-plan, .row > .c-ai { grid-column: 1; }
+    .row > .actions { grid-column: 2; grid-row: 1 / span 3; }
+  }
+
+  /* Give Pro dialog */
+  dialog { border: 0; border-radius: 22px; padding: 24px; width: min(420px, 100% - 32px); background: var(--canvas); color: var(--ink); box-shadow: 0 30px 80px -20px rgba(0,0,0,.45); }
+  dialog::backdrop { background: rgba(0,0,0,.35); }
+  dialog h2 { margin: 0 0 4px; font: 700 24px Fraunces, Georgia, serif; }
+  dialog .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 16px 0; }
+  dialog .grid button[aria-pressed="true"] { background: var(--ink); color: var(--canvas); }
+  dialog .row2 { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<header class="wrap">
+  <a class="logo" href="../">joshu<i></i></a><span class="tag">Admin</span>
+  <div class="me hidden" id="me"><span id="me-email"></span><button class="soft small" id="signout">Sign out</button></div>
+</header>
+
+<main class="wrap">
+  <section class="signin hidden" id="signin">
+    <div class="orb"></div>
+    <h1 style="margin-top:0">Joshu admin</h1>
+    <p class="sub">Sign in with your Joshu account. Only admins get in.</p>
+    <button class="google" id="google" type="button">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+      Sign in with Google
+    </button>
+    <div class="or">or</div>
+    <form id="pw">
+      <input id="email" type="email" placeholder="Email" autocomplete="username" required>
+      <input id="password" type="password" placeholder="Password" autocomplete="current-password" required>
+      <button>Sign in</button>
+    </form>
+    <p class="err" id="signin-err"></p>
+  </section>
+
+  <section class="hidden" id="app">
+    <h1>Accounts</h1>
+    <p class="sub" id="updated">Loading…</p>
+    <div class="tiles" id="tiles"></div>
+    <div class="bar">
+      <div class="chips" id="filters">
+        <button class="chip" data-f="all" aria-pressed="true">All</button>
+        <button class="chip" data-f="paying" aria-pressed="false">Paying</button>
+        <button class="chip" data-f="tester" aria-pressed="false">Testers</button>
+        <button class="chip" data-f="free" aria-pressed="false">Free</button>
+        <button class="chip" data-f="lapsed" aria-pressed="false">Lapsed</button>
+      </div>
+      <button class="soft small" id="refresh">Refresh</button>
+      <input id="search" type="search" placeholder="Search by email or name">
+    </div>
+    <div class="table">
+      <div class="row head"><span>Account</span><span>Plan &amp; payment</span><span class="c-joined">Joined</span><span class="c-data">Synced items</span><span>AI today / 30 days</span><span></span></div>
+      <div id="rows"></div>
+    </div>
+    <p class="err" id="app-err"></p>
+  </section>
+</main>
+
+<dialog id="give">
+  <h2>Give Pro</h2>
+  <p class="muted" id="give-who"></p>
+  <div class="grid" id="lengths">
+    <button class="soft" data-days="7">7 days</button>
+    <button class="soft" data-days="30" aria-pressed="true">30 days</button>
+    <button class="soft" data-days="90">90 days</button>
+    <button class="soft" data-days="365">1 year</button>
+    <button class="soft" data-days="forever">For good</button>
+  </div>
+  <input id="note" maxlength="80" placeholder="Note, like “Beta tester”" value="Beta tester">
+  <p class="err" id="give-err"></p>
+  <div class="row2"><button class="soft" id="give-cancel" type="button">Cancel</button><button id="give-ok" type="button">Give Pro</button></div>
+</dialog>
+
+<script>
+// Joshu's admin page. It holds no keys: you sign in with your own Joshu account, and the `admin` server function
+// checks you're an admin before it shows or changes anything.
+const SUPABASE = "https://qngpfkqupvxeuxzwdeex.supabase.co";
+const KEY = "sb_publishable_89YmEqm9OVBoYLJpkjh-kQ_adxqYFfQ";
+const local = ["localhost", "127.0.0.1"].includes(location.hostname);
+// Only on your own machine can the page talk to a stand-in server (for testing); a link can't redirect it elsewhere.
+const API = (local && new URLSearchParams(location.search).get("api")) || `${SUPABASE}/functions/v1/admin`;
+const $ = (id) => document.getElementById(id);
+let accounts = [], filter = "all", giving = null, length = "30";
+
+// Sign-in comes back from Google in the address (#access_token=…); keep it for this tab only, then clean the address.
+const back = new URLSearchParams(location.hash.slice(1));
+if (back.get("access_token")) {
+  sessionStorage.setItem("joshu-admin", JSON.stringify({ token: back.get("access_token"), until: Date.now() + Number(back.get("expires_in") || 3600) * 1000 }));
+  history.replaceState(null, "", location.pathname + location.search);
+}
+function token() {
+  try { const s = JSON.parse(sessionStorage.getItem("joshu-admin")); return s && s.until > Date.now() + 30000 ? s.token : null; } catch { return null; }
+}
+
+function showSignIn(message = "") {
+  $("signin").classList.remove("hidden"); $("app").classList.add("hidden"); $("me").classList.add("hidden");
+  $("signin-err").textContent = message;
+}
+
+$("google").onclick = () => {
+  const u = new URL(`${SUPABASE}/auth/v1/authorize`);
+  u.searchParams.set("provider", "google");
+  u.searchParams.set("redirect_to", location.origin + location.pathname);
+  location.href = u;
+};
+$("pw").onsubmit = async (e) => {
+  e.preventDefault();
+  $("signin-err").textContent = "";
+  try {
+    const r = await fetch(`${SUPABASE}/auth/v1/token?grant_type=password`, { method: "POST",
+      headers: { apikey: KEY, "content-type": "application/json" }, body: JSON.stringify({ email: $("email").value, password: $("password").value }) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error_description || j.msg || "Couldn't sign in.");
+    sessionStorage.setItem("joshu-admin", JSON.stringify({ token: j.access_token, until: Date.now() + j.expires_in * 1000 }));
+    $("password").value = "";
+    load();
+  } catch (x) { $("signin-err").textContent = x.message; }
+};
+$("signout").onclick = () => { sessionStorage.removeItem("joshu-admin"); accounts = []; $("rows").innerHTML = ""; showSignIn(); };
+
+async function api(body) {
+  const r = await fetch(API, { method: "POST", headers: { apikey: KEY, authorization: `Bearer ${token()}`, "content-type": "application/json" },
+    body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401) { sessionStorage.removeItem("joshu-admin"); showSignIn("Your sign-in ran out. Sign in again."); throw new Error("signed out"); }
+  if (r.status === 403) { sessionStorage.removeItem("joshu-admin"); showSignIn("That account isn't an admin."); throw new Error("not admin"); }
+  if (!r.ok) throw new Error(j.error || `Something went wrong (${r.status}).`);
+  return j;
+}
+
+async function load() {
+  if (!token()) return showSignIn();
+  $("signin").classList.add("hidden"); $("app").classList.remove("hidden"); $("me").classList.remove("hidden");
+  $("app-err").textContent = "";
+  try {
+    const j = await api({ action: "list" });
+    accounts = j.accounts.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+    $("me-email").textContent = accounts.find((a) => a.id === j.me)?.email ?? "";
+    $("updated").textContent = `${accounts.length} account${accounts.length === 1 ? "" : "s"} · updated ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+    render();
+  } catch (x) { if (!/signed out|not admin/.test(x.message)) $("app-err").textContent = x.message; }
+}
+
+const day = (d) => d ? new Date(d).toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" }) : "—";
+function ago(d) {
+  if (!d) return "never";
+  const m = (Date.now() - new Date(d)) / 60000;
+  if (m < 60) return "just now"; if (m < 1440) return `${Math.round(m / 60)} h ago`;
+  const days = Math.round(m / 1440); return days === 1 ? "yesterday" : days < 60 ? `${days} days ago` : day(d);
+}
+/// What kind of account this is right now, and the words for it.
+function plan(a) {
+  const active = a.pro_until && new Date(a.pro_until) > new Date();
+  const forGood = a.pro_until && new Date(a.pro_until).getFullYear() >= 2099;
+  if (a.source === "owner" && active) return { kind: "tester", badge: "b-owner", label: "Owner", detail: "Pro for good" };
+  if (a.source === "app_store") {
+    const what = /year/.test(a.product_id || "") ? "Yearly" : /month/.test(a.product_id || "") ? "Monthly" : "App Store";
+    return active ? { kind: "paying", badge: "b-paying", label: `Paying · ${what}`, detail: `Paid through ${day(a.pro_until)}` }
+                  : { kind: "lapsed", badge: "b-lapsed", label: "Lapsed", detail: `${what} ended ${day(a.pro_until)}` };
+  }
+  if (a.source === "gift" && active) return { kind: "tester", badge: "b-tester", label: a.note || "Tester", detail: forGood ? "Pro for good" : `Pro until ${day(a.pro_until)}` };
+  if (a.source === "gift") return { kind: "free", badge: "b-free", label: "Free", detail: `${a.note || "Tester"} Pro ended ${day(a.pro_until)}` };
+  return { kind: "free", badge: "b-free", label: "Free", detail: "" };
+}
+
+function tile(value, label, color) { return `<div class="tile" style="background:var(--${color})"><b>${value}</b><span>${label}</span></div>`; }
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function render() {
+  const kinds = accounts.map(plan);
+  const count = (k) => kinds.filter((p) => p.kind === k).length;
+  $("tiles").innerHTML = tile(accounts.length, "Accounts", "cyan") + tile(count("paying"), "Paying", "mint") + tile(count("tester"), "Testers & owner", "lime")
+    + tile(count("free") + count("lapsed"), "Free", "peach") + tile(accounts.reduce((n, a) => n + a.ai_today, 0), "AI requests today", "purple");
+  const q = $("search").value.trim().toLowerCase();
+  const shown = accounts.filter((a, i) => (filter === "all" || kinds[i].kind === filter) && (!q || `${a.email} ${a.name}`.toLowerCase().includes(q)));
+  $("rows").innerHTML = shown.length ? shown.map((a) => {
+    const p = plan(a);
+    const canGive = p.kind !== "paying" && a.source !== "owner";
+    const canEnd = a.source === "gift" && a.pro_until && new Date(a.pro_until) > new Date();
+    return `<div class="row">
+      <div class="who"><b>${esc(a.email || a.id)}</b><small>${esc([a.name, a.providers.join(", "), a.confirmed ? "" : "email not confirmed", a.admin ? "admin" : ""].filter(Boolean).join(" · "))}</small></div>
+      <div class="c-plan"><span class="badge ${p.badge}">${esc(p.label)}</span> <span class="muted">${esc(p.detail)}</span></div>
+      <div class="c-joined muted">${day(a.created_at)}<br>seen ${ago(a.last_sign_in_at)}</div>
+      <div class="c-data num">${a.records.toLocaleString()}</div>
+      <div class="c-ai num">${a.ai_today} <span class="muted">/ ${a.ai_month}</span></div>
+      <div class="actions">${canGive ? `<button class="small" data-give="${a.id}">${canEnd ? "Extend" : "Give Pro"}</button>` : ""}${canEnd ? `<button class="danger small" data-end="${a.id}">End Pro</button>` : ""}</div>
+    </div>`;
+  }).join("") : `<div class="empty">No accounts here.</div>`;
+}
+
+$("filters").onclick = (e) => {
+  const b = e.target.closest("[data-f]"); if (!b) return;
+  filter = b.dataset.f;
+  for (const c of $("filters").children) c.setAttribute("aria-pressed", String(c === b));
+  render();
+};
+$("search").oninput = render;
+$("refresh").onclick = load;
+
+$("rows").onclick = async (e) => {
+  const give = e.target.closest("[data-give]"), end = e.target.closest("[data-end]");
+  if (give) {
+    giving = accounts.find((a) => a.id === give.dataset.give);
+    $("give-who").textContent = `For ${giving.email}. They can use the assistant and every Pro feature straight away.`;
+    $("note").value = giving.note || "Beta tester";
+    $("give-err").textContent = "";
+    $("give").showModal();
+  }
+  if (end) {
+    const a = accounts.find((x) => x.id === end.dataset.end);
+    if (!confirm(`End Pro for ${a.email}? They keep all their data; the AI features switch off.`)) return;
+    try { await api({ action: "revoke", user_id: a.id }); load(); } catch (x) { $("app-err").textContent = x.message; }
+  }
+};
+$("lengths").onclick = (e) => {
+  const b = e.target.closest("[data-days]"); if (!b) return;
+  length = b.dataset.days;
+  for (const c of $("lengths").children) c.setAttribute("aria-pressed", String(c === b));
+};
+$("give-cancel").onclick = () => $("give").close();
+$("give-ok").onclick = async () => {
+  $("give-ok").disabled = true; $("give-err").textContent = "";
+  try {
+    await api({ action: "grant", user_id: giving.id, note: $("note").value.trim(), ...(length === "forever" ? { forever: true } : { days: Number(length) }) });
+    $("give").close();
+    load();
+  } catch (x) { $("give-err").textContent = x.message; }
+  $("give-ok").disabled = false;
+};
+
+load();
+</script>
+</body>
+</html>

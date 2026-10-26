@@ -19,6 +19,9 @@ What's left needs your accounts and your OK. In order:
    `supabase secrets set --project-ref qngpfkqupvxeuxzwdeex ANTHROPIC_API_KEY=sk-ant-…`
    Optional: `AI_DAILY_LIMIT=300` (requests per person per day).
 4. Run `scripts/deploy-server.sh`.
+5. Admin page: run `supabase/admin.sql`, with the last line uncommented and your email in it. Then open
+   https://ahmedwalid4499.github.io/Orbit/admin/ and sign in. Add that address to Supabase › Authentication ›
+   URL Configuration › Redirect URLs so "Sign in with Google" can come back to it.
 
 ## 3. App Store Connect
 1. **Create the app.** Use bundle ID `com.ahmedwalid.orbit` (iPhone; keep it, it's invisible to users).

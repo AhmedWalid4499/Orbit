@@ -10,6 +10,8 @@ struct RootView: View {
     @AppStorage("hiddenTabs") private var hiddenTabs = ""
     @AppStorage("assistantName") private var assistantName = "Joshu"
     @AppStorage("onboarded") private var onboarded = false
+    @AppStorage(SignedOutWelcome.key) private var showSignedOutWelcome = false
+    @ObservedObject private var cloud = CloudSync.shared
     @ObservedObject private var focus = FocusTimer.shared
     /// In full screen the window has no title bar, so keep the tabs below the camera notch.
     @State private var fullScreenTopInset: CGFloat = 0
@@ -72,6 +74,8 @@ struct RootView: View {
         }
         .task { if ProcessInfo.processInfo.arguments.contains("-tour") { state.tourOpen = true } }
         .sheet(item: Binding(get: { focus.justFinished }, set: { focus.justFinished = $0 })) { FocusDoneSheet(session: $0) }
+        .overlay { if showSignedOutWelcome && !cloud.isSignedIn && !Snapshot.isActive { SignedOutWelcome().transition(.opacity) } }
+        .animation(.easeInOut(duration: 0.3), value: showSignedOutWelcome && !cloud.isSignedIn)
         .modifier(SplashOverlay())
         // A tab you hid closes if you were on it.
         .onChange(of: hiddenTabs) { _, raw in if raw.split(separator: ",").contains(Substring(state.tab.rawValue)) { state.tab = .today } }

@@ -1,0 +1,116 @@
+/* Phone layout around the shared (desktop-first) screens. */
+html, body, #root { height: 100%; overscroll-behavior: none; }
+body { -webkit-tap-highlight-color: transparent; font-size: 15px; }
+input, textarea, select { font-size: 16px; }
+
+.phone { height: 100%; display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); }
+.phone-bar { display: flex; align-items: center; gap: 8px; padding: 10px 16px 6px; flex: none; min-height: 58px; }
+.phone-bar .logo { font-size: 28px; }
+.phone-bar .back { font-weight: 600; font-size: 16px; gap: 2px; min-height: 40px; }
+.phone-bar .icon-btn, .phone-bar .avatar { width: 38px; height: 38px; flex: none; }
+.phone-bar .timer-title { display: none; }
+.phone-main { flex: 1; min-height: 0; position: relative; overflow: hidden; }
+.phone-main > * { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+.tabbar { flex: none; display: flex; border-top: 1px solid var(--line); background: var(--canvas); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); }
+.tabbar button { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; font-weight: 600; color: var(--ink3); padding: 2px 0; }
+.tabbar .tab-icon { width: 54px; height: 30px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; transition: background 0.15s; }
+.tabbar button.on { color: var(--ink); }
+.tabbar button.on .tab-icon { background: var(--lime); color: var(--sticker-ink); }
+
+/* Pages: phone gutters instead of the desktop's 32px */
+.page { padding: 4px 16px 28px !important; }
+.phone-main > div[style*="padding"] { padding-left: 16px !important; padding-right: 16px !important; }
+.page-title { font-size: 32px; }
+.phone-main h1.page-title + * { margin-top: 0; }
+
+/* Sheets: modals slide up from the bottom, full width */
+.backdrop { align-items: flex-end; }
+.modal { width: 100% !important; max-width: 100% !important; max-height: 92vh; border-radius: 24px 24px 0 0; padding: 22px 16px calc(24px + env(safe-area-inset-bottom)) !important; animation: sheet-up 0.22s ease-out; }
+@keyframes sheet-up { from { transform: translateY(40px); opacity: 0.6; } }
+.modal label.row > .secondary:first-child { width: 104px !important; flex: none; }
+
+/* Touch: things that appear on hover on the desktop are always visible */
+.task-row .focus-btn { opacity: 1; }
+.stat-tile:hover { transform: none; }
+.btn-soft, .btn-primary { min-height: 40px; }
+.check { width: 24px !important; height: 24px !important; }
+
+/* Assistant tab */
+.assistant { display: flex; flex-direction: column; overflow: hidden !important; }
+.ask-btn { width: 38px; height: 38px; border-radius: 50%; flex: none; display: inline-flex; align-items: center; justify-content: center; color: var(--ink2); }
+.ask-btn.send { background: var(--inverse); color: var(--on-inverse); }
+.ask-btn.live { background: var(--critical); color: #fff; animation: pulse 1.2s infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 8px rgba(229, 72, 77, 0.2); } }
+
+/* More */
+.more-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.more-tile { background: var(--card); border-radius: 18px; padding: 14px 8px; display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; text-align: center; min-height: 92px; }
+.more-icon { width: 42px; height: 42px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--sticker-ink); }
+
+.signin-wrap { height: 100%; padding: env(safe-area-inset-top) 20px 0; }
+.signin-wrap > div > div { width: 100% !important; max-width: 400px; }
+
+/* Today */
+.today-actions { gap: 8px; overflow-x: auto; }
+.today-actions button { display: inline-flex; align-items: center; gap: 6px; background: var(--card); border-radius: 999px; padding: 8px 12px; font-size: 13px; font-weight: 600; white-space: nowrap; flex: none; }
+.today-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.phone-today > .row > * { min-width: 0; }
+.phone-today > .row > .row:last-child { flex: 1; min-width: 0; }
+/* Scrolling pages are flex columns of fixed height: never squash their sections */
+.phone-main > .col > * { flex-shrink: 0; }
+.today-tiles .display { font-size: 20px !important; }
+.today-clock > * { width: 100% !important; max-width: 100% !important; }
+
+/* Desktop multi-column layouts stack on a phone: rows with wide gaps become columns, fixed side columns go full width */
+.phone-main [style*="gap: 20px"]:not(.col):not(.seg),
+.phone-main [style*="gap: 22px"]:not(.col),
+.phone-main [style*="gap: 24px"]:not(.col),
+.phone-main [style*="gap: 26px"]:not(.col),
+.phone-main [style*="gap: 28px"]:not(.col),
+.phone-main [style*="gap: 36px"]:not(.col) { flex-direction: column !important; align-items: stretch !important; }
+.phone-main [style*="width: 2"][style*="px"]:not(button):not(span):not(img),
+.phone-main [style*="width: 3"][style*="px"]:not(button):not(span):not(img),
+.phone-main [style*="width: 4"][style*="px"]:not(button):not(span):not(img) { max-width: 100% !important; }
+.phone-main [style*="width: 250px"], .phone-main [style*="width: 300px"], .phone-main [style*="width: 330px"], .phone-main [style*="width: 340px"],
+.phone-main [style*="width: 380px"], .phone-main [style*="width: 390px"], .phone-main [style*="width: 400px"], .phone-main [style*="width: 420px"],
+.phone-main [style*="width: 440px"], .phone-main [style*="width: 920px"], .phone-main [style*="width: 940px"] { width: 100% !important; flex: none !important; }
+
+/* Tasks: the filter sidebar becomes a strip of chips */
+.phone-main aside { height: auto !important; overflow: visible !important; padding-bottom: 0 !important; }
+.phone-main aside > .col { flex-direction: row; overflow-x: auto; gap: 6px !important; padding-bottom: 6px; }
+.phone-main aside > .col > button { width: auto !important; flex: none; background: var(--card); white-space: nowrap; }
+.phone-main aside > .col > .muted { display: none; }
+
+/* Page headers: title, then the buttons wrap underneath */
+.phone-main .row:has(> .page-title) { flex-wrap: wrap; row-gap: 10px; }
+.phone-main .row:has(> .page-title) > .spacer { display: none; }
+.phone-main .row:has(> .page-title) > .page-title { flex-basis: 100%; }
+.phone-main .seg { max-width: 100%; overflow-x: auto; }
+.money-balance { padding: 16px 18px; gap: 8px; }
+.money-balance .value { font-size: 30px; }
+.money-txn .menu-btn { opacity: 1; }
+.money-menu { left: 12px !important; right: 12px; max-height: 70vh; overflow-y: auto; }
+
+/* Calendar: toolbar wraps, days are narrower */
+.cal { padding: 4px 12px 12px !important; }
+.cal-toolbar { flex-wrap: wrap; row-gap: 8px; }
+.cal-toolbar > .muted, .cal-toolbar > .spacer { display: none; }
+.cal-toolbar .icon-btn { width: 38px !important; height: 38px !important; }
+.cal-title { font-size: 26px; }
+.cal-headnum { font-size: 22px; padding: 0 6px; }
+.cal-headday { font-size: 11px; padding: 6px 0; }
+.cal-gutter { width: 44px; }
+.cal-hourlabel { font-size: 10px; }
+
+/* Reading: the shelf sidebar becomes chips above the books */
+.reading { flex-direction: column; gap: 10px !important; padding: 4px 16px 0 !important; overflow-y: auto; }
+.reading-side { width: auto; display: flex; overflow-x: auto; gap: 6px; padding-bottom: 4px; flex: none; }
+.reading-side > * { flex: none; width: auto !important; }
+.reading-side .rfilter { background: var(--card); white-space: nowrap; }
+.reading-side .rfilter.on { background: var(--inverse); }
+.reading-side .rside-label, .reading-side > .muted { display: none; }
+.reading-main { overflow: visible; flex: none; }
+.rstat .v { font-size: 22px; }
+.reading-main .row:has(> .rstat) { display: grid !important; grid-template-columns: 1fr 1fr; gap: 10px !important; }
+.rstat { padding: 12px; }

@@ -16,7 +16,7 @@ import Splash from '@/components/Splash'
 import { PlanTomorrowSheet } from '@/screens/PlanTomorrow'
 import { useProfilePhoto } from '@/lib/profileCard'
 import SignIn from '@/screens/SignIn'
-import Today from '@/screens/Today'
+import Today from './screens/Today'
 import CalendarScreen from '@/screens/Calendar'
 import Tasks from '@/screens/Tasks'
 import Habits from '@/screens/Habits'
@@ -41,6 +41,7 @@ import GitHub from './screens/GitHub'
 import Jobs from './screens/Jobs'
 import Insights from './screens/Insights'
 import Bills from './screens/Bills'
+import Accounts from './screens/Accounts'
 
 const DEMO = new URLSearchParams(location.search).has('demo')
 
@@ -154,6 +155,7 @@ function Shell() {
         {main === 'more' && page === 'ideas' && <Ideas />}
         {main === 'more' && page === 'goals' && <Goals />}
         {main === 'more' && page === 'bills' && <Bills />}
+        {main === 'more' && page === 'accounts' && <Accounts />}
         {main === 'more' && page === 'github' && <GitHub />}
         {main === 'more' && page === 'jobs' && <Jobs />}
         {main === 'more' && page === 'insights' && <Insights />}

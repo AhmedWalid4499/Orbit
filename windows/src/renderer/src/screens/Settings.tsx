@@ -95,7 +95,7 @@ export default function SettingsModal({ open, onClose }: { open: boolean; onClos
   )
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+export function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 18 }}>
       <div className="muted" style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>{title}</div>
@@ -104,7 +104,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="row" style={{ gap: 14 }}>
       <span className="secondary" style={{ width: 120, fontSize: 13 }}>{label}</span>
@@ -115,7 +115,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 // MARK: AI (Anthropic key, directly or unlocked from the Mac's encrypted key sync)
 
-function AISection() {
+export function AISection() {
   const keys = useKeys()
   const [vs, setVs] = useState(vaultState())
   const [pass, setPass] = useState('')
@@ -203,7 +203,7 @@ function AISection() {
 
 // MARK: Email (Gmail accounts and receipts → Money)
 
-function EmailSection() {
+export function EmailSection() {
   const keys = useKeys()
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')

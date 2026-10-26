@@ -16,7 +16,8 @@ export interface Rec<T = Record<string, any>> {
 }
 
 /** Settings that follow you between devices (same list as the Mac app). */
-export const SYNCED_SETTINGS = ['monthlyBudget', 'readingGoal', 'currencyCode', 'assistantName', 'userName', 'weatherCity', 'profileCard'] as const
+export const SYNCED_SETTINGS = ['monthlyBudget', 'readingGoal', 'currencyCode', 'assistantName', 'userName', 'weatherCity', 'profileCard',
+  'merchantRules', 'categoryBudgets', 'assistant.memory', 'assistantSpeaks', 'goodreadsUser', 'budget.periodStart'] as const
 export type SettingKey = (typeof SYNCED_SETTINGS)[number]
 
 interface Cache {
@@ -135,6 +136,11 @@ class Store {
     const id = crypto.randomUUID().toLowerCase()
     this.write({ id, kind, data: { ...data }, deleted: false })
     return id
+  }
+
+  /** Creates or replaces an item whose id is chosen by the caller (e.g. an assistant chat). */
+  put<T extends object>(id: string, kind: string, data: T): void {
+    this.write({ id, kind, data: { ...data }, deleted: false })
   }
 
   /** Merges `patch` into the item's fields, keeping everything else as it was. */

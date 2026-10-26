@@ -6,15 +6,16 @@
 import { secrets } from './secrets'
 
 const DEVICE_ONLY = new Set(['sync-passphrase', 'vault-mac', 'github-user', 'google-client-id'])
-const keyCache = new Map<string, Uint8Array>()
+type Bytes = Uint8Array<ArrayBuffer>
+const keyCache = new Map<string, Bytes>()
 const enc = new TextEncoder()
 
-const b64 = (b: Uint8Array): string => { let s = ''; b.forEach((x) => (s += String.fromCharCode(x))); return btoa(s) }
-const unb64 = (s: string): Uint8Array => Uint8Array.from(atob(s), (c) => c.charCodeAt(0))
-const hex = (b: Uint8Array): string => [...b].map((x) => x.toString(16).padStart(2, '0')).join('')
-const same = (a: Uint8Array, b: Uint8Array): boolean => a.length === b.length && a.every((x, i) => x === b[i])
+const b64 = (b: Bytes): string => { let s = ''; b.forEach((x) => (s += String.fromCharCode(x))); return btoa(s) }
+const unb64 = (s: string): Bytes => Uint8Array.from(atob(s), (c) => c.charCodeAt(0))
+const hex = (b: Bytes): string => [...b].map((x) => x.toString(16).padStart(2, '0')).join('')
+const same = (a: Bytes, b: Bytes): boolean => a.length === b.length && a.every((x, i) => x === b[i])
 
-async function deriveKey(pass: string, salt: Uint8Array): Promise<Uint8Array> {
+async function deriveKey(pass: string, salt: Bytes): Promise<Bytes> {
   const id = `${b64(salt)}|${pass}`
   if (!keyCache.has(id)) {
     const base = await crypto.subtle.importKey('raw', enc.encode(pass), 'PBKDF2', false, ['deriveBits'])
@@ -24,9 +25,9 @@ async function deriveKey(pass: string, salt: Uint8Array): Promise<Uint8Array> {
   return keyCache.get(id)!
 }
 
-const aes = (key: Uint8Array) => crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['encrypt', 'decrypt'])
+const aes = (key: Bytes) => crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['encrypt', 'decrypt'])
 
-async function seal(plain: Uint8Array, key: Uint8Array): Promise<string> {
+async function seal(plain: Bytes, key: Bytes): Promise<string> {
   const nonce = crypto.getRandomValues(new Uint8Array(12))
   const body = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, await aes(key), plain))
   const all = new Uint8Array(12 + body.length)
@@ -34,14 +35,14 @@ async function seal(plain: Uint8Array, key: Uint8Array): Promise<string> {
   return b64(all)
 }
 
-async function open(box: string, key: Uint8Array): Promise<Uint8Array | null> {
+async function open(box: string, key: Bytes): Promise<Bytes | null> {
   try {
     const all = unb64(box)
     return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: all.subarray(0, 12) }, await aes(key), all.subarray(12)))
   } catch { return null }
 }
 
-async function mac(plain: Uint8Array, key: Uint8Array): Promise<string> {
+async function mac(plain: Bytes, key: Bytes): Promise<string> {
   const k = await crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
   return hex(new Uint8Array(await crypto.subtle.sign('HMAC', k, plain)))
 }
@@ -106,7 +107,7 @@ async function rest(r: VaultRequest, path: string, init: RequestInit = {}): Prom
   return t ? JSON.parse(t) : null
 }
 
-async function upload(r: VaultRequest, id: string, plain: Uint8Array, salt: Uint8Array, key: Uint8Array): Promise<void> {
+async function upload(r: VaultRequest, id: string, plain: Bytes, salt: Bytes, key: Bytes): Promise<void> {
   const data = { v: 1, salt: b64(salt), box: await seal(plain, key), mac: await mac(plain, key) }
   await rest(r, 'orbit_records?on_conflict=user_id,id', {
     method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },

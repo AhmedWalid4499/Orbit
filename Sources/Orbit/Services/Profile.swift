@@ -70,6 +70,14 @@ final class ProfileStore: ObservableObject {
         UserDefaults.standard.set(synced, forKey: Self.syncKey)
     }
 
+    /// Signing out clears this device: the photo goes from here only (it stays in your account and comes back
+    /// when you sign in again, so nothing is written to the synced setting).
+    func forgetLocal() {
+        try? FileManager.default.removeItem(at: url)
+        photo = nil
+        adopted = nil
+    }
+
     func removePhoto() {
         try? FileManager.default.removeItem(at: url)
         photo = nil

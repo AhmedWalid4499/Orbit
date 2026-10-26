@@ -555,6 +555,7 @@ final class CloudSync: ObservableObject {
             clearDevice(context: context)
         }
         signOut()
+        if !isTestDevice { UserDefaults.standard.set(true, forKey: SignedOutWelcome.key) }
     }
 
     /// The account whose data is on this device. Joshu never uploads one account's data into another: signing in
@@ -601,6 +602,7 @@ final class CloudSync: ObservableObject {
             AIAssistant.shared.clearBrief()
             DaySummaryStore.shared.forget()
             InboxStore.shared.forgetLocal()
+            ProfileStore.shared.forgetLocal()
             for key in syncedSettings + ["moneyCoachCache", "githubUser"] { UserDefaults.standard.removeObject(forKey: key) }
             // Keys and sign-ins to other services (they're in the account's encrypted key sync). Joshu's own Google setup stays.
             for k in Keychain.syncable().keys where k != "google-client-secret" { Keychain.delete(k) }

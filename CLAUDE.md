@@ -24,6 +24,13 @@ The owner installs updates through the in-app updater, which reads GitHub Releas
 - Apple Watch: `iOS/OrbitWatch` (app) and `iOS/OrbitWatchWidgets` (complications), embedded in the iPhone app. The watch shows a `WatchSnapshot` the iPhone sends over WatchConnectivity (`iOS/OrbitPhone/WatchBridge.swift`) and asks the iPhone to act (`WatchAction`); both types live in `iOS/Shared/WatchPayload.swift`. `gen-ios-project.py --no-watch` leaves the watch out.
 - The owner has a free Apple account: `scripts/install-iphone.sh` installs on the connected iPhone and must be re-run every 7 days. There's no TestFlight or in-app updater on iPhone. If Apple refuses the App Group, the script installs without widgets.
 
+## Android app
+
+`android/` is Joshu for Android: a Vite + Capacitor app that reuses the Windows renderer (`windows/src/renderer/src`, imported as `@/`) with its own phone shell, bridge and screens in `android/src` (`~/`). `android/src/bridge.ts` implements the same `window.orbit` API as the Windows preload (Claude, Google sign-in, key vault, updates), so shared screens run unchanged; Android-only pieces (Keystore-encrypted secrets, Google loopback sign-in, reading bank SMS, speech) are in `android/native/app/src/main/java/com/personal/orbit/OrbitNativePlugin.java`. A Vite plugin shows "Orbit" as "Joshu" in the shared screens at build time; don't rename anything internal. Phone layout overrides for desktop screens live in `android/src/mobile.css`.
+- Build: `scripts/build-android.sh` → `build/Orbit.apk` (version from `VERSION`). It uses `~/.local/android-tools` (JDK 21 + Android SDK) and signs with the release key in `~/Library/Application Support/Orbit/android/` (password in the Keychain, "Orbit Android keystore"). Every update must be signed with that same key.
+- Preview: `npm --prefix android run dev`, open `http://localhost:5199/?demo` at phone width.
+- The app looks for `Orbit.apk` on the latest GitHub release to offer updates.
+
 ## Widgets
 
 Desktop widgets are a WidgetKit extension in `Widgets/` (SwiftPM can't build extensions). `scripts/build-widgets.sh` compiles it with `swiftc` and signs it, sandboxed, with the `Y2K55S3UA9.com.personal.orbit` app group. `build-app.sh` calls it and assembles and signs the whole app in a temp folder, because the iCloud-synced Desktop adds file attributes that codesign rejects. The app writes `widget.json` to the group container (`WidgetBridge.swift`); keep its types in step with `Widgets/OrbitWidgets.swift`.

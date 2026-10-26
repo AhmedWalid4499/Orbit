@@ -14,6 +14,7 @@ struct PhoneRoot: View {
     @ObservedObject private var reading = ReadingTimer.shared
     @AppStorage("phoneOnboarded") private var onboarded = false
     @AppStorage("tourSeen") private var tourSeen = false
+    @AppStorage(SignedOutWelcome.key) private var showSignedOutWelcome = false
 
     @State private var tab: PhoneTab = .today
     @State private var morePath: [Tab] = []
@@ -25,6 +26,8 @@ struct PhoneRoot: View {
                 TourView { tourSeen = true }
             } else if !onboarded && !cloud.isSignedIn && !Snapshot.isActive {
                 PhoneWelcome { onboarded = true }
+            } else if showSignedOutWelcome && !cloud.isSignedIn && !Snapshot.isActive {
+                SignedOutWelcome()
             } else {
                 tabs
             }

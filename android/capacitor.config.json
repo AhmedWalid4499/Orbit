@@ -2,7 +2,17 @@
   "appId": "com.personal.orbit",
   "appName": "Joshu",
   "webDir": "dist",
-  "android": { "path": "native" },
-  "server": { "androidScheme": "https" },
-  "plugins": { "CapacitorHttp": { "enabled": false } }
+  "android": {
+    "path": "native",
+    "adjustMarginsForEdgeToEdge": "force"
+  },
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": false
+    }
+  },
+  "backgroundColor": "#ffffff"
 }

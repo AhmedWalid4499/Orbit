@@ -404,7 +404,15 @@ struct AccountSettings: View {
         signingOut = true
         deleteError = nil
         Task {
-            do { try await cloud.signOut(context: context, keepOnDevice: keep) } catch { deleteError = error.localizedDescription }
+            do {
+                try await cloud.signOut(context: context, keepOnDevice: keep)
+                // Settings closes and the welcome page is what's left.
+                #if os(macOS)
+                NSApp.keyWindow?.close()
+                #else
+                AppState.current?.settingsOpen = false
+                #endif
+            } catch { deleteError = error.localizedDescription }
             signingOut = false
         }
     }

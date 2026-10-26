@@ -94,6 +94,7 @@ extension Snapshot {
             renderAlone("goto", width: 1100, height: 820, wait: 3, ScrollView { GoToSection().padding(28) })
             renderAlone("money-rules", width: 560, height: 720, MoneyRulesSheet())
             renderAlone("tour", width: 1040, height: 660, wait: 1.5, TourView {})
+            renderAlone("signed-out", width: 1280, height: 800, wait: 1, SignedOutWelcome())
             // The tour's MacBook screens: a smaller window, so text stays readable when the picture is shown small.
             if ProcessInfo.processInfo.environment["ORBIT_SNAPSHOT_TOUR"] != nil {
                 let tourSize = CGSize(width: 1280, height: 800)

@@ -179,7 +179,7 @@ export default function Today({ nav }: { nav: Nav }) {
   )
 }
 
-function AgendaRow({ e, dim }: { e: Rec<CalEvent>; dim?: boolean }) {
+export function AgendaRow({ e, dim }: { e: Rec<CalEvent>; dim?: boolean }) {
   const start = parse(e.data.start)!, end = parse(e.data.end)!
   const now = new Date()
   return (
@@ -196,7 +196,7 @@ function AgendaRow({ e, dim }: { e: Rec<CalEvent>; dim?: boolean }) {
   )
 }
 
-function HabitChip({ h }: { h: Rec<Habit> }) {
+export function HabitChip({ h }: { h: Rec<Habit> }) {
   const key = dayKey(new Date())
   const done = h.data.doneDays.includes(key)
   const color = AREA_COLOR[areaOf(h.data.area)]
@@ -211,7 +211,7 @@ function HabitChip({ h }: { h: Rec<Habit> }) {
   )
 }
 
-function LookingForward({ dreams }: { dreams: Rec<Bucket>[] }) {
+export function LookingForward({ dreams }: { dreams: Rec<Bucket>[] }) {
   const today = startOfDay(new Date())
   const open = dreams.filter((d) => !d.data.isDone)
   const upcoming = open.filter((d) => d.data.targetDate && parse(d.data.targetDate)! >= today).sort((a, b) => a.data.targetDate!.localeCompare(b.data.targetDate!))
@@ -269,7 +269,7 @@ function WeekGlance({ tasks, events }: { tasks: Rec<Task>[]; events: Rec<CalEven
 }
 const i18nDay = (d: Date): string => (isToday(d) ? 'Today' : d.toLocaleDateString(undefined, { weekday: 'short' }))
 
-function MoodCard({ journal, onOpen }: { journal?: Rec<Note>; onOpen: () => void }) {
+export function MoodCard({ journal, onOpen }: { journal?: Rec<Note>; onOpen: () => void }) {
   const setMood = (m: number) => {
     const value = journal?.data.mood === m ? 0 : m
     if (journal) store.update<Note>(journal.id, { mood: value, moodSetByUser: value !== 0 })
@@ -297,7 +297,7 @@ function MoodCard({ journal, onOpen }: { journal?: Rec<Note>; onOpen: () => void
   )
 }
 
-function ClockWeather() {
+export function ClockWeather() {
   const city = useSetting<string>('weatherCity', '')
   const [now, setNow] = useState(new Date())
   const [weather, setWeather] = useState<Weather | null>(null)
@@ -333,7 +333,7 @@ function ClockWeather() {
 
 /** Quick add for the header. With an Anthropic key, Claude sorts the text into tasks, events, money and notes
  *  (several at once works too); without one, or if Claude can't be reached, the offline parser makes a task. */
-function QuickAdd() {
+export function QuickAdd() {
   const keys = useKeys()
   const name = useAssistantName()
   const [text, setText] = useState('')
@@ -472,7 +472,7 @@ function saveCaptured(i: Captured): string {
 
 // MARK: Morning brief
 
-function BriefCard({ hasKey }: { hasKey: boolean }) {
+export function BriefCard({ hasKey }: { hasKey: boolean }) {
   const name = useAssistantName()
   const { brief, loading, error, refresh } = useBrief(hasKey)
   if (!hasKey) {
@@ -524,7 +524,7 @@ function BriefCard({ hasKey }: { hasKey: boolean }) {
 
 // MARK: Inbox
 
-function InboxCard({ accounts, inbox }: { accounts: string[]; inbox: { digest: Digest | null; loading: boolean; error: string; refresh: () => void } }) {
+export function InboxCard({ accounts, inbox }: { accounts: string[]; inbox: { digest: Digest | null; loading: boolean; error: string; refresh: () => void } }) {
   const name = useAssistantName()
   const keys = useKeys()
   const d = inbox.digest
@@ -575,7 +575,7 @@ function MailRow({ item, tint, multi }: { item: MailItem; tint: string; multi: b
   )
 }
 
-function AddTaskInline() {
+export function AddTaskInline() {
   const [text, setText] = useState('')
   const add = () => {
     const t = parseQuick(text)

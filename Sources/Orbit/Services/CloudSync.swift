@@ -509,6 +509,7 @@ final class CloudSync: ObservableObject {
     func signIn(email: String, password: String, context: ModelContext) async throws {
         try await CloudAuth.signIn(email: email, password: password)
         self.email = CloudAuth.session?.email
+        adoptDevice(context: context)
         loadState()
         await sync(context: context)
     }
@@ -516,6 +517,7 @@ final class CloudSync: ObservableObject {
     func signInWithGoogle(context: ModelContext) async throws {
         try await CloudAuth.signInWithGoogle()
         self.email = CloudAuth.session?.email
+        adoptDevice(context: context)
         loadState()
         await sync(context: context)
     }
@@ -524,6 +526,7 @@ final class CloudSync: ObservableObject {
         let result = try await CloudAuth.signUp(email: email, password: password)
         if result == .signedIn {
             self.email = CloudAuth.session?.email
+            adoptDevice(context: context)
             loadState()
             await sync(context: context)
         }
@@ -535,6 +538,76 @@ final class CloudSync: ObservableObject {
         guard let url = URL(string: "\(SupabaseConfig.url)/rest/v1/rpc/delete_my_account") else { return }
         _ = try await rest(url, method: "POST", body: [String: Any]())
         signOut()
+    }
+
+    /// Signs out. Unless `keepOnDevice`, a last sync first makes sure everything is safe in the account, and only
+    /// then is this device's copy removed (data, chats, the AI's notes and connected accounts). It all comes back
+    /// when you sign in again. If the last sync fails, nothing is removed and you stay signed in.
+    func signOut(context: ModelContext, keepOnDevice: Bool) async throws {
+        if !keepOnDevice {
+            while syncing { try? await Task.sleep(for: .milliseconds(200)) }
+            guard await sync(context: context) else {
+                throw CloudError("Your latest changes couldn't be saved to your account, so nothing was removed and you're still signed in. Check your connection and try again.")
+            }
+            if case .error = vaultState {
+                throw CloudError("Your keys and connected accounts couldn't be saved to your account, so nothing was removed and you're still signed in. Try again, or keep a copy on this device.")
+            }
+            clearDevice(context: context)
+        }
+        signOut()
+    }
+
+    /// The account whose data is on this device. Joshu never uploads one account's data into another: signing in
+    /// as someone else first clears this device's copy, which is safe in its own account.
+    private var ownerKey: String { "sync.owner" + deviceTag }
+
+    /// The sync test plays pretend devices (a `deviceTag`) on a real Mac: it must never touch the real account's
+    /// sync records, keys or settings.
+    private var isTestDevice: Bool { !deviceTag.isEmpty }
+
+    /// This device's sync records: sync-<account id><deviceTag>.json.
+    private var syncRecords: [URL] {
+        let files = (try? FileManager.default.contentsOfDirectory(at: Self.folder, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        return files.filter { f in
+            let name = f.lastPathComponent
+            return name.hasPrefix("sync-") && name.hasSuffix("\(deviceTag).json") && name.count == "sync-".count + 36 + deviceTag.count + ".json".count
+        }
+    }
+
+    private var deviceOwner: String? {
+        if let o = UserDefaults.standard.string(forKey: ownerKey) { return o }
+        // Before the owner was recorded: the account that last synced here, from its sync record.
+        let latest = syncRecords
+            .max { (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate ?? .distantPast) ?? .distantPast
+                 < (try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate ?? .distantPast) ?? .distantPast }
+        return latest.map { String($0.deletingPathExtension().lastPathComponent.dropFirst(5).prefix(36)) }
+    }
+
+    /// Right after signing in: if this device holds another account's data, it's cleared before anything syncs.
+    private func adoptDevice(context: ModelContext) {
+        guard let uid = CloudAuth.session?.userID else { return }
+        if let owner = deviceOwner, owner.lowercased() != uid.lowercased() { clearDevice(context: context) }
+        UserDefaults.standard.set(uid, forKey: ownerKey)
+    }
+
+    private static let folder = URL.applicationSupportDirectory.appending(path: "Orbit", directoryHint: .isDirectory)
+
+    /// Removes this device's copy of the account. It also forgets what was synced (the sync-*.json records), so the
+    /// next sign-in downloads everything fresh and can never mistake the empty device for deletions.
+    private func clearDevice(context: ModelContext) {
+        DataReset.clearAll(context, settings: !isTestDevice)
+        if !isTestDevice {
+            AssistantStore.shared.forgetLocal()
+            AIAssistant.shared.clearBrief()
+            DaySummaryStore.shared.forget()
+            InboxStore.shared.forgetLocal()
+            for key in syncedSettings + ["moneyCoachCache", "githubUser"] { UserDefaults.standard.removeObject(forKey: key) }
+            // Keys and sign-ins to other services (they're in the account's encrypted key sync). Joshu's own Google setup stays.
+            for k in Keychain.syncable().keys where k != "google-client-secret" { Keychain.delete(k) }
+        }
+        for f in syncRecords { try? FileManager.default.removeItem(at: f) }
+        state = State()
+        UserDefaults.standard.removeObject(forKey: ownerKey)
     }
 
     func signOut() {
@@ -554,8 +627,10 @@ final class CloudSync: ObservableObject {
         await sync(context: context)
     }
 
-    func sync(context: ModelContext) async {
-        guard !syncing, let session = CloudAuth.session else { return }
+    /// Returns whether everything was synced.
+    @discardableResult
+    func sync(context: ModelContext) async -> Bool {
+        guard !syncing, let session = CloudAuth.session else { return false }
         syncing = true
         defer { syncing = false }
         do {
@@ -576,8 +651,11 @@ final class CloudSync: ObservableObject {
             lastSync = .now
             UserDefaults.standard.set(true, forKey: repairKey)
             status = pulled + pushed == 0 ? "Up to date" : "Synced \(pulled) down, \(pushed) up"
+            if UserDefaults.standard.string(forKey: ownerKey) == nil { UserDefaults.standard.set(session.userID, forKey: ownerKey) }
+            return true
         } catch {
             status = error.localizedDescription
+            return false
         }
     }
 

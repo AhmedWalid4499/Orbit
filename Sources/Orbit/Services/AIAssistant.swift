@@ -36,6 +36,8 @@ final class AIAssistant: ObservableObject {
     /// The AI can be used: your own key, or Joshu Pro through Joshu's server.
     @Published private(set) var hasKey = Keychain.apiKey != nil || Pro.serverAI
     @Published private(set) var brief: MorningBrief?
+    /// Signing out clears this device: today's brief goes too.
+    func clearBrief() { brief = nil; UserDefaults.standard.removeObject(forKey: "aiMorningBriefCache") }
     @Published private(set) var briefState: BriefState = .idle
 
     @AppStorage("aiSmartCapture") var smartCaptureEnabled = true

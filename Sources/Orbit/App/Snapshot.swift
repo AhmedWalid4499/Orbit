@@ -277,6 +277,37 @@ enum SyncTest {
                 await cloud.sync(context: b)
                 check("New device gets the keys with nothing to type (\(cloud.vaultState))",
                       cloud.vaultState == .on && Keychain.read("orbit-test-secret") == testSecret)
+
+                // Signing out removes this device's copy, but only after a last sync, and deletes nothing from the account.
+                func serverRows(_ token: String) async throws -> [[String: Any]] {
+                    var r = URLRequest(url: URL(string: "\(SupabaseConfig.url)/rest/v1/orbit_records?select=data,kind,deleted")!)
+                    r.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                    return (try JSONSerialization.jsonObject(with: try await URLSession.shared.data(for: r).0) as? [[String: Any]]) ?? []
+                }
+                func deletions(_ token: String) async throws -> Int { try await serverRows(token).filter { J.bool($0["deleted"]) }.count }
+                cloud.deviceTag = "-testA"
+                let deletedBefore = try await deletions("tok")
+                let tasksBefore = count(TaskItem.self, a), booksBefore = count(Book.self, a)
+                try await cloud.signOut(context: a, keepOnDevice: false)
+                check("Sign-out removes this device's copy (\(count(TaskItem.self, a)) tasks, \(count(Book.self, a)) books left)",
+                      count(TaskItem.self, a) == 0 && count(Book.self, a) == 0 && CloudAuth.session == nil)
+                let deletedAfterOut = try await deletions("tok")
+                check("Sign-out deletes nothing from the account (\(deletedAfterOut - deletedBefore) new deletions)", deletedAfterOut == deletedBefore)
+                try await cloud.signIn(email: "test@example.com", password: "secret1", context: a)
+                check("Signing in again brings it all back (\(count(TaskItem.self, a))/\(tasksBefore) tasks, \(count(Book.self, a))/\(booksBefore) books)",
+                      tasksBefore > 0 && count(TaskItem.self, a) == tasksBefore && count(Book.self, a) == booksBefore)
+                let deletedAfterIn = try await deletions("tok")
+                check("Signing in again deletes nothing (\(deletedAfterIn - deletedBefore) new deletions)", deletedAfterIn == deletedBefore)
+
+                // Keeping a copy, then someone else signs in here: the copy is cleared first and never reaches their account.
+                try await cloud.signOut(context: a, keepOnDevice: true)
+                check("Keeping a copy leaves it on this device (\(count(TaskItem.self, a)) tasks)", count(TaskItem.self, a) == tasksBefore)
+                try await cloud.signIn(email: "other@example.com", password: "secret2", context: a)
+                let otherTasks = try await serverRows("tok2").filter { $0["kind"] as? String == "task" }.count
+                check("Another account gets none of it (\(otherTasks) tasks uploaded, \(count(TaskItem.self, a)) left here)",
+                      otherTasks == 0 && count(TaskItem.self, a) == 0)
+                let deletedAfterSwitch = try await deletions("tok")
+                check("The first account loses nothing (\(deletedAfterSwitch - deletedBefore) new deletions)", deletedAfterSwitch == deletedBefore)
             } catch {
                 results.append("FAIL  \(error.localizedDescription)")
             }
@@ -284,6 +315,10 @@ enum SyncTest {
             for tag in ["-testA", "-testB", "-testC"] { cloud.deviceTag = tag; if let s = CloudAuth.session {
                 try? FileManager.default.removeItem(at: URL.applicationSupportDirectory.appending(path: "Orbit/sync-\(s.userID)\(tag).json")) } }
             cloud.signOut()
+            let orbitFolder = URL.applicationSupportDirectory.appending(path: "Orbit", directoryHint: .isDirectory)
+            for f in (try? FileManager.default.contentsOfDirectory(at: orbitFolder, includingPropertiesForKeys: nil)) ?? []
+            where f.lastPathComponent.hasPrefix("sync-") && f.lastPathComponent.contains("-test") { try? FileManager.default.removeItem(at: f) }
+            for tag in ["-testA", "-testB", "-testC"] { UserDefaults.standard.removeObject(forKey: "sync.owner" + tag) }
             cloud.deviceTag = ""
             Keychain.delete("orbit-test-secret")
             if let realPassphrase { Keychain.write(realPassphrase, account: "sync-passphrase") } else { Keychain.delete("sync-passphrase") }

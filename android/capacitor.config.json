@@ -1,0 +1,8 @@
+{
+  "appId": "com.personal.orbit",
+  "appName": "Joshu",
+  "webDir": "dist",
+  "android": { "path": "native" },
+  "server": { "androidScheme": "https" },
+  "plugins": { "CapacitorHttp": { "enabled": false } }
+}

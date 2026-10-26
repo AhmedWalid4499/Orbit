@@ -397,6 +397,17 @@ struct AccountSettings: View {
     @ObservedObject private var cloud = CloudSync.shared
     @State private var confirmDelete = false
     @State private var deleteError: String?
+    @State private var confirmSignOut = false
+    @State private var signingOut = false
+
+    private func signOut(keep: Bool) {
+        signingOut = true
+        deleteError = nil
+        Task {
+            do { try await cloud.signOut(context: context, keepOnDevice: keep) } catch { deleteError = error.localizedDescription }
+            signingOut = false
+        }
+    }
 
     var body: some View {
         Form {
@@ -415,7 +426,14 @@ struct AccountSettings: View {
                     if let last = cloud.lastSync {
                         Text("Last synced \(last.formatted(.relative(presentation: .named)))").font(.caption).foregroundStyle(.secondary)
                     }
-                    Button("Sign Out", role: .destructive) { cloud.signOut() }
+                    Button(signingOut ? "Saving to your account…" : "Sign Out…", role: .destructive) { confirmSignOut = true }
+                        .disabled(signingOut)
+                        .confirmationDialog("Sign out of Joshu?", isPresented: $confirmSignOut, titleVisibility: .visible) {
+                            Button("Sign Out and Remove from This Device", role: .destructive) { signOut(keep: false) }
+                            Button("Sign Out and Keep a Copy Here") { signOut(keep: true) }
+                        } message: {
+                            Text("Everything is saved to your account first, then removed from this device, with your chats and connected accounts like Gmail. Sign in again and it all comes back. Keep a copy only on a device that's just yours.")
+                        }
                     Button("Delete Account…", role: .destructive) { confirmDelete = true }
                         .confirmationDialog("Delete your Joshu account?", isPresented: $confirmDelete, titleVisibility: .visible) {
                             Button("Delete Account", role: .destructive) {

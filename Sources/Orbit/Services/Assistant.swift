@@ -88,6 +88,13 @@ final class AssistantStore: ObservableObject {
         load()
     }
 
+    /// Removes past chats from this device only (they stay in your account). Used when signing out.
+    func forgetLocal() {
+        guard !Snapshot.isActive || ProcessInfo.processInfo.environment["ORBIT_SYNC_TEST"] != nil else { return }
+        try? FileManager.default.removeItem(at: Self.folder)
+        chats = []; currentID = UUID(); items = []; messages = []; system = ""; container = nil; error = nil; lastSavedCount = 0
+    }
+
     func delete(_ id: UUID) {
         guard !Snapshot.isActive else { return }
         try? FileManager.default.removeItem(at: Self.folder.appending(path: "\(id.uuidString).json"))

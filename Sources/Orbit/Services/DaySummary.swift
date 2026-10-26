@@ -48,6 +48,9 @@ final class DaySummaryStore: ObservableObject {
         if !Snapshot.isDemo, let d = UserDefaults.standard.data(forKey: cacheKey), let s = try? JSONDecoder().decode(DaySummary.self, from: d) { summary = s }
     }
 
+    /// Signing out clears this device: the day summary goes too.
+    func forget() { summary = nil; UserDefaults.standard.removeObject(forKey: cacheKey) }
+
     var isToday: Bool { summary?.day == DayKey.key(.now) }
 
     /// Debug snapshots only.

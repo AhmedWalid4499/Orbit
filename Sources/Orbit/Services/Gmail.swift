@@ -309,6 +309,13 @@ final class InboxStore: ObservableObject {
     @Published private(set) var error: String?
     @Published var signingIn = false
 
+    /// Signing out clears this device: connected accounts and the summary of their mail go.
+    func forgetLocal() {
+        for a in accounts { GoogleAuth.remove(a) }
+        accounts = []; digest = nil; error = nil
+        UserDefaults.standard.removeObject(forKey: "inboxDigestCache")
+    }
+
     private let cacheKey = "inboxDigestCache"
 
     private init() {

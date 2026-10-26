@@ -3,7 +3,8 @@ import SwiftData
 
 enum DataReset {
     /// Removes everything Orbit stores locally. Apple Calendar and Reminders are never touched.
-    static func clearAll(_ context: ModelContext) {
+    /// `settings: false` leaves the brief and the assistant's memory (the sync test, which runs on a real Mac).
+    static func clearAll(_ context: ModelContext, settings: Bool = true) {
         try? context.delete(model: TaskItem.self)
         try? context.delete(model: EventItem.self)
         try? context.delete(model: Habit.self)
@@ -27,6 +28,7 @@ enum DataReset {
         try? context.delete(model: ChatThread.self)
         try? context.delete(model: Goal.self)
         try? context.save()
+        guard settings else { return }
         UserDefaults.standard.removeObject(forKey: "aiMorningBriefCache")
         UserDefaults.standard.removeObject(forKey: AssistantMemory.key)
     }

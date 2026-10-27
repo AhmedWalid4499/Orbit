@@ -51,6 +51,9 @@
   .btn.soft { background: var(--card); color: var(--ink); }
   .btn.small { padding: 10px 18px; font-size: 14px; }
   .btn svg { width: 18px; height: 18px; flex: none; }
+  .android-h { margin: 30px 0 4px; font-size: 18px; }
+  .final .btn + .btn { margin-left: 10px; }
+  @media (max-width: 520px) { .final .btn + .btn { margin: 10px 0 0; } }
 
   /* Nav */
   nav { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--canvas) 85%, transparent); backdrop-filter: saturate(1.6) blur(14px);
@@ -236,7 +239,7 @@
       <span class="word"><span id="word-text">joshu</span></span>
       <span class="dot" id="dot"></span>
     </div>
-    <span class="eyebrow">For Mac · iPhone coming soon</span>
+    <span class="eyebrow">For Mac and Android · iPhone coming soon</span>
     <h1>Your whole life, in one calm place.</h1>
     <p class="lede">Joshu brings your day, tasks, habits, money, reading and plans together on your Mac, with an assistant that doesn't just talk: it gets things done.</p>
     <div class="cta">
@@ -244,9 +247,12 @@
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.4 12.6c0-2.4 2-3.6 2.1-3.7-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.1 1-4 2.4-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.1-1.2 2.9-2.4.9-1.4 1.3-2.7 1.3-2.8 0 0-2.5-1-2.5-3.9zM14 5.5c.7-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.5-.6.7-1.2 1.8-1 2.9 1 .1 2.1-.6 2.8-1.4z"/></svg>
         Download for Mac
       </a>
-      <a class="btn soft" href="#features">See what it does</a>
+      <a class="btn soft" href="https://github.com/AhmedWalid4499/Orbit/releases/latest/download/Joshu.apk" data-android>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.6 9.48l1.84-3.18c.16-.31.04-.69-.26-.85a.64.64 0 0 0-.83.22l-1.88 3.24a11.43 11.43 0 0 0-8.94 0L5.65 5.67a.64.64 0 0 0-.87-.2c-.28.18-.37.54-.22.83L6.4 9.48A10.78 10.78 0 0 0 1 18h22a10.78 10.78 0 0 0-5.4-8.52zM7 15.25a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5zm10 0a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5z"/></svg>
+        Download for Android
+      </a>
     </div>
-    <p class="fine"><span data-version>Free · Version 1.42.1</span> · macOS 15 or later · Apple silicon · 7 MB · <a href="https://github.com/AhmedWalid4499/Orbit/releases">Release notes</a></p>
+    <p class="fine"><span data-version>Free · Version 1.42.1</span> · macOS 15 or later on Apple silicon · Android 6 or later · <a href="https://github.com/AhmedWalid4499/Orbit/releases">Release notes</a></p>
 
     <div class="shot-stage">
       <div class="window"><div class="bar"><span></span><span></span><span></span></div>
@@ -441,6 +447,13 @@
     </ol>
     <p>After that, Joshu keeps itself up to date: a button appears in the top bar when a new version is out.</p>
     <a class="btn primary" href="https://github.com/AhmedWalid4499/Orbit/releases/latest/download/Joshu.dmg" data-download>Download Joshu.dmg</a>
+    <h3 class="android-h">On Android</h3>
+    <ol class="steps">
+      <li><span><b>Download</b> Joshu.apk on your phone and open it.</span></li>
+      <li><span>Android asks to <b>allow installing apps</b> from your browser. Allow it once, then tap <b>Install</b>.</span></li>
+      <li><span><b>Sign in</b> with your Joshu account and everything from your Mac comes across.</span></li>
+    </ol>
+    <a class="btn soft" href="https://github.com/AhmedWalid4499/Orbit/releases/latest/download/Joshu.apk" data-android><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.6 9.48l1.84-3.18c.16-.31.04-.69-.26-.85a.64.64 0 0 0-.83.22l-1.88 3.24a11.43 11.43 0 0 0-8.94 0L5.65 5.67a.64.64 0 0 0-.87-.2c-.28.18-.37.54-.22.83L6.4 9.48A10.78 10.78 0 0 0 1 18h22a10.78 10.78 0 0 0-5.4-8.52zM7 15.25a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5zm10 0a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5z"/></svg> Download Joshu.apk</a>
   </div>
   <div class="panel p-privacy">
     <h2>Yours, and private</h2>
@@ -542,6 +555,10 @@
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.4 12.6c0-2.4 2-3.6 2.1-3.7-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.1 1-4 2.4-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.1-1.2 2.9-2.4.9-1.4 1.3-2.7 1.3-2.8 0 0-2.5-1-2.5-3.9zM14 5.5c.7-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.5-.6.7-1.2 1.8-1 2.9 1 .1 2.1-.6 2.8-1.4z"/></svg>
       Download for Mac
     </a>
+    <a class="btn soft" href="https://github.com/AhmedWalid4499/Orbit/releases/latest/download/Joshu.apk" data-android>
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.6 9.48l1.84-3.18c.16-.31.04-.69-.26-.85a.64.64 0 0 0-.83.22l-1.88 3.24a11.43 11.43 0 0 0-8.94 0L5.65 5.67a.64.64 0 0 0-.87-.2c-.28.18-.37.54-.22.83L6.4 9.48A10.78 10.78 0 0 0 1 18h22a10.78 10.78 0 0 0-5.4-8.52zM7 15.25a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5zm10 0a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5z"/></svg>
+      Download for Android
+    </a>
     <p class="fine"><span data-version>Free · Version 1.42.1</span> · macOS 15 or later · Apple silicon</p>
   </div>
 </section>
@@ -603,6 +620,16 @@
   // Border under the nav once you scroll.
   const nav = document.getElementById("nav");
   addEventListener("scroll", () => nav.classList.toggle("scrolled", scrollY > 8), { passive: true });
+
+  // On an Android phone the Android download comes first.
+  if (/Android/i.test(navigator.userAgent)) {
+    document.querySelectorAll("[data-android]").forEach((a) => {
+      a.classList.replace("soft", "primary");
+      const mac = a.parentElement.querySelector("[data-download]");
+      if (mac) { mac.classList.replace("primary", "soft"); a.parentElement.insertBefore(a, mac); }
+    });
+    document.querySelectorAll("nav [data-download]").forEach((a) => { a.href = "https://github.com/AhmedWalid4499/Orbit/releases/latest/download/Joshu.apk"; });
+  }
 
   // The version is stamped in by scripts/release.sh; this only updates it if GitHub has something newer.
   fetch("https://api.github.com/repos/AhmedWalid4499/Orbit/releases/latest")

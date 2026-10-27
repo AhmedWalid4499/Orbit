@@ -494,6 +494,8 @@ final class CloudSync: ObservableObject {
         struct Known: Codable { var kind: String; var hash: String }
     }
     private var state = State()
+    /// How many items the last sync brought down (0 on a brand-new account).
+    private var lastPulled = 0
     /// Lets a test act as two different Macs on one machine.
     var deviceTag = "" { didSet { loadState() } }
     private var stateURL: URL? {
@@ -509,26 +511,20 @@ final class CloudSync: ObservableObject {
     func signIn(email: String, password: String, context: ModelContext) async throws {
         try await CloudAuth.signIn(email: email, password: password)
         self.email = CloudAuth.session?.email
-        adoptDevice(context: context)
-        loadState()
-        await sync(context: context)
+        await firstSync(context: context)
     }
 
     func signInWithGoogle(context: ModelContext) async throws {
         try await CloudAuth.signInWithGoogle()
         self.email = CloudAuth.session?.email
-        adoptDevice(context: context)
-        loadState()
-        await sync(context: context)
+        await firstSync(context: context)
     }
 
     func signUp(email: String, password: String, context: ModelContext) async throws -> CloudAuth.SignUpResult {
         let result = try await CloudAuth.signUp(email: email, password: password)
         if result == .signedIn {
             self.email = CloudAuth.session?.email
-            adoptDevice(context: context)
-            loadState()
-            await sync(context: context)
+            await firstSync(context: context)
         }
         return result
     }
@@ -538,6 +534,18 @@ final class CloudSync: ObservableObject {
         guard let url = URL(string: "\(SupabaseConfig.url)/rest/v1/rpc/delete_my_account") else { return }
         _ = try await rest(url, method: "POST", body: [String: Any]())
         signOut()
+    }
+
+    /// Right after signing in. A brand-new account (nothing on the server yet) gets the welcome tour and the quick
+    /// setup, even on a device that has seen them before.
+    private func firstSync(context: ModelContext) async {
+        adoptDevice(context: context)
+        loadState()
+        let fresh = state.cursor.isEmpty
+        guard await sync(context: context), fresh, lastPulled == 0, !isTestDevice else { return }
+        UserDefaults.standard.set(false, forKey: "tourSeen")
+        UserDefaults.standard.set(false, forKey: "onboarded")
+        UserDefaults.standard.set(true, forKey: SetupFlow.key)
     }
 
     /// Signs out. Unless `keepOnDevice`, a last sync first makes sure everything is safe in the account, and only
@@ -644,6 +652,7 @@ final class CloudSync: ObservableObject {
             let repairing = !UserDefaults.standard.bool(forKey: repairKey) && !state.cursor.isEmpty
             if repairing { state.known = state.known.filter { $0.value.kind == "setting" } }
             let pulled = try await pull(context: context, ignoreDeletes: repairing)
+            lastPulled = pulled
             if pulled > 0 { AssistantStore.shared.adoptSharedChats(context: context) }
             let pushed = try await push(context: context, userID: session.userID)
             do { try await syncVault(userID: session.userID) } catch { vaultState = .error(error.localizedDescription) }

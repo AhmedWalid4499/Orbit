@@ -147,6 +147,15 @@
   <div class="row2"><button class="soft" id="give-cancel" type="button">Cancel</button><button id="give-ok" type="button">Give Pro</button></div>
 </dialog>
 
+<dialog id="del">
+  <h2>Delete account</h2>
+  <p class="muted" id="del-what"></p>
+  <p class="muted">Type their email to confirm:</p>
+  <input id="del-email" autocomplete="off" spellcheck="false">
+  <p class="err" id="del-err"></p>
+  <div class="row2"><button class="soft" id="del-cancel" type="button">Cancel</button><button id="del-ok" type="button" style="background:var(--bad);color:#fff">Delete for good</button></div>
+</dialog>
+
 <script>
 // Joshu's admin page. It holds no keys: you sign in with your own Joshu account, and the `admin` server function
 // checks you're an admin before it shows or changes anything.
@@ -156,7 +165,7 @@ const local = ["localhost", "127.0.0.1"].includes(location.hostname);
 // Only on your own machine can the page talk to a stand-in server (for testing); a link can't redirect it elsewhere.
 const API = (local && new URLSearchParams(location.search).get("api")) || `${SUPABASE}/functions/v1/admin`;
 const $ = (id) => document.getElementById(id);
-let accounts = [], filter = "all", giving = null, length = "30";
+let accounts = [], filter = "all", giving = null, deleting = null, length = "30";
 
 // Sign-in comes back from Google in the address (#access_token=…); keep it for this tab only, then clean the address.
 const back = new URLSearchParams(location.hash.slice(1));
@@ -259,7 +268,7 @@ function render() {
       <div class="c-joined muted">${day(a.created_at)}<br>seen ${ago(a.last_sign_in_at)}</div>
       <div class="c-data num">${a.records.toLocaleString()}</div>
       <div class="c-ai num">${a.ai_today} <span class="muted">/ ${a.ai_month}</span></div>
-      <div class="actions">${canGive ? `<button class="small" data-give="${a.id}">${canEnd ? "Extend" : "Give Pro"}</button>` : ""}${canEnd ? `<button class="danger small" data-end="${a.id}">End Pro</button>` : ""}</div>
+      <div class="actions">${canGive ? `<button class="small" data-give="${a.id}">${canEnd ? "Extend" : "Give Pro"}</button>` : ""}${canEnd ? `<button class="danger small" data-end="${a.id}">End Pro</button>` : ""}${a.admin ? "" : `<button class="danger small" data-del="${a.id}" title="Delete this account">Delete</button>`}</div>
     </div>`;
   }).join("") : `<div class="empty">No accounts here.</div>`;
 }
@@ -274,7 +283,15 @@ $("search").oninput = render;
 $("refresh").onclick = load;
 
 $("rows").onclick = async (e) => {
-  const give = e.target.closest("[data-give]"), end = e.target.closest("[data-end]");
+  const give = e.target.closest("[data-give]"), end = e.target.closest("[data-end]"), del = e.target.closest("[data-del]");
+  if (del) {
+    deleting = accounts.find((a) => a.id === del.dataset.del);
+    const paying = plan(deleting).kind === "paying";
+    $("del-what").innerHTML = `<b>${esc(deleting.email)}</b> and everything synced for it (${deleting.records.toLocaleString()} items) will be deleted for good, on all their devices. This can't be undone.`
+      + (paying ? `<br><br><b>They pay through the App Store.</b> Deleting the account doesn't stop Apple charging them; they cancel in their Apple ID settings.` : "");
+    $("del-email").value = ""; $("del-err").textContent = "";
+    $("del").showModal();
+  }
   if (give) {
     giving = accounts.find((a) => a.id === give.dataset.give);
     $("give-who").textContent = `For ${giving.email}. They can use the assistant and every Pro feature straight away.`;
@@ -302,6 +319,15 @@ $("give-ok").onclick = async () => {
     load();
   } catch (x) { $("give-err").textContent = x.message; }
   $("give-ok").disabled = false;
+};
+
+$("del-cancel").onclick = () => $("del").close();
+$("del-ok").onclick = async () => {
+  if ($("del-email").value.trim().toLowerCase() !== deleting.email.toLowerCase()) { $("del-err").textContent = "That's not their email."; return; }
+  $("del-ok").disabled = true; $("del-err").textContent = "";
+  try { await api({ action: "delete", user_id: deleting.id, email: $("del-email").value.trim() }); $("del").close(); load(); }
+  catch (x) { $("del-err").textContent = x.message; }
+  $("del-ok").disabled = false;
 };
 
 load();

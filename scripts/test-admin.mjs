@@ -37,7 +37,11 @@ function query(table) {
 const db = {
   auth: {
     getUser: async (jwt) => ({ data: { user: tokens[jwt] ? { id: tokens[jwt] } : null } }),
-    admin: { listUsers: async ({ page }) => ({ data: { users: page === 1 ? users : [] }, error: null }) },
+    admin: {
+      listUsers: async ({ page }) => ({ data: { users: page === 1 ? users : [] }, error: null }),
+      getUserById: async (id) => ({ data: { user: users.find((u) => u.id === id) ?? null } }),
+      deleteUser: async (id) => { users.splice(users.findIndex((u) => u.id === id), 1); return { error: null }; },
+    },
   },
   from: query,
   rpc: async (name) => ({
@@ -78,5 +82,10 @@ check("Ends a tester's Pro", revoke.status === 200 && new Date(t.pro_until) <= n
 const forever = await call({ action: "grant", user_id: TESTER, forever: true, note: "Friend" });
 const t2 = tables.entitlements.find((e) => e.user_id === TESTER);
 check("Gives Pro for good", forever.status === 200 && t2.pro_until.startsWith("2100") && t2.note === "Friend");
+check("Delete needs the right email", (await call({ action: "delete", user_id: TESTER, email: "someone@else.com" })).status === 400 && users.length === 3);
+check("Can't delete yourself", (await call({ action: "delete", user_id: OWNER, email: "owner@example.com" })).status === 409);
+const del = await call({ action: "delete", user_id: TESTER, email: "Tester@Example.com" });
+check("Deletes an account", del.status === 200 && users.length === 2 && !users.some((u) => u.id === TESTER));
+check("A deleted account can't be deleted twice", (await call({ action: "delete", user_id: TESTER, email: "tester@example.com" })).status === 404);
 check("Unknown action is refused", (await call({ action: "drop_tables" })).status === 400);
 process.exit(failed ? 1 : 0);

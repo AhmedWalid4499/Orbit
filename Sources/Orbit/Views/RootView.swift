@@ -12,6 +12,7 @@ struct RootView: View {
     @AppStorage("onboarded") private var onboarded = false
     @AppStorage(SignedOutWelcome.key) private var showSignedOutWelcome = false
     @ObservedObject private var cloud = CloudSync.shared
+    @ObservedObject private var pro = Pro.shared
     @ObservedObject private var focus = FocusTimer.shared
     /// In full screen the window has no title bar, so keep the tabs below the camera notch.
     @State private var fullScreenTopInset: CGFloat = 0
@@ -69,6 +70,9 @@ struct RootView: View {
             if tourSeen { WelcomeView() } else { TourView { tourSeen = true } }
         }
         .sheet(isPresented: $state.tourOpen) { TourView { state.tourOpen = false } }
+        // Once, when Pro first switches on (after the tour and setup, and once the purchase sheet is closed).
+        .sheet(isPresented: Binding(get: { pro.showWelcome && onboarded && tourSeen && !state.proOpen && !state.tourOpen },
+                                    set: { if !$0 { pro.welcomeDone() } })) { ProWelcome() }
         .sheet(isPresented: $state.newTaskOpen) {
             NewTaskSheet { state.newTaskOpen = false; DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { CapturePanel.shared.show() } }
         }

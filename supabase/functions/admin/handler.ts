@@ -5,6 +5,7 @@
 // POST { action: "list" }                                   → every account with its plan, AI use and synced data
 // POST { action: "grant", user_id, days | forever, note }   → Pro for a tester or a friend (source "gift")
 // POST { action: "revoke", user_id }                        → ends a grant (App Store purchases are refunded by Apple)
+// POST { action: "delete", user_id, email }                 → deletes the account and everything synced for it
 
 export const ORIGINS = ["https://ahmedwalid4499.github.io", "http://localhost:8790", "http://127.0.0.1:8790"];
 
@@ -70,6 +71,23 @@ export async function handle(req: Request, db: DB): Promise<Response> {
       }
       const { error } = await db.from("entitlements")
         .update({ pro_until: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("user_id", id);
+      if (error) return respond(req, 500, { error: error.message });
+      return respond(req, 200, { ok: true });
+    }
+    case "delete": {
+      const id = String(input.user_id ?? "");
+      if (!id) return respond(req, 400, { error: "Which account?" });
+      if (id === me.id) return respond(req, 409, { error: "You can't delete your own account here." });
+      const { data: target } = await db.auth.admin.getUserById(id);
+      if (!target?.user) return respond(req, 404, { error: "That account doesn't exist any more." });
+      // The page asks you to type the email, and the server checks it, so a wrong click can't delete anyone.
+      if (String(input.email ?? "").trim().toLowerCase() !== String(target.user.email ?? "").toLowerCase()) {
+        return respond(req, 400, { error: "The email doesn't match that account." });
+      }
+      const { data: isAdmin } = await db.from("admins").select("user_id").eq("user_id", id).maybeSingle();
+      if (isAdmin) return respond(req, 409, { error: "That's an admin. Remove them from public.admins first." });
+      // Their synced data, Pro record and AI counts go with the account ("on delete cascade").
+      const { error } = await db.auth.admin.deleteUser(id);
       if (error) return respond(req, 500, { error: error.message });
       return respond(req, 200, { ok: true });
     }

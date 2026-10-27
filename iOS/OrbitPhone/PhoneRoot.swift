@@ -15,6 +15,8 @@ struct PhoneRoot: View {
     @AppStorage("phoneOnboarded") private var onboarded = false
     @AppStorage("tourSeen") private var tourSeen = false
     @AppStorage(SignedOutWelcome.key) private var showSignedOutWelcome = false
+    @ObservedObject private var pro = Pro.shared
+    @AppStorage(SetupFlow.key) private var setupNeeded = false
 
     @State private var tab: PhoneTab = .today
     @State private var morePath: [Tab] = []
@@ -28,6 +30,8 @@ struct PhoneRoot: View {
                 PhoneWelcome { onboarded = true }
             } else if showSignedOutWelcome && !cloud.isSignedIn && !Snapshot.isActive {
                 SignedOutWelcome()
+            } else if setupNeeded && cloud.isSignedIn && !Snapshot.isActive {
+                SetupFlow()
             } else {
                 tabs
             }
@@ -38,6 +42,9 @@ struct PhoneRoot: View {
         .sheet(isPresented: $state.assistantOpen) { AssistantPanel().presentationDragIndicator(.visible) }
         .sheet(isPresented: $state.searchOpen) { SearchView() }
         .fullScreenCover(isPresented: $state.tourOpen) { TourView { state.tourOpen = false } }
+        // Once, when Pro first switches on (after the tour, and once the purchase sheet is closed).
+        .fullScreenCover(isPresented: Binding(get: { pro.showWelcome && tourSeen && !state.proOpen && !state.tourOpen },
+                                              set: { if !$0 { pro.welcomeDone() } })) { ProWelcome() }
         .sheet(isPresented: $state.settingsOpen) { PhoneSettings() }
         .sheet(isPresented: $state.reviewOpen) { ReviewView() }
         .sheet(isPresented: $state.cardOpen) { PhoneCardSheet() }

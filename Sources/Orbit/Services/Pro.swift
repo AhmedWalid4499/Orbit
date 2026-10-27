@@ -24,6 +24,8 @@ final class Pro: ObservableObject {
     @Published private(set) var serverActive = UserDefaults.standard.bool(forKey: "pro.server")
     @Published private(set) var busy = false
     @Published var message: String?
+    /// The one-time "Welcome to Joshu Pro" page: shown the first time Pro is on for this account.
+    @Published private(set) var showWelcome = false
 
     private var updates: Task<Void, Never>?
 
@@ -46,6 +48,13 @@ final class Pro: ObservableObject {
     /// Free accounts connect one email; Pro, as many as they like.
     func canAddEmail(existing: Int) -> Bool { isPro || existing == 0 }
 
+    private var welcomeKey: String { "pro.welcomed." + (CloudAuth.session?.userID ?? "device") }
+
+    func welcomeDone() {
+        UserDefaults.standard.set(true, forKey: welcomeKey)
+        showWelcome = false
+    }
+
     // MARK: Status
 
     /// Checks the App Store and the Joshu server, and loads prices.
@@ -61,6 +70,7 @@ final class Pro: ObservableObject {
         }
         storeActive = active
         await checkServer()
+        if (storeActive || serverActive) && !Snapshot.isActive && !UserDefaults.standard.bool(forKey: welcomeKey) { showWelcome = true }
         UserDefaults.standard.set((storeActive || serverActive) && CloudAuth.session != nil, forKey: "pro.serverAI")
         AIAssistant.shared.reloadKey()
     }

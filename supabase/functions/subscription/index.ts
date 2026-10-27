@@ -30,6 +30,9 @@ async function verifyApple(jws: string): Promise<Record<string, any>> {
   return JSON.parse(new TextDecoder().decode(payload));
 }
 
+/// Whole seconds: Joshu 1.42 and earlier can't read dates with fractions of a second.
+const whole = (d: Date) => new Date(Math.floor(d.getTime() / 1000) * 1000).toISOString().replace(".000Z", "Z");
+
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 }
@@ -50,10 +53,10 @@ Deno.serve(async (req) => {
       if (!BUNDLES.includes(t.bundleId) || !PRODUCTS.includes(t.productId)) return json(400, { error: "Not a Joshu Pro purchase" });
       const until = t.revocationDate ? new Date() : new Date(t.expiresDate ?? 0);
       await admin.from("entitlements").upsert({
-        user_id: user.id, pro_until: until.toISOString(), source: "app_store", product_id: t.productId,
+        user_id: user.id, pro_until: whole(until), source: "app_store", product_id: t.productId,
         original_transaction_id: String(t.originalTransactionId), updated_at: new Date().toISOString(),
       });
-      return json(200, { pro_until: until.toISOString() });
+      return json(200, { pro_until: whole(until) });
     }
 
     if (input.signedPayload) {
@@ -65,7 +68,7 @@ Deno.serve(async (req) => {
       if (!BUNDLES.includes(t.bundleId)) return json(200, { ok: true });
       const ended = ["EXPIRED", "REFUND", "REVOKE", "GRACE_PERIOD_EXPIRED"].includes(note.notificationType);
       const until = ended || t.revocationDate ? new Date() : new Date(t.expiresDate ?? 0);
-      const row: Record<string, unknown> = { pro_until: until.toISOString(), product_id: t.productId, updated_at: new Date().toISOString() };
+      const row: Record<string, unknown> = { pro_until: whole(until), product_id: t.productId, updated_at: new Date().toISOString() };
       // appAccountToken is the Joshu account the purchase was made from (set by the app).
       if (t.appAccountToken) {
         await admin.from("entitlements").upsert({ user_id: t.appAccountToken, source: "app_store",

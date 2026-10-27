@@ -385,7 +385,7 @@ export function QuickAdd() {
 interface Captured { kind: string; title: string; area: Area; date: string; has_time: boolean; duration_minutes: number; amount: number; category: string; priority: number }
 const MONEY_CATS = ['Food', 'Transport', 'Bills', 'Shopping', 'Health', 'Fun', 'Subscriptions', 'Income', 'General']
 
-async function smartParse(text: string): Promise<Captured[]> {
+export async function smartParse(text: string): Promise<Captured[]> {
   const now = new Date()
   const pad = (n: number) => String(n).padStart(2, '0')
   const local = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`
@@ -434,7 +434,7 @@ function localDate(s: string): Date | null {
 }
 
 /** Saves one captured item with every field the Mac expects; returns a short summary. */
-function saveCaptured(i: Captured): string {
+export function saveCaptured(i: Captured): string {
   const nowIso = iso(new Date())
   const area = areaOf(i.area)
   let date = i.date ? localDate(i.date) : null
@@ -593,7 +593,7 @@ export function AddTaskInline() {
 }
 
 /** Small offline parser: #area, ! priority, today / tomorrow / weekday names. */
-function parseQuick(raw: string): { title: string; area: Area; priority: number; due: Date | null } {
+export function parseQuick(raw: string): { title: string; area: Area; priority: number; due: Date | null } {
   let text = raw.trim()
   let area: Area = 'personal'
   let priority = 0

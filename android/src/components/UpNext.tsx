@@ -1,17 +1,18 @@
 // Today › Up next, as on the iPhone (PhoneToday.upNext): a few of today's open tasks and what's still coming up on the
 // calendar (yours and Google Calendar), in one card.
-import { useMemo } from 'react'
-import { CheckCheck } from 'lucide-react'
-import { useRecords, Rec } from '@/lib/store'
-import { Task, CalEvent, AREA_COLOR, areaOf } from '@/lib/models'
+import { useMemo, useState } from 'react'
+import { CheckCheck, Moon, NotebookText } from 'lucide-react'
+import { useRecords, Rec, store } from '@/lib/store'
+import { todayKey, localTicks, setLocalTick } from '@/lib/dayPlan'
+import { Task, CalEvent, DayPlan, AREA_COLOR, areaOf } from '@/lib/models'
 import { parse, startOfDay, addDays, sameDay, fmtTime } from '@/lib/dates'
 import { useExternalEvents, externalEvents, ExternalEvent } from '@/lib/externalEvents'
-import { Card, SectionHeader, EmptyHint, AreaPill } from '@/components/ui'
-import { TaskRow } from '@/components/TaskRow'
+import { Card, SectionHeader, EmptyHint, AreaPill, CheckCircle } from '@/components/ui'
+import { TaskRow, completeTask } from '@/components/TaskRow'
 
 type Entry = { id: string; title: string; start: Date; end: Date; allDay: boolean; color: string; calendar?: string; local?: Rec<CalEvent> }
 
-export default function UpNext({ onTasks, onCalendar }: { onTasks: () => void; onCalendar: () => void }) {
+export default function UpNext({ onTasks, onCalendar, plan }: { onTasks: () => void; onCalendar: () => void; plan?: Rec<DayPlan> | null }) {
   const tasks = useRecords<Task>('task')
   const events = useRecords<CalEvent>('event')
   useExternalEvents()
@@ -35,7 +36,8 @@ export default function UpNext({ onTasks, onCalendar }: { onTasks: () => void; o
   return (
     <Card className="col" padding={14} style={{ gap: 8, flex: 'none' }}>
       <SectionHeader title="Up next" trailing="All tasks" onTrailing={onTasks} />
-      {open.length === 0 && next.length === 0 && <EmptyHint icon={<CheckCheck size={14} />} text="Nothing due and nothing on the calendar. Nice." />}
+      {plan && plan.data.top.length > 0 && <TopThreeList plan={plan} />}
+      {open.length === 0 && next.length === 0 && !(plan && plan.data.top.length) && <EmptyHint icon={<CheckCheck size={14} />} text="Nothing due and nothing on the calendar. Nice." />}
       {open.slice(0, 3).map((t) => <TaskRow key={t.id} rec={t} showDue={parse(t.data.due)! < today} />)}
       {open.length > 3 && <MoreLink text={`+${open.length - 3} more due today`} onClick={onTasks} />}
       {next.length > 0 && (
@@ -69,6 +71,38 @@ function EntryRow({ e }: { e: Entry }) {
       </div>
       {area && <AreaPill area={area} compact />}
       {!e.allDay && e.start <= now && e.end > now && <span className="pill compact" style={{ background: 'var(--critical)', color: '#fff', fontWeight: 700 }}>Now</span>}
+    </div>
+  )
+}
+
+const NUMBER_TINTS = ['var(--lime)', 'var(--pink)', 'var(--cyan)']
+
+/** Your top 3 for today, numbered, inside Up next (the iPhone's TopThreeList). */
+function TopThreeList({ plan }: { plan: Rec<DayPlan> }) {
+  const [, force] = useState(0)
+  const day = todayKey()
+  const ticks = localTicks(day)
+  return (
+    <div className="col" style={{ gap: 8, background: 'var(--canvas)', borderRadius: 14, padding: '12px 14px' }}>
+      <div className="row" style={{ gap: 8, fontSize: 14, fontWeight: 600 }}>
+        <Moon size={15} />Your top 3<span className="spacer" />{plan.data.note && <NotebookText size={18} className="secondary" />}
+      </div>
+      {plan.data.top.map((title, i) => {
+        const task = plan.data.taskUUIDs[i] ? store.get<Task>(plan.data.taskUUIDs[i]) : undefined
+        const done = task ? task.data.isDone : ticks.includes(i)
+        const toggle = () => {
+          if (task) { if (task.data.isDone) store.update<Task>(task.id, { isDone: false, completedAt: null }); else completeTask(task) }
+          else { setLocalTick(day, i, !done); force((n) => n + 1) }
+        }
+        return (
+          <div key={i} className="row" style={{ gap: 12 }}>
+            <span style={{ width: 24, height: 24, borderRadius: '50%', background: NUMBER_TINTS[i % 3], color: 'var(--sticker-ink)', fontSize: 12, fontWeight: 700,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>{i + 1}</span>
+            <span className="clamp1" style={{ flex: 1, fontSize: 15, textDecoration: done ? 'line-through' : 'none', opacity: done ? 0.5 : 1 }}>{title}</span>
+            <CheckCircle on={done} size={24} onClick={toggle} />
+          </div>
+        )
+      })}
     </div>
   )
 }

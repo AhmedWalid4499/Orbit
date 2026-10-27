@@ -106,7 +106,6 @@ export default function PhoneTasks() {
 
   return (
     <div className="page col" style={{ gap: 12 }}>
-      <h1 className="page-title">Tasks</h1>
 
       <div className="row" style={{ gap: 8, overflowX: 'auto', margin: '0 -16px', padding: '0 16px 2px', scrollbarWidth: 'none' }}>
         {filters.map((f) => {

@@ -48,7 +48,8 @@ export async function handle(req: Request, db: DB): Promise<Response> {
       const forever = input.forever === true;
       const days = Number(input.days ?? 0);
       if (!forever && !(days > 0 && days <= 3650)) return respond(req, 400, { error: "Give Pro for 1 to 3650 days, or for good." });
-      const until = forever ? new Date("2100-01-01T00:00:00Z") : new Date(Date.now() + days * 86_400_000);
+      // Whole seconds: Joshu 1.42 and earlier can't read dates with fractions of a second.
+      const until = forever ? new Date("2100-01-01T00:00:00Z") : new Date(Math.floor((Date.now() + days * 86_400_000) / 1000) * 1000);
       const { data: current } = await db.from("entitlements").select("pro_until, source").eq("user_id", id).maybeSingle();
       // A paid subscription that already runs longer stays as it is.
       if (current?.source === "app_store" && current.pro_until && new Date(current.pro_until) > until) {
@@ -56,7 +57,7 @@ export async function handle(req: Request, db: DB): Promise<Response> {
       }
       const note = String(input.note ?? "").slice(0, 80) || null;
       const { error } = await db.from("entitlements").upsert(
-        { user_id: id, pro_until: until.toISOString(), source: "gift", note, updated_at: new Date().toISOString() },
+        { user_id: id, pro_until: until.toISOString().replace(".000Z", "Z"), source: "gift", note, updated_at: new Date().toISOString() },
         { onConflict: "user_id" },
       );
       if (error) return respond(req, 500, { error: error.message });
@@ -70,7 +71,7 @@ export async function handle(req: Request, db: DB): Promise<Response> {
         return respond(req, 409, { error: "They pay through the App Store. Apple handles cancelling and refunds." });
       }
       const { error } = await db.from("entitlements")
-        .update({ pro_until: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("user_id", id);
+        .update({ pro_until: new Date(Math.floor(Date.now() / 1000) * 1000).toISOString().replace(".000Z", "Z"), updated_at: new Date().toISOString() }).eq("user_id", id);
       if (error) return respond(req, 500, { error: error.message });
       return respond(req, 200, { ok: true });
     }

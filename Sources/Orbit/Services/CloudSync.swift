@@ -206,8 +206,12 @@ private struct SyncKind {
 
 enum J {
     static let iso = ISO8601DateFormatter()
+    /// The server sometimes adds fractions of a second ("…:45.123+00:00"), which the plain formatter rejects.
+    private static let isoFraction: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return f
+    }()
     static func date(_ d: Date?) -> Any { d.map { iso.string(from: $0) } ?? NSNull() }
-    static func date(_ v: Any?) -> Date? { (v as? String).flatMap { iso.date(from: $0) } }
+    static func date(_ v: Any?) -> Date? { (v as? String).flatMap { iso.date(from: $0) ?? isoFraction.date(from: $0) } }
     static func str(_ v: Any?) -> String { v as? String ?? "" }
     static func num(_ v: Any?) -> Double { (v as? NSNumber)?.doubleValue ?? 0 }
     static func int(_ v: Any?) -> Int { (v as? NSNumber)?.intValue ?? 0 }
@@ -542,7 +546,9 @@ final class CloudSync: ObservableObject {
         adoptDevice(context: context)
         loadState()
         let fresh = state.cursor.isEmpty
-        guard await sync(context: context), fresh, lastPulled == 0, !isTestDevice else { return }
+        let synced = await sync(context: context)
+        if !isTestDevice { await Pro.shared.refresh() }   // this account's Pro, not the last one's
+        guard synced, fresh, lastPulled == 0, !isTestDevice else { return }
         UserDefaults.standard.set(false, forKey: "tourSeen")
         UserDefaults.standard.set(false, forKey: "onboarded")
         UserDefaults.standard.set(true, forKey: SetupFlow.key)

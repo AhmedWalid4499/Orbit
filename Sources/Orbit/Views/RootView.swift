@@ -64,6 +64,10 @@ struct RootView: View {
         .sheet(isPresented: $state.cardOpen) { ProfileCardSheet() }
         .sheet(isPresented: $state.proOpen) { ProSheet() }
         .task { await Pro.shared.refresh() }
+        // Pro given from the admin page (or bought on another device) shows up when you come back to Joshu.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await Pro.shared.refresh() }
+        }
         .sheet(isPresented: $state.planOpen) { PlanTomorrowSheet() }
         // First launch: the tour, then a few quick settings.
         .sheet(isPresented: Binding(get: { !onboarded && !Snapshot.isActive }, set: { if !$0 { onboarded = true } })) {

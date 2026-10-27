@@ -109,6 +109,8 @@ struct PhoneRoot: View {
             WakeListener.shared.appActive = phase == .active
             guard phase == .active, !Snapshot.isActive else { return }
             Task { await WelcomeVoice.greetIfDue(context: context, apple: apple) }
+            // Pro given from the admin page (or bought on another device) shows up when you come back to Joshu.
+            Task { await Pro.shared.refresh() }
             var rounds = 0
             while !Task.isCancelled {
                 await cloud.syncIfSignedIn(context: context)

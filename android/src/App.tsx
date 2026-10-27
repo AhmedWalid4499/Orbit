@@ -2,7 +2,7 @@
 // PhoneRoot: Today, Tasks, Money, the assistant and More), plus the Android-only pieces.
 import { useEffect, useState, ReactNode } from 'react'
 import { App as CapApp } from '@capacitor/app'
-import { Sun, ListChecks, CreditCard, LayoutGrid, ChevronLeft, Settings as Gear, Plus, IdCard, TrendingUp, Search as SearchIcon } from 'lucide-react'
+import { Sun, ListChecks, CreditCard, LayoutGrid, ChevronLeft, Settings as Gear, Plus, Sparkles, IdCard, TrendingUp, Search as SearchIcon } from 'lucide-react'
 import * as cloud from '@/lib/cloud'
 import { store, useSetting } from '@/lib/store'
 import { demoRecords, demoProfileCard } from '@/lib/demo'
@@ -44,7 +44,7 @@ import { onVoiceStart, startWake } from './voice'
 import VoiceOrb from './components/VoiceOrb'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import Assistant from './screens/Assistant'
-import More, { MoreTab, MORE_TITLES } from './screens/More'
+import More, { MoreTab } from './screens/More'
 import Settings from './screens/Settings'
 import Ideas from './screens/Ideas'
 import Goals from './screens/Goals'
@@ -166,21 +166,22 @@ function Shell({ onSignIn }: { onSignIn: () => void }) {
     return () => { h.then((x) => x.remove()) }
   }, [settings, adding, searching, review, plan, card, page, main])
 
-  const title = main === 'more' && page ? MORE_TITLES[page] : null
-
   return (
     <div className="phone">
-      {/* The iPhone's bar: quick add, the assistant's orb and your avatar menu; running timers in a strip below */}
-      <header className="phone-bar">
-        {title
-          ? <button className="row back" onClick={() => setPage(null)}><ChevronLeft size={20} /> More</button>
-          : <div className="logo">joshu<i /></div>}
+      {/* The iPhone's bar: the large title (or back on More pages) and one capsule with quick add, the orb and your
+          avatar menu; running timers in a strip below. The assistant has its own header. */}
+      {main !== 'assistant' && <header className="phone-bar">
+        {page
+          ? <button className="bar-back" aria-label="Back to More" onClick={() => setPage(null)}><ChevronLeft size={22} /></button>
+          : <h1 className="bar-title">{main === 'today' ? 'Today' : main === 'tasks' ? 'Tasks' : main === 'money' ? 'Money' : 'More'}</h1>}
         <span className="spacer" />
-        <button className="icon-btn" aria-label="Quick add" onClick={() => setAdding(true)}><Plus size={19} /></button>
-        <button className="orb-btn" aria-label={assistant} onClick={() => setMain('assistant')}><Orb size={34} /></button>
-        <ProfileMenu initials={initials} photo={photo} onCard={() => setCard(true)} onReview={() => setReview(true)}
-          onSearch={() => setSearching(true)} onSettings={() => setSettings(true)} />
-      </header>
+        <div className="bar-tools">
+          <button aria-label="Quick add" onClick={() => setAdding(true)}><Plus size={22} /></button>
+          <button aria-label={assistant} onClick={() => setMain('assistant')}><Orb size={30} /></button>
+          <ProfileMenu initials={initials} photo={photo} onCard={() => setCard(true)} onReview={() => setReview(true)}
+            onSearch={() => setSearching(true)} onSettings={() => setSettings(true)} />
+        </div>
+      </header>}
       <div className="timer-strip"><FocusPill /><ReadingTimerPill onOpen={() => open('reading')} /></div>
       <main className="phone-main">
         {main === 'today' && <Today nav={nav} />}
@@ -203,11 +204,11 @@ function Shell({ onSignIn }: { onSignIn: () => void }) {
         {main === 'more' && page === 'insights' && <Insights />}
       </main>
       <nav className="tabbar">
-        <TabButton on={main === 'today'} icon={<Sun size={21} />} label="Today" onClick={() => { setMain('today'); setPage(null) }} />
-        <TabButton on={main === 'tasks'} icon={<ListChecks size={21} />} label="Tasks" onClick={() => setMain('tasks')} />
-        <TabButton on={main === 'money'} icon={<CreditCard size={21} />} label="Money" onClick={() => setMain('money')} />
-        <TabButton on={main === 'assistant'} icon={<Orb size={22} spark={false} />} label={assistant} onClick={() => setMain('assistant')} />
-        <TabButton on={main === 'more'} icon={<LayoutGrid size={21} />} label="More" onClick={() => { if (main === 'more') setPage(null); setMain('more') }} />
+        <TabButton on={main === 'today'} icon={<Sun size={24} strokeWidth={2.4} />} label="Today" onClick={() => { setMain('today'); setPage(null) }} />
+        <TabButton on={main === 'tasks'} icon={<ListChecks size={24} strokeWidth={2.2} />} label="Tasks" onClick={() => setMain('tasks')} />
+        <TabButton on={main === 'money'} icon={<CreditCard size={24} fill="currentColor" stroke="var(--canvas)" strokeWidth={1.6} />} label="Money" onClick={() => setMain('money')} />
+        <TabButton on={main === 'assistant'} icon={<Sparkles size={24} fill="currentColor" strokeWidth={1.2} />} label={assistant} onClick={() => setMain('assistant')} />
+        <TabButton on={main === 'more'} icon={<LayoutGrid size={24} fill="currentColor" strokeWidth={1.4} />} label="More" onClick={() => { if (main === 'more') setPage(null); setMain('more') }} />
       </nav>
       <Settings open={settings} onClose={() => setSettings(false)} onSignIn={() => { setSettings(false); onSignIn() }} />
       <SearchSheet open={searching} onClose={() => setSearching(false)} onGo={(d) => open(d)} />

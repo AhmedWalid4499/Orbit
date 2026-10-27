@@ -4,19 +4,25 @@ body { -webkit-tap-highlight-color: transparent; font-size: 15px; }
 input, textarea, select { font-size: 16px; }
 
 .phone { height: 100%; display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); }
-.phone-bar { display: flex; align-items: center; gap: 8px; padding: 10px 16px 6px; flex: none; min-height: 58px; }
-.phone-bar .logo { font-size: 28px; }
-.phone-bar .back { font-weight: 600; font-size: 16px; gap: 2px; min-height: 40px; }
-.phone-bar .icon-btn, .phone-bar .avatar { width: 38px; height: 38px; flex: none; }
-.phone-bar .timer-title { display: none; }
+.phone-bar { display: flex; align-items: center; gap: 8px; padding: 8px 16px 4px; flex: none; min-height: 64px; }
+/* The iPhone's large inline title and the capsule of toolbar buttons */
+.bar-title { font: 800 34px/1.1 var(--ui); letter-spacing: -0.5px; margin: 0; }
+.bar-back { width: 44px; height: 44px; border-radius: 50%; background: var(--canvas); box-shadow: 0 2px 14px rgba(0, 0, 0, 0.1); display: inline-flex; align-items: center; justify-content: center; color: var(--ink); }
+.bar-tools { display: flex; align-items: center; gap: 4px; padding: 4px 6px; border-radius: 999px; background: var(--canvas); box-shadow: 0 2px 16px rgba(0, 0, 0, 0.1); }
+.bar-tools > button, .bar-tools > div > .avatar { width: 40px; height: 40px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--ink); }
+.bar-tools .avatar { font-size: 13px; }
 .phone-main { flex: 1; min-height: 0; position: relative; overflow: hidden; }
 .phone-main > * { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
-.tabbar { flex: none; display: flex; border-top: 1px solid var(--line); background: var(--canvas); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); }
-.tabbar button { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; font-weight: 600; color: var(--ink3); padding: 2px 0; }
-.tabbar .tab-icon { width: 54px; height: 30px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; transition: background 0.15s; }
-.tabbar button.on { color: var(--ink); }
-.tabbar button.on .tab-icon { background: var(--lime); color: var(--sticker-ink); }
+/* The iPhone's floating tab bar: a capsule over the content, the selected tab on a grey pill */
+.phone-main { padding-bottom: 0; }
+.phone-main > * { padding-bottom: 96px !important; }
+.tabbar { position: fixed; left: 16px; right: 16px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 30; display: flex; padding: 5px;
+  border-radius: 999px; background: color-mix(in srgb, var(--canvas) 88%, transparent); backdrop-filter: blur(18px) saturate(1.6);
+  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.14), inset 0 0 0 0.5px rgba(0, 0, 0, 0.06); }
+.tabbar button { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; font-size: 11px; font-weight: 500; color: var(--ink); padding: 7px 0 6px; border-radius: 999px; transition: background 0.15s; }
+.tabbar .tab-icon { height: 26px; display: inline-flex; align-items: center; justify-content: center; }
+.tabbar button.on { background: color-mix(in srgb, var(--ink) 8%, transparent); }
 
 /* Pages: phone gutters instead of the desktop's 32px */
 .page { padding: 4px 16px 28px !important; }
@@ -133,11 +139,11 @@ input, textarea, select { font-size: 16px; }
 .today-glance .mini > span:last-child { font-size: 11px; font-weight: 600; opacity: 0.75; }
 .code-block { background: var(--card); border-radius: 12px; margin: 8px 0; overflow: hidden; white-space: normal; }
 .code-block pre { margin: 0; padding: 4px 12px 12px; font: 12.5px/1.5 ui-monospace, 'SF Mono', Menlo, monospace; overflow-x: auto; white-space: pre; }
-.orb-btn { width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.orb-btn-unused { width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
 .timer-strip { display: flex; gap: 8px; padding: 0 16px; flex: none; }
 .timer-strip:has(> *) { padding-bottom: 6px; }
 .timer-strip .timer-title { display: inline; }
-.phone-bar .pop-menu { right: 0; top: 46px; min-width: 200px; }
+.phone-bar .pop-menu { right: -6px; top: 50px; min-width: 200px; }
 .phone-bar .pop-menu button { min-height: 44px; font-size: 15px; }
 .money-wrap { padding-top: 4px; }
 .money-wrap > .page { height: auto !important; overflow: visible !important; }
@@ -158,3 +164,26 @@ input, textarea, select { font-size: 16px; }
 @keyframes breathe { 50% { transform: scale(1.06); } }
 @keyframes talk { from { transform: scale(1); } to { transform: scale(1.05); } }
 .signin-back { position: fixed; top: calc(14px + env(safe-area-inset-top)); left: 16px; font-size: 15px; }
+
+/* Today (PhoneToday) */
+.ptd-weather { display: flex; align-items: center; gap: 8px; background: var(--card); border-radius: 999px; padding: 6px 16px 6px 12px; flex: none; }
+.ptd-chips, .ptd-scroll { display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px; padding: 0 16px; flex: none; }
+.ptd-chips button { display: inline-flex; align-items: center; gap: 6px; background: var(--card); border-radius: 999px; padding: 8px 12px; font-size: 13px; font-weight: 650; white-space: nowrap; flex: none; color: var(--ink); }
+.ptd-chips button.lime { background: var(--lime); color: var(--sticker-ink); }
+.ptd-capture { display: flex; align-items: center; gap: 10px; background: var(--card); border-radius: 999px; padding: 6px 6px 6px 16px; }
+.ptd-capture input { font-size: 15px; flex: 1; min-width: 0; }
+.ptd-mic { width: 38px; height: 38px; border-radius: 50%; background: var(--canvas); display: inline-flex; align-items: center; justify-content: center; flex: none; color: var(--ink); }
+.ptd-mic.live { background: var(--critical); color: #fff; }
+.ptd-glance { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.ptd-mini { border-radius: 14px; padding: 9px 10px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; color: var(--sticker-ink); min-width: 0; text-align: left; }
+.ptd-mini .display { max-width: 100%; line-height: 1.15; }
+.ptd-mini > span:last-child { font-size: 11px; font-weight: 600; opacity: 0.75; }
+.ptd-habit { display: inline-flex; align-items: center; gap: 6px; border: 1.5px solid; border-radius: 999px; padding: 7px 12px; font-size: 13px; font-weight: 600; white-space: nowrap; background: var(--canvas); color: var(--ink); flex: none; }
+.ptd-habit small { font-size: 11px; }
+.ptd-mood { display: flex; align-items: center; gap: 4px; background: var(--blush); border-radius: 16px; padding: 6px 12px; }
+.ptd-mood button { width: 34px; height: 34px; border-radius: 50%; font-size: 20px; }
+.ptd-small { display: inline-flex; align-items: center; gap: 6px; background: var(--card); border-radius: 999px; padding: 6px 12px 6px 6px; font-size: 13px; font-weight: 500; white-space: nowrap; flex: none; color: var(--ink); }
+.ptd-small > span { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--sticker-ink); }
+.ptd-mini .display { letter-spacing: -0.3px; }
+.ptd-glance { gap: 7px; }
+.ptd-mini { padding: 9px 8px; }

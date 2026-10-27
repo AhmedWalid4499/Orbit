@@ -32,7 +32,6 @@ export default function More({ onOpen, onSettings, onCard, onReview, onPlan }: {
   const first = useSetting<string>('userName', '').split(' ')[0]
   return (
     <div className="page col" style={{ gap: 16 }}>
-      <h1 className="page-title">More</h1>
       <div className="more-grid">
         {TILES.map((t) => (
           <button key={t.id} className="more-tile" onClick={() => onOpen(t.id)}>

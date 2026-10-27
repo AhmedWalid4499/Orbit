@@ -93,6 +93,7 @@ fi
 # Android: Joshu.apk (the Android app's updater looks for it on the latest release). ORBIT_SKIP_ANDROID=1 carries the
 # previous release's APK over unchanged.
 APK_TYPE=application/vnd.android.package-archive
+APK_FOR_SITE=""
 if [[ -n "${ORBIT_SKIP_ANDROID:-}" ]]; then
   PREVA="$(api "https://api.github.com/repos/$REPO/releases?per_page=10" | python3 -c '
 import json, sys
@@ -108,12 +109,17 @@ for r in json.load(sys.stdin):
     echo "Android: kept $PREVA's APK (no Android update in this release)."
   fi
 elif scripts/build-android.sh; then
+  APK_FOR_SITE=build/Joshu.apk
   api -X POST -H "Content-Type: $APK_TYPE" --data-binary @build/Joshu.apk \
     "https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=Joshu.apk" >/dev/null
   echo "Android: https://github.com/$REPO/releases/latest/download/Joshu.apk"
 else
   echo "Skipped the Android build (see message above); the rest of the release is published."
 fi
+
+# The website's download buttons use copies on the site itself (no links elsewhere); a skipped Android build keeps
+# the APK already there.
+scripts/publish-downloads.sh "$APK_FOR_SITE" || echo "The website downloads weren't updated (see above); the release itself is published."
 
 echo "Published Orbit $VERSION: https://github.com/$REPO/releases/tag/$TAG"
 echo "Installer: https://github.com/$REPO/releases/latest/download/Joshu.dmg"

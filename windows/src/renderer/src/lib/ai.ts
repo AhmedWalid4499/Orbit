@@ -17,14 +17,14 @@ export async function structured<T>(system: string, user: string, schema: Record
 }
 
 /** One streamed model turn. `onText` gets the full text so far. */
-export async function streamTurn(opts: { system: string; messages: Msg[]; tools?: Tool[]; effort?: Effort; maxTokens?: number; onText?: (text: string) => void }):
-  Promise<{ text: string; content: Block[]; stopReason: string | null }> {
+export async function streamTurn(opts: { system: string; messages: Msg[]; tools?: Tool[]; effort?: Effort; maxTokens?: number; container?: string; onText?: (text: string) => void }):
+  Promise<{ text: string; content: Block[]; stopReason: string | null; container?: string }> {
   const id = crypto.randomUUID()
   const off = window.orbit.onClaudeDelta((d) => { if (d.id === id) opts.onText?.(d.text) })
   try {
-    const r = await window.orbit.claudeTurn({ id, system: opts.system, messages: opts.messages, tools: opts.tools, effort: opts.effort ?? 'low', maxTokens: opts.maxTokens })
+    const r = await window.orbit.claudeTurn({ id, system: opts.system, messages: opts.messages, tools: opts.tools, effort: opts.effort ?? 'low', maxTokens: opts.maxTokens, container: opts.container })
     if (!r.ok) throw new AIError(r.error ?? 'Claude request failed.')
-    return { text: r.text ?? '', content: r.content ?? [], stopReason: r.stopReason ?? null }
+    return { text: r.text ?? '', content: r.content ?? [], stopReason: r.stopReason ?? null, container: r.container }
   } finally {
     off()
   }

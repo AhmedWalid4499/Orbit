@@ -33,3 +33,9 @@ export const secrets = {
   },
   names: (): string[] => Object.keys(cache ?? {}),
 }
+
+/** Removes every key and sign-in from this phone (signing out without keeping a copy). */
+export async function clearSecrets(): Promise<void> {
+  cache = {}
+  await persist()
+}

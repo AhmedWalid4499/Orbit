@@ -1,7 +1,7 @@
 // Settings on Android: the Windows app's account, AI and email sections, plus bank texts (SMS),
 // what the assistant remembers, and updates from the GitHub release.
 import { useEffect, useState } from 'react'
-import { RefreshCw, MessageSquareText, Trash2, Download } from 'lucide-react'
+import { RefreshCw, MessageSquareText, Trash2, Download, Link2 } from 'lucide-react'
 import * as cloud from '@/lib/cloud'
 import { store, useSetting, useStoreVersion } from '@/lib/store'
 import { Modal, defaultCurrency } from '@/components/ui'
@@ -11,10 +11,18 @@ import { BANKS, chosenBanks, setChosenBanks, extraSenders, setExtraSenders } fro
 import { smsEnabled, enableSms, disableSms, checkBankTexts, smsActivity, onSmsChange } from '../sms'
 import { memories, setMemories } from './Assistant'
 import { isNative } from '../native'
+import DeleteAccount from '../components/DeleteAccount'
+import Connections from './Connections'
+import { isPro, proUntil, refreshPro, onProChange } from '../pro'
+import { refreshKeys } from '@/lib/ai'
+import { Orb } from '../components/Orb'
+import { wakeEnabled, setWakeEnabled } from '../voice'
+import { secrets, clearSecrets } from '../secrets'
+import { syncVault } from '@/lib/vault'
 
 const CURRENCIES = ['EGP', 'USD', 'EUR', 'GBP', 'AED', 'SAR', 'KWD', 'QAR', 'JPY', 'CAD', 'AUD', 'INR']
 
-export default function Settings({ open, onClose }: { open: boolean; onClose: () => void }) {
+export default function Settings({ open, onClose, onSignIn }: { open: boolean; onClose: () => void; onSignIn: () => void }) {
   useStoreVersion()
   const session = cloud.getSession()
   const userName = useSetting<string>('userName', '')
@@ -25,6 +33,8 @@ export default function Settings({ open, onClose }: { open: boolean; onClose: ()
   const city = useSetting<string>('weatherCity', '')
   const [version, setVersion] = useState('')
   const [update, setUpdate] = useState<{ state: string; version?: string; message?: string }>({ state: 'idle' })
+  const [signingOut, setSigningOut] = useState(false)
+  const [connections, setConnections] = useState(false)
 
   useEffect(() => {
     window.orbit.config().then((c) => setVersion(c.version))
@@ -36,18 +46,36 @@ export default function Settings({ open, onClose }: { open: boolean; onClose: ()
       <h2 className="page-title" style={{ fontSize: 28, marginBottom: 18 }}>Settings</h2>
 
       <Section title="Account">
-        <div className="col" style={{ gap: 2 }}>
-          <strong className="clamp1">{session?.email}</strong>
-          <span className="muted" style={{ fontSize: 12 }}>
-            {store.syncing ? 'Syncing…' : store.status || 'Synced with your Joshu account'}
-            {store.lastSync && ` · ${relativeTime(store.lastSync)}`}
-          </span>
-        </div>
-        <div className="row">
-          <button className="btn-soft" onClick={() => store.sync()} disabled={store.syncing}><RefreshCw size={13} /> Sync now</button>
-          <button className="btn-soft" onClick={() => { if (confirm('Sign out of Joshu on this phone?')) { cloud.signOut(); onClose() } }}>Sign out</button>
-        </div>
+        {store.isLocal ? <>
+          <div className="col" style={{ gap: 2 }}>
+            <strong>On this phone only</strong>
+            <span className="muted" style={{ fontSize: 12 }}>Sign in or create an account to sync with your other devices. What you've added here comes with you.</span>
+          </div>
+          <button className="btn-primary" style={{ alignSelf: 'flex-start' }} onClick={onSignIn}>Sign in or create account</button>
+        </> : <>
+          <div className="col" style={{ gap: 2 }}>
+            <strong className="clamp1">{session?.email}</strong>
+            <span className="muted" style={{ fontSize: 12 }}>
+              {store.syncing ? 'Syncing…' : store.status || 'Synced with your Joshu account'}
+              {store.lastSync && ` · ${relativeTime(store.lastSync)}`}
+            </span>
+          </div>
+          <div className="row">
+            <button className="btn-soft" onClick={() => store.sync()} disabled={store.syncing}><RefreshCw size={13} /> Sync now</button>
+            <button className="btn-soft" onClick={() => setSigningOut(true)}>Sign out</button>
+          </div>
+          <DeleteAccount onDone={onClose} />
+        </>}
       </Section>
+
+      <Section title="Connections">
+        <span className="secondary" style={{ fontSize: 13 }}>Gmail and Google Calendar, GitHub, bank texts and Goodreads.</span>
+        <button className="btn-soft" style={{ alignSelf: 'flex-start' }} onClick={() => setConnections(true)}><Link2 size={13} /> Open Connections</button>
+      </Section>
+      <Connections open={connections} onClose={() => setConnections(false)}
+        onBankTexts={() => { setConnections(false); setTimeout(() => document.getElementById('bank-texts')?.scrollIntoView({ behavior: 'smooth' }), 250) }} />
+
+      {signingOut && <SignOutChoice onCancel={() => setSigningOut(false)} onDone={onClose} />}
 
       <Section title="You">
         <Field label="Your name"><input key={userName} className="field" defaultValue={userName} onBlur={(e) => store.setSetting('userName', e.target.value.trim())} /></Field>
@@ -55,7 +83,12 @@ export default function Settings({ open, onClose }: { open: boolean; onClose: ()
         <Field label="Weather city"><input key={city} className="field" defaultValue={city} placeholder="Cairo" onBlur={(e) => store.setSetting('weatherCity', e.target.value.trim())} /></Field>
       </Section>
 
-      <AISection />
+      <ProSection />
+      <details className="advanced">
+        <summary>Your own Anthropic key and synced keys</summary>
+        <AISection />
+      </details>
+      <VoiceSection />
       <MemorySection />
       <BankTextsSection />
       <EmailSection />
@@ -132,7 +165,7 @@ function BankTextsSection() {
   }
 
   return (
-    <Section title="Bank texts">
+    <div id="bank-texts"><Section title="Bank texts">
       <div className="row" style={{ alignItems: 'flex-start' }}>
         <MessageSquareText size={18} style={{ flex: 'none', marginTop: 2 }} />
         <span style={{ flex: 1, fontSize: 13 }} className="secondary">
@@ -178,6 +211,98 @@ function BankTextsSection() {
           ))}
         </div>
       )}
+    </Section></div>
+  )
+}
+
+/** Signing out, as on the Mac and iPhone (1.40): everything is saved to your account first, then removed from
+ *  this phone (data, chats, keys and connected accounts) unless you keep a copy. Sign in again and it all comes back. */
+function SignOutChoice({ onCancel, onDone }: { onCancel: () => void; onDone: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const go = async (keep: boolean) => {
+    setBusy(true); setError('')
+    const session = cloud.getSession()
+    await store.sync()
+    if (store.unsent > 0) {
+      setBusy(false)
+      setError("Some changes couldn't be saved to your account, so nothing was removed and you're still signed in. Check your connection and try again, or keep a copy on this phone.")
+      if (!keep) return
+    }
+    if (secrets.get('sync-passphrase')) {
+      const v = await syncVault()
+      if (v.state !== 'on' && !keep) {
+        setBusy(false)
+        setError("Your keys and connected accounts couldn't be saved to your account, so nothing was removed and you're still signed in. Try again, or keep a copy on this phone.")
+        return
+      }
+    }
+    if (!keep && session) {
+      for (const k of Object.keys(localStorage)) {
+        if (k === `orbit.cache.${session.userID}` || k.startsWith('orbit.ask.') || k.startsWith('orbit.github') || k.startsWith('orbit.linkedin') || k === 'orbit.gcal'
+          || k.startsWith('bankSMS.') || k === 'orbit.profilePhoto') localStorage.removeItem(k)
+      }
+      await clearSecrets()
+    }
+    cloud.signOut()
+    onDone()
+  }
+  return (
+    <div className="card col" style={{ gap: 10, marginBottom: 18, background: 'var(--blush)' }}>
+      <strong>Sign out of Joshu?</strong>
+      <span className="secondary" style={{ fontSize: 13 }}>
+        Everything is saved to your account first, then removed from this phone, with your chats and connected accounts like Gmail.
+        Sign in again and it all comes back. Keep a copy only on a phone that's just yours.
+      </span>
+      {error && <span style={{ fontSize: 13, color: 'var(--critical)' }}>{error}</span>}
+      <button className="btn-primary" disabled={busy} onClick={() => go(false)}>{busy ? 'Saving…' : 'Sign out'}</button>
+      <button className="btn-soft" disabled={busy} onClick={() => go(true)}>Sign out and keep a copy here</button>
+      <button className="link" disabled={busy} onClick={onCancel}>Cancel</button>
+    </div>
+  )
+}
+
+/** Joshu Pro: the AI through Joshu's server, given to your account (no key to add). */
+function ProSection() {
+  const [, tick] = useState(0)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => onProChange(() => tick((n) => n + 1)), [])
+  const on = isPro()
+  const own = !!secrets.get('anthropic-api-key')
+  const until = proUntil()
+  return (
+    <Section title="Joshu Pro">
+      <div className="row" style={{ gap: 12, alignItems: 'flex-start' }}>
+        <Orb size={40} />
+        <div className="col" style={{ gap: 4, flex: 1 }}>
+          <strong>{on ? "You're on Pro. Thanks for supporting Joshu." : own ? 'Using your own Anthropic key.' : 'Your AI assistant needs Joshu Pro.'}</strong>
+          <span className="secondary" style={{ fontSize: 13 }}>
+            {on ? `Your assistant, morning brief, email summaries and money coach are on${until < 4e12 ? ` until ${new Date(until).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}. No API keys, nothing to set up.`
+              : 'Everything in Joshu, plus your AI assistant and the smart features that save you time. Pro is added to your Joshu account; once it is, it works here straight away.'}
+          </span>
+        </div>
+      </div>
+      <button className="btn-soft" style={{ alignSelf: 'flex-start' }} disabled={busy}
+        onClick={async () => { setBusy(true); await refreshPro(); await refreshKeys(); setBusy(false) }}>
+        <RefreshCw size={13} /> {busy ? 'Checking…' : 'Check my plan'}
+      </button>
+    </Section>
+  )
+}
+
+/** "Hey Joshu" while the app is open (Settings › AI › Voice on the Mac). */
+function VoiceSection() {
+  const [on, setOn] = useState(wakeEnabled())
+  const name = useSetting<string>('assistantName', 'Joshu') || 'Joshu'
+  return (
+    <Section title="Voice">
+      <label className="row" style={{ alignItems: 'flex-start', gap: 12 }}>
+        <input type="checkbox" checked={on} style={{ marginTop: 3 }} onChange={(e) => { setOn(e.target.checked); setWakeEnabled(e.target.checked) }} />
+        <span className="col" style={{ gap: 2 }}>
+          <strong>Listen for “Hey {name}”</strong>
+          <span className="secondary" style={{ fontSize: 13 }}>While Joshu is open, say “Hey {name}” and just talk. It answers out loud and keeps listening until you say “stop” or “bye”. Listening happens on this phone.</span>
+        </span>
+      </label>
     </Section>
   )
 }

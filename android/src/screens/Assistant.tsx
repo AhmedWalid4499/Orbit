@@ -1,13 +1,15 @@
 // The assistant tab (the iPhone's AssistantTabView): chat with tools that act in Joshu, past chats shared
 // with the Mac and iPhone, photos and PDFs, and voice (speak, and hear the reply).
 import { useEffect, useRef, useState, ReactNode } from 'react'
-import { Sparkles, SquarePen, ArrowUp, Undo2, ListChecks, Calendar, Flame, Library, StickyNote, Mountain, CreditCard, Target, History, Mic, Square, Paperclip, X, Trash2, Volume2, VolumeX, Brain } from 'lucide-react'
+import { Sparkles, SquarePen, ArrowUp, Undo2, ListChecks, Calendar, Flame, Library, StickyNote, Mountain, CreditCard, Target, History, Mic, Square, Paperclip, X, Trash2, Volume2, VolumeX, Brain, Globe, Code2, Copy, Check, AudioLines } from 'lucide-react'
 import { streamTurn, useKeys, useAssistantName, Block, Tool } from '@/lib/ai'
 import { ASK_TOOLS, runTool, undo as undoAction, Outcome } from '@/lib/askTools'
 import { store, useStoreVersion } from '@/lib/store'
 import { relativeTime, parse } from '@/lib/dates'
 import { Convo, Item, newConvo, listChats, openChat, saveChat, deleteChat } from '../chats'
 import { native, isNative } from '../native'
+import { Orb } from '../components/Orb'
+import { setVoiceAsker, voiceAnswer, voiceState, startConversation } from '../voice'
 
 const SUGGESTIONS = [
   'What should I focus on today?',
@@ -33,6 +35,31 @@ const EXTRA_TOOLS: Tool[] = [
   { name: 'forget', description: 'Forget remembered facts containing this text.',
     input_schema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'], additionalProperties: false } },
 ]
+
+/** Anthropic-run tools, as on the Mac: web search, reading pages and a code sandbox. */
+function serverTools(): any[] {
+  const city = store.setting<string>('weatherCity') || Intl.DateTimeFormat().resolvedOptions().timeZone.split('/').pop()?.replace(/_/g, ' ') || ''
+  return [
+    { type: 'web_search_20260209', name: 'web_search', max_uses: 6, user_location: { type: 'approximate', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, city } },
+    { type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 4 },
+    { type: 'code_execution_20260521', name: 'code_execution' },
+  ]
+}
+
+/** What a server tool did, as a row in the chat (Assistant.swift). */
+function serverActions(content: Block[]): Item[] {
+  const out: Item[] = []
+  for (const b of content) {
+    if (b.type !== 'server_tool_use') continue
+    const input = b.input ?? {}
+    let text = ''
+    if (b.name === 'web_search' && input.query) text = `Searched the web: “${input.query}”`
+    else if (b.name === 'web_fetch' && input.url) { try { text = `Read ${new URL(input.url).host}` } catch { text = `Read ${input.url}` } }
+    else if (String(b.name).includes('code_execution')) text = input.command ? `Ran: ${String(input.command).slice(0, 60)}` : input.path ? `Worked on ${input.path}` : 'Ran code'
+    if (text && out[out.length - 1]?.text !== text) out.push({ id: crypto.randomUUID(), role: 'action', text, symbol: b.name === 'web_search' || b.name === 'web_fetch' ? 'web' : 'code', undone: false })
+  }
+  return out
+}
 
 async function run(name: string, input: Record<string, any>): Promise<Outcome> {
   if (name === 'remember') {
@@ -73,7 +100,7 @@ Current date and time: ${when} (${Intl.DateTimeFormat().resolvedOptions().timeZo
 
 const ICONS: Record<string, ReactNode> = {
   task: <ListChecks size={12} />, event: <Calendar size={12} />, habit: <Flame size={12} />, books: <Library size={12} />,
-  note: <StickyNote size={12} />, bucket: <Mountain size={12} />, money: <CreditCard size={12} />, budget: <Target size={12} />, memory: <Brain size={12} />,
+  note: <StickyNote size={12} />, web: <Globe size={12} />, code: <Code2 size={12} />, bucket: <Mountain size={12} />, money: <CreditCard size={12} />, budget: <Target size={12} />, memory: <Brain size={12} />,
 }
 
 interface Attachment { name: string; block: Block }
@@ -112,7 +139,11 @@ export default function Assistant({ seed, onSeedUsed }: { seed?: string; onSeedU
     if (seed && keys.anthropic && !busy) { onSeedUsed(); send(seed) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seed, keys.anthropic])
-  useEffect(() => () => { if (isNative) { native.stopListening().catch(() => {}); native.stopSpeaking().catch(() => {}) } }, [])
+  useEffect(() => () => { if (isNative && voiceState().phase === 'off') { native.stopListening().catch(() => {}); native.stopSpeaking().catch(() => {}) } }, [])
+  // Questions asked by voice ("Hey Joshu") are answered here and read aloud.
+  const sendRef = useRef(send)
+  sendRef.current = send
+  useEffect(() => { setVoiceAsker((q) => sendRef.current(q, true)); return () => setVoiceAsker(null) }, [])
 
   async function send(raw: string, spoken = false) {
     let text = raw.trim()
@@ -138,25 +169,31 @@ export default function Assistant({ seed, onSeedUsed }: { seed?: string; onSeedU
               const next = received.slice(shown.length, shown.length + 3)
               shown += next
               setRevealed(shown)
+              voiceAnswer(shown)
               await new Promise((r) => setTimeout(r, /[.?!\n]/.test(next) ? 140 : 18))
             } else await new Promise((r) => setTimeout(r, 40))
           }
         })()
         let turn
         try {
-          turn = await streamTurn({ system: c.system, messages: c.messages, tools: [...ASK_TOOLS, ...EXTRA_TOOLS], effort: 'medium', onText: (t) => { received = t } })
+          turn = await streamTurn({ system: c.system, messages: c.messages, tools: [...ASK_TOOLS, ...EXTRA_TOOLS, ...serverTools()], effort: 'medium',
+            container: c.container, onText: (t) => { received = t } })
         } finally {
           done = true
           await reveal
           setRevealed('')
         }
-        c = { ...convoRef.current, messages: [...convoRef.current.messages, { role: 'assistant', content: turn.content }] }
+        c = { ...convoRef.current, ...(turn.container ? { container: turn.container } : {}),
+          messages: [...convoRef.current.messages, { role: 'assistant', content: turn.content }] }
+        c = { ...c, items: [...c.items, ...serverActions(turn.content)] }
         if (turn.text.trim()) {
           c = { ...c, items: [...c.items, { id: crypto.randomUUID(), role: 'assistant', text: turn.text.trim(), symbol: '', undone: false }] }
           spokenReply += (spokenReply ? '\n' : '') + turn.text.trim()
         }
         update(c)
 
+        // A long web search pauses the turn; sending the conversation back as it is lets it carry on.
+        if (turn.stopReason === 'pause_turn') continue
         const calls = turn.content.filter((b: Block) => b.type === 'tool_use')
         if (turn.stopReason === 'max_tokens') { setError(`${assistant}'s reply was cut off. Ask it to continue.`); break }
         if (turn.stopReason !== 'tool_use' || !calls.length) break
@@ -179,6 +216,7 @@ export default function Assistant({ seed, onSeedUsed }: { seed?: string; onSeedU
       saveChat(convoRef.current)
     }
     if (spokenReply && (spoken || speakAll) && isNative) {
+      voiceAnswer(spokenReply, true)
       await native.speak({ text: spokenReply.replace(/\*\*?|\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/•/g, '') }).catch(() => {})
     }
   }
@@ -240,14 +278,13 @@ export default function Assistant({ seed, onSeedUsed }: { seed?: string; onSeedU
   return (
     <div className="assistant">
       <div className="row" style={{ padding: '4px 16px 10px', gap: 10 }}>
-        <span style={{ width: 34, height: 34, borderRadius: '50%', background: 'var(--lime)', color: 'var(--sticker-ink)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
-          <Sparkles size={16} />
-        </span>
+        <Orb size={34} busy={busy || listening} />
         <div className="display" style={{ fontSize: 24, flex: 1 }}>{assistant}</div>
         <button className="icon-btn" aria-label={speakAll ? 'Stop reading replies aloud' : 'Read replies aloud'}
           onClick={() => { const v = !speakAll; setSpeakAll(v); localStorage.setItem(SPEAK_KEY, v ? 'on' : 'off'); if (!v && isNative) native.stopSpeaking() }}>
           {speakAll ? <Volume2 size={16} /> : <VolumeX size={16} />}
         </button>
+        <button className="icon-btn" aria-label="Talk hands-free" onClick={() => startConversation()}><AudioLines size={16} /></button>
         <button className="icon-btn" aria-label="Past chats" onClick={() => setHistory(true)}><History size={16} /></button>
         <button className="icon-btn" aria-label="New chat" disabled={busy} onClick={fresh}><SquarePen size={16} /></button>
       </div>
@@ -255,7 +292,7 @@ export default function Assistant({ seed, onSeedUsed }: { seed?: string; onSeedU
       {!keys.anthropic ? (
         <div className="col secondary" style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, textAlign: 'center', gap: 12 }}>
           <Sparkles size={28} />
-          <div style={{ fontSize: 14 }}>To chat with {assistant}, open Settings (the gear at the top) and either unlock the keys synced from your Mac with your sync passphrase, or paste your Anthropic API key.</div>
+          <div style={{ fontSize: 14 }}>{assistant} comes with Joshu Pro: no keys, nothing to set up. Once Pro is on your account, open Settings › Joshu Pro and tap Check my plan.</div>
         </div>
       ) : (
         <>
@@ -329,9 +366,30 @@ function Row({ item, onUndo }: { item: Item; onUndo: () => void }) {
   )
 }
 
-/** Assistant text with light markdown: **bold**, *italic*, [links](https://…). */
+/** Assistant text with light markdown: **bold**, *italic*, [links](https://…), and ``` code blocks with a Copy button. */
 function AssistantText({ text }: { text: string }) {
-  return <div style={{ fontSize: 15, lineHeight: 1.55, whiteSpace: 'pre-wrap', userSelect: 'text', paddingRight: 20 }}>{inline(text)}</div>
+  const parts = text.split(/```([\w+-]*)\n?([\s\S]*?)(?:```|$)/g)
+  const out: ReactNode[] = []
+  for (let i = 0; i < parts.length; i += 3) {
+    if (parts[i]) out.push(<span key={i}>{inline(parts[i].replace(/^\n+|\n+$/g, ''))}</span>)
+    if (i + 2 < parts.length) out.push(<CodeBlock key={`c${i}`} lang={parts[i + 1]} code={parts[i + 2].replace(/\n$/, '')} />)
+  }
+  return <div style={{ fontSize: 15, lineHeight: 1.55, whiteSpace: 'pre-wrap', userSelect: 'text', paddingRight: 20, minWidth: 0 }}>{out}</div>
+}
+
+function CodeBlock({ lang, code }: { lang: string; code: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <div className="code-block">
+      <div className="row" style={{ padding: '6px 10px', fontSize: 11, fontWeight: 600 }}>
+        <span className="muted">{lang || 'code'}</span><span className="spacer" />
+        <button className="row" style={{ gap: 4, fontSize: 12 }} onClick={() => { navigator.clipboard?.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 1500) }}>
+          {copied ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
+        </button>
+      </div>
+      <pre>{code}</pre>
+    </div>
+  )
 }
 
 function inline(text: string): ReactNode[] {

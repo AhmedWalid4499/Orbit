@@ -13,10 +13,13 @@ interface OrbitNative {
   bringToFront(): Promise<void>
   smsPermission(o: { request: boolean }): Promise<{ granted: boolean }>
   readSms(o: { since: number; limit: number }): Promise<{ messages: Sms[] }>
-  listen(o: { lang?: string }): Promise<{ text: string }>
+  listen(o: { lang?: string; quiet?: boolean }): Promise<{ text: string }>
   stopListening(): Promise<void>
   speak(o: { text: string; lang?: string }): Promise<void>
   stopSpeaking(): Promise<void>
+  httpStream(o: { id: string; url: string; headers: Record<string, string>; body: string }): Promise<void>
+  addListener(event: 'head', fn: (d: { id: string; status: number; contentType: string }) => void): Promise<PluginListenerHandle>
+  addListener(event: 'chunk', fn: (d: { id: string; data: string }) => void): Promise<PluginListenerHandle>
   addListener(event: 'partial', fn: (d: { text: string }) => void): Promise<PluginListenerHandle>
   addListener(event: 'level', fn: (d: { level: number }) => void): Promise<PluginListenerHandle>
 }

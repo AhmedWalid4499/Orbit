@@ -7,7 +7,7 @@ export type MoreTab = 'calendar' | 'habits' | 'bucket' | 'notes' | 'reading' | '
 
 export const MORE_TITLES: Record<MoreTab, string> = {
   calendar: 'Calendar', habits: 'Habits', bucket: 'Bucket list', notes: 'Journal & Notes', reading: 'Reading', documents: 'Documents',
-  ideas: 'Ideas', goals: 'Goals', bills: 'Bills', accounts: 'Accounts', github: 'GitHub', jobs: 'Job alerts', insights: 'Insights',
+  ideas: 'Ideas', goals: 'Goals', bills: 'Bills', accounts: 'Accounts', github: 'GitHub', jobs: 'LinkedIn', insights: 'Insights',
 }
 
 const TILES: { id: MoreTab; icon: ReactNode; color: string }[] = [

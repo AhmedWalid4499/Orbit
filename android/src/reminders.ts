@@ -59,9 +59,12 @@ export async function scheduleReminders(): Promise<void> {
           b.data.amount ? `${Math.round(b.data.amount)} ${cur}` : 'Bill reminder')
       }
     }
-    const pending = await LocalNotifications.getPending()
-    if (pending.notifications.length) await LocalNotifications.cancel({ notifications: pending.notifications.map((n) => ({ id: n.id })) })
+    // Replace only the reminders scheduled here before (spending alerts and others are left alone).
+    const mine: number[] = JSON.parse(localStorage.getItem('reminders.ids') ?? '[]')
+    if (mine.length) await LocalNotifications.cancel({ notifications: mine.map((id) => ({ id })) })
     list.sort((a, b) => a.schedule.at.getTime() - b.schedule.at.getTime())
-    if (list.length) await LocalNotifications.schedule({ notifications: list.slice(0, 60) })
+    const next = list.slice(0, 60)
+    if (next.length) await LocalNotifications.schedule({ notifications: next })
+    localStorage.setItem('reminders.ids', JSON.stringify(next.map((n) => n.id)))
   } catch { /* notifications are a nice-to-have */ }
 }

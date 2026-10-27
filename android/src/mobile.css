@@ -114,3 +114,47 @@ input, textarea, select { font-size: 16px; }
 .rstat .v { font-size: 22px; }
 .reading-main .row:has(> .rstat) { display: grid !important; grid-template-columns: 1fr 1fr; gap: 10px !important; }
 .rstat { padding: 12px; }
+
+/* Joshu's orb (the Mac's AssistantAvatar): the wordmark's full stop and the assistant's face */
+.orb { position: relative; display: inline-block; border-radius: 50%; overflow: hidden; flex: none; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45); }
+.orb-wheel, .orb-shine { position: absolute; inset: 0; border-radius: 50%; }
+.orb-wheel.busy { animation: orb-spin 3s linear infinite; }
+@keyframes orb-spin { to { transform: rotate(360deg); } }
+.orb-spark { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.28)); }
+.logo i {
+  background: radial-gradient(circle at 32% 26%, rgba(255,255,255,0.6), rgba(255,255,255,0) 60%),
+              conic-gradient(from 120deg, #C6F432, #3DDC97, #22D3EE, #8B7CF6, #F472B6, #C6F432) !important;
+  width: 0.3em !important; height: 0.3em !important; margin-bottom: 0.12em !important; margin-left: 0.06em;
+}
+.today-clock > * { flex: none !important; min-width: 0 !important; align-items: stretch !important; }
+.today-glance { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.today-glance .mini { border-radius: 14px; padding: 9px 10px; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; color: var(--sticker-ink); min-width: 0; text-align: left; }
+.today-glance .mini .display { font-size: 17px; max-width: 100%; }
+.today-glance .mini > span:last-child { font-size: 11px; font-weight: 600; opacity: 0.75; }
+.code-block { background: var(--card); border-radius: 12px; margin: 8px 0; overflow: hidden; white-space: normal; }
+.code-block pre { margin: 0; padding: 4px 12px 12px; font: 12.5px/1.5 ui-monospace, 'SF Mono', Menlo, monospace; overflow-x: auto; white-space: pre; }
+.orb-btn { width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.timer-strip { display: flex; gap: 8px; padding: 0 16px; flex: none; }
+.timer-strip:has(> *) { padding-bottom: 6px; }
+.timer-strip .timer-title { display: inline; }
+.phone-bar .pop-menu { right: 0; top: 46px; min-width: 200px; }
+.phone-bar .pop-menu button { min-height: 44px; font-size: 15px; }
+.money-wrap { padding-top: 4px; }
+.money-wrap > .page { height: auto !important; overflow: visible !important; }
+/* Money: the bar on top shows the budget month; the shared screen keeps its tabs and month arrows */
+.money-wrap > .col:first-child { padding: 0 16px 6px; }
+.money-wrap > .col:first-child > .row:first-child > .icon-btn { display: none; }
+.money-wrap .row:has(> .page-title) > .page-title { display: none; }
+.advanced { margin-bottom: 18px; }
+.advanced > summary { font-size: 13px; color: var(--ink2); padding: 8px 2px; cursor: pointer; }
+
+/* Voice mode */
+.voice-orb { position: fixed; inset: 0; z-index: 120; background: color-mix(in srgb, var(--canvas) 94%, transparent); backdrop-filter: blur(12px);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 36px; animation: fade 0.2s; }
+.voice-close { position: absolute; top: calc(16px + env(safe-area-inset-top)); right: 16px; }
+.voice-ball { filter: drop-shadow(0 12px 40px rgba(139, 124, 246, 0.35)); transition: transform 0.3s; }
+.voice-ball.listening { animation: breathe 2.4s ease-in-out infinite; }
+.voice-ball.speaking { animation: talk 0.5s ease-in-out infinite alternate; }
+@keyframes breathe { 50% { transform: scale(1.06); } }
+@keyframes talk { from { transform: scale(1); } to { transform: scale(1.05); } }
+.signin-back { position: fixed; top: calc(14px + env(safe-area-inset-top)); left: 16px; font-size: 15px; }

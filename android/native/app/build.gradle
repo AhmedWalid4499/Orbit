@@ -4,12 +4,12 @@ android {
     namespace "com.personal.orbit"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.personal.orbit"
+        applicationId "com.personal.joshu"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // scripts/build-android.sh passes the app's version (VERSION) in.
-        versionCode (project.findProperty('orbitVersionCode') ?: '1') as int
-        versionName project.findProperty('orbitVersionName') ?: '1.0'
+        versionCode((project.findProperty('orbitVersionCode') ?: '1').toString().toInteger())
+        versionName((project.findProperty('orbitVersionName') ?: '1.0').toString())
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

@@ -17,14 +17,20 @@ export interface Rec<T = Record<string, any>> {
 
 /** Settings that follow you between devices (same list as the Mac app). */
 export const SYNCED_SETTINGS = ['monthlyBudget', 'readingGoal', 'currencyCode', 'assistantName', 'userName', 'weatherCity', 'profileCard',
-  'merchantRules', 'categoryBudgets', 'assistant.memory', 'assistantSpeaks', 'goodreadsUser', 'budget.periodStart'] as const
+  'merchantRules', 'categoryBudgets', 'assistant.memory', 'assistantSpeaks', 'goodreadsUser', 'budget.periodStart', 'notify.budgets', 'notify.bigCharges', 'spendAlerts.sent'] as const
 export type SettingKey = (typeof SYNCED_SETTINGS)[number]
 
 interface Cache {
   cursor: string
   records: Record<string, Rec>
   pending: Record<string, Rec>
+  /** Local mode only: the account a kept copy came from. Its edits go back only into that account. */
+  owner?: string
 }
+
+/** Where Joshu keeps your data when you use it without an account (Android). */
+export const LOCAL_CACHE = 'orbit.cache.local'
+const ACCOUNT_CACHE = /^orbit\.cache\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 class Store {
   private records = new Map<string, Rec>()
@@ -37,8 +43,12 @@ class Store {
   private pushTimer: ReturnType<typeof setTimeout> | null = null
   private saveTimer: ReturnType<typeof setTimeout> | null = null
   private loop: ReturnType<typeof setInterval> | null = null
+  private local = false
+  private localOwner: string | undefined
   syncing = false
   lastSync: Date | null = null
+  /** Edits made here that haven't reached the account yet. */
+  get unsent(): number { return this.pending.size }
   status = ''
 
   // MARK: Lifecycle
@@ -46,6 +56,7 @@ class Store {
   async start(): Promise<void> {
     const s = getSession()
     if (!s) return
+    if (this.local) this.stop() // signing in from local mode: adoptLocal() then brings its edits in
     this.userID = s.userID
     for (const key of SYNCED_SETTINGS) this.settingIDs.set(key, await settingID(key))
     this.load()
@@ -67,7 +78,81 @@ class Store {
     this.emit()
   }
 
+  /** Using Joshu without an account: everything stays on this device under LOCAL_CACHE and nothing syncs.
+   *  The first time, a copy kept on this device at sign-out (the most recently synced account) is carried on with. */
+  async startLocal(): Promise<void> {
+    if (getSession()) return
+    for (const key of SYNCED_SETTINGS) this.settingIDs.set(key, await settingID(key))
+    let c = readCache(LOCAL_CACHE)
+    if (!c) {
+      let best: { key: string; cache: Cache } | null = null
+      for (const key of Object.keys(localStorage)) {
+        if (!ACCOUNT_CACHE.test(key)) continue
+        const cache = readCache(key)
+        if (cache && (!best || (cache.cursor ?? '') > (best.cache.cursor ?? ''))) best = { key, cache }
+      }
+      if (best) c = { cursor: '', records: best.cache.records, pending: {}, owner: best.key.slice('orbit.cache.'.length) }
+    }
+    this.records = new Map(Object.entries(c?.records ?? {}))
+    this.pending = new Map(Object.entries(c?.pending ?? {}))
+    this.localOwner = c?.owner
+    this.cursor = ''
+    this.userID = ''
+    this.local = true
+    this.status = 'On this device only'
+    this.writeLocal()
+    this.emit()
+  }
+
+  /** True while using Joshu without an account. */
+  get isLocal(): boolean { return this.local }
+
+  /** Whether there's data made without an account waiting to come into the account you sign in to. */
+  hasLocalData(): boolean {
+    const c = readCache(LOCAL_CACHE)
+    return !!c && Object.values(c.pending ?? {}).some((r) => !r.deleted)
+  }
+
+  /** Right after start() on sign-in (like the Mac's adoptDevice): what you did without an account comes into this
+   *  account and syncs up, then the local copy is removed. Joshu never moves one account's data into another, so
+   *  edits to a copy kept from a different account are dropped (they're safe in that account up to sign-out).
+   *  Settings already set in the account keep the account's value. Returns how many items were brought in. */
+  async adoptLocal(): Promise<number> {
+    const c = readCache(LOCAL_CACHE)
+    if (!c || !this.userID) return 0
+    let moved = 0
+    if (!c.owner || c.owner.toLowerCase() === this.userID.toLowerCase()) {
+      for (const r of Object.values(c.pending ?? {})) {
+        if (!c.owner && r.deleted) continue // never reached any account
+        if (!c.owner && r.kind === 'setting' && this.records.get(r.id) && !this.records.get(r.id)!.deleted) continue
+        const { updated_at: _, ...rec } = r
+        this.records.set(r.id, rec)
+        this.pending.set(r.id, rec)
+        moved++
+      }
+    }
+    localStorage.removeItem(LOCAL_CACHE)
+    if (moved) {
+      this.emit()
+      this.save()
+      await this.sync()
+    }
+    return moved
+  }
+
+  /** Removes everything kept without an account (e.g. when deleting it from this device). */
+  discardLocal(): void {
+    localStorage.removeItem(LOCAL_CACHE)
+    if (this.local) { this.records.clear(); this.pending.clear(); this.localOwner = undefined; this.emit() }
+  }
+
+  private writeLocal(): void {
+    const c: Cache = { cursor: '', records: Object.fromEntries(this.records), pending: Object.fromEntries(this.pending), owner: this.localOwner }
+    try { localStorage.setItem(LOCAL_CACHE, JSON.stringify(c)) } catch { /* storage full: kept in memory */ }
+  }
+
   stop(): void {
+    if (this.local) { this.writeLocal(); this.local = false; this.localOwner = undefined; this.status = '' }
     if (this.loop) clearInterval(this.loop)
     this.loop = null
     window.removeEventListener('focus', this.onFocus)
@@ -93,6 +178,7 @@ class Store {
   private save(): void {
     if (this.saveTimer) clearTimeout(this.saveTimer)
     this.saveTimer = setTimeout(() => {
+      if (this.local) { this.writeLocal(); return }
       if (!this.userID) return
       const c: Cache = { cursor: this.cursor, records: Object.fromEntries(this.records), pending: Object.fromEntries(this.pending) }
       localStorage.setItem(`orbit.cache.${this.userID}`, JSON.stringify(c))
@@ -164,6 +250,7 @@ class Store {
 
   private write(r: Rec): void {
     this.records.set(r.id, r)
+    if (this.local) { this.pending.set(r.id, r); this.emit(); this.save(); return } // no account: this device only
     if (!this.userID) { this.emit(); return } // demo preview: keep it in memory
     this.pending.set(r.id, r)
     this.emit()
@@ -224,6 +311,10 @@ class Store {
     }
     return rows.length
   }
+}
+
+function readCache(key: string): Cache | null {
+  try { return JSON.parse(localStorage.getItem(key) ?? 'null') } catch { return null }
 }
 
 /** Same id the Mac app uses for a setting: the first 16 bytes of SHA-256("orbit-setting:<key>") as a UUID. */

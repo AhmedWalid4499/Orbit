@@ -1,11 +1,11 @@
 #!/bin/zsh
-# Builds the Android app (shown as "Joshu") into build/Orbit.apk: the Windows app's screens plus android/src,
+# Builds Joshu for Android into build/Joshu.apk: the Windows app's screens plus android/src,
 # in a Capacitor shell (android/native). Version comes from VERSION.
 #
 # Needs a JDK 21 and the Android SDK. Without them on the PATH it uses ~/.local/android-tools (jdk-21*/, sdk/),
 # which this script sets up the first time (no admin password needed).
-# The release key is ~/Library/Application Support/Orbit/android/joshu-release.keystore and its password is in the
-# Keychain ("Orbit Android keystore"). Keep both: an update signed with a different key won't install over the app.
+# The release key is ~/Library/Application Support/Joshu/android/joshu-release.keystore and its password is in the
+# Keychain ("Joshu Android keystore"). Keep both: an update signed with a different key won't install over the app.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TOOLS="$HOME/.local/android-tools"
@@ -37,12 +37,12 @@ if [[ ! -d "$ANDROID_HOME/platforms/android-35" || ! -d "$ANDROID_HOME/build-too
 fi
 
 # MARK: Release key (made once, kept outside the repo)
-KEYDIR="$HOME/Library/Application Support/Orbit/android"
+KEYDIR="$HOME/Library/Application Support/Joshu/android"
 KEYSTORE="$KEYDIR/joshu-release.keystore"
-if ! PASS="$(security find-generic-password -s "Orbit Android keystore" -w 2>/dev/null)"; then
+if ! PASS="$(security find-generic-password -s "Joshu Android keystore" -w 2>/dev/null)"; then
   [[ -f "$KEYSTORE" ]] && { echo "The keystore exists but its password isn't in the Keychain. Restore it before building."; exit 1; }
   PASS="$(openssl rand -base64 24 | tr -d '/+=')"
-  security add-generic-password -s "Orbit Android keystore" -a joshu -w "$PASS"
+  security add-generic-password -s "Joshu Android keystore" -a joshu -w "$PASS"
 fi
 if [[ ! -f "$KEYSTORE" ]]; then
   mkdir -p "$KEYDIR"
@@ -62,5 +62,5 @@ echo "sdk.dir=$ANDROID_HOME" > local.properties
 ./gradlew --quiet assembleRelease -PorbitVersionName="$VERSION" -PorbitVersionCode="$CODE" \
   -PorbitKeystore="$KEYSTORE" -PorbitKeystorePassword="$PASS"
 mkdir -p "$ROOT/build"
-cp app/build/outputs/apk/release/app-release.apk "$ROOT/build/Orbit.apk"
-echo "Built build/Orbit.apk (Joshu $VERSION, version code $CODE)"
+cp app/build/outputs/apk/release/app-release.apk "$ROOT/build/Joshu.apk"
+echo "Built build/Joshu.apk (Joshu $VERSION, version code $CODE)"

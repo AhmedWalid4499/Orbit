@@ -5,6 +5,7 @@ import { store, Rec } from '@/lib/store'
 import { Txn, MONEY_CATEGORIES } from '@/lib/models'
 import { iso, parse, sameDay } from '@/lib/dates'
 import { structured } from '@/lib/ai'
+import { learnedCategory } from './screens/MoneyRules'
 
 export interface Parsed { kind: 'expense' | 'refund' | 'income' | 'not_payment'; amount: number; currency: string; merchant: string; category: string }
 export interface BankAccount { name: string; last4: string; kind: string; colorIndex: number; balance: number; balanceAt: string | null; createdAt: string }
@@ -117,8 +118,8 @@ export function merchantIn(text: string): string {
 
 export function guessCategory(title: string): string {
   const t = title.toLowerCase()
-  const rules = store.setting<Record<string, string>>('merchantRules') ?? {}
-  for (const [k, v] of Object.entries(rules)) if (k && t.includes(k.toLowerCase())) return v
+  const learned = learnedCategory(title)
+  if (learned) return learned
   const map: [string, string[]][] = [
     ['Income', ['salary', 'payroll']],
     ['Food', ['lunch', 'dinner', 'breakfast', 'coffee', 'grocer', 'food', 'restaurant', 'snack', 'carrefour', 'seoudi', 'spinneys',

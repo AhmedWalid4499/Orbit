@@ -2,6 +2,7 @@
 // windows/src/main/claude.ts. The key stays in the encrypted secret store and is read per request.
 import Anthropic from '@anthropic-ai/sdk'
 import { secrets } from './secrets'
+import { isPro, proFetch } from './pro'
 
 export const MODEL = 'claude-opus-5-5'
 // Server-side fallback: if a safety classifier declines, the API retries on a suitable model.
@@ -9,15 +10,24 @@ const BETAS: Anthropic.Beta.AnthropicBeta[] = ['server-side-fallback-2026-07-01'
 
 let client: Anthropic | null = null
 let clientKey = ''
+/** Your own key if you added one (the owner's setup), otherwise Joshu's AI server with Joshu Pro. */
 function api(): Anthropic {
   const key = secrets.get('anthropic-api-key')
-  if (!key) throw new Error('Add your Anthropic API key in Settings › AI.')
-  if (!client || key !== clientKey) { client = new Anthropic({ apiKey: key, dangerouslyAllowBrowser: true }); clientKey = key }
+  const want = key || (isPro() ? 'joshu-pro' : '')
+  if (!want) throw new Error('This needs Joshu Pro.')
+  if (!client || want !== clientKey) {
+    client = key ? new Anthropic({ apiKey: key, dangerouslyAllowBrowser: true })
+      : new Anthropic({ apiKey: 'joshu-pro', dangerouslyAllowBrowser: true, fetch: proFetch as any, maxRetries: 1 })
+    clientKey = want
+  }
   return client
 }
 
 /** Turns SDK errors into short messages the app can show. */
 function explain(e: unknown): string {
+  // Joshu's AI server explains itself (sign in, needs Pro, today's limit): show its words.
+  const joshu = (e as any)?.error?.error
+  if (joshu?.type === 'joshu' && joshu.message) return joshu.message
   if (e instanceof Anthropic.AuthenticationError) return 'The Anthropic API key was rejected. Check it in Settings › AI.'
   if (e instanceof Anthropic.RateLimitError) return 'Rate limited by the API. Try again in a minute.'
   if (e instanceof Anthropic.APIConnectionError) return 'Network problem: Joshu couldn’t reach Claude.'
@@ -32,6 +42,8 @@ export interface TurnRequest {
   tools?: Anthropic.Beta.BetaTool[]
   effort: 'low' | 'medium' | 'high'
   maxTokens?: number
+  /** The chat's code sandbox, so files made there stay for the next question. */
+  container?: string
 }
 
 /** Keeps only what may be echoed back: after a mid-output fallback, non-text blocks before the last `fallback` marker are dropped. */
@@ -55,6 +67,7 @@ export async function turn(req: TurnRequest): Promise<any> {
       system: req.system,
       messages: req.messages,
       ...(req.tools?.length ? { tools: req.tools } : {}),
+      ...(req.container ? { container: req.container } : {}),
       output_config: { effort: req.effort },
       betas: BETAS,
       fallbacks: 'default',
@@ -67,7 +80,7 @@ export async function turn(req: TurnRequest): Promise<any> {
     const message = await stream.finalMessage()
     if (message.stop_reason === 'refusal') return { ok: false, error: 'This request was declined.' }
     const all = message.content.filter((b) => b.type === 'text').map((b: any) => b.text).join('')
-    return { ok: true, text: all, content: replayable(message.content), stopReason: message.stop_reason }
+    return { ok: true, text: all, content: replayable(message.content), stopReason: message.stop_reason, container: (message as any).container?.id }
   } catch (e) {
     return { ok: false, error: explain(e) }
   }

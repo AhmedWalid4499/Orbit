@@ -9,7 +9,7 @@ import type { Msg, Block } from '@/lib/ai'
 import type { Undo } from '@/lib/askTools'
 
 export interface Item { id: string; role: 'user' | 'assistant' | 'action'; text: string; symbol: string; undone: boolean; files?: string[]; androidUndo?: Undo }
-export interface Convo { id: string; system: string; messages: Msg[]; items: Item[] }
+export interface Convo { id: string; system: string; messages: Msg[]; items: Item[]; container?: string }
 interface ChatRec { title: string; updatedAt: string; payload: string }
 
 const toB64 = (s: string): string => { let out = ''; new TextEncoder().encode(s).forEach((b) => (out += String.fromCharCode(b))); return btoa(out) }
@@ -40,7 +40,7 @@ export function openChat(id: string): Convo | null {
     // A conversation saved mid tool-call can't be continued as is: keep what was said, drop the dangling call.
     const last = messages[messages.length - 1]
     if (last?.role === 'assistant' && Array.isArray(last.content) && last.content.some((b) => b.type === 'tool_use')) messages.pop()
-    return { id, system: p.system ?? '', messages, items }
+    return { id, system: p.system ?? '', messages, items, container: p.container ?? undefined }
   } catch { return null }
 }
 
@@ -50,6 +50,7 @@ export function saveChat(c: Convo): void {
   const title = first.length > 60 ? `${first.slice(0, 57).trim()}…` : first
   const payload = JSON.stringify({
     system: c.system,
+    ...(c.container ? { container: c.container } : {}),
     messages: toB64(JSON.stringify(withoutFiles(c.messages))),
     items: c.items.map((i) => ({ id: i.id.toUpperCase(), role: i.role, text: i.text, symbol: i.symbol, undone: i.undone,
       ...(i.files ? { files: i.files } : {}), ...(i.androidUndo ? { androidUndo: i.androidUndo } : {}) })),

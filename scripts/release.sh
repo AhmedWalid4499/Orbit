@@ -90,5 +90,30 @@ else
   echo "Skipped the Windows build (see message above); the Mac release is published."
 fi
 
+# Android: Joshu.apk (the Android app's updater looks for it on the latest release). ORBIT_SKIP_ANDROID=1 carries the
+# previous release's APK over unchanged.
+APK_TYPE=application/vnd.android.package-archive
+if [[ -n "${ORBIT_SKIP_ANDROID:-}" ]]; then
+  PREVA="$(api "https://api.github.com/repos/$REPO/releases?per_page=10" | python3 -c '
+import json, sys
+for r in json.load(sys.stdin):
+    if r["tag_name"] != sys.argv[1] and any(a["name"] == "Joshu.apk" for a in r["assets"]):
+        print(r["tag_name"]); break' "$TAG")"
+  if [[ -n "$PREVA" ]]; then
+    TMPA="$(mktemp -d)"
+    curl -fsSL -o "$TMPA/Joshu.apk" "https://github.com/$REPO/releases/download/$PREVA/Joshu.apk"
+    api -X POST -H "Content-Type: $APK_TYPE" --data-binary @"$TMPA/Joshu.apk" \
+      "https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=Joshu.apk" >/dev/null
+    rm -rf "$TMPA"
+    echo "Android: kept $PREVA's APK (no Android update in this release)."
+  fi
+elif scripts/build-android.sh; then
+  api -X POST -H "Content-Type: $APK_TYPE" --data-binary @build/Joshu.apk \
+    "https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=Joshu.apk" >/dev/null
+  echo "Android: https://github.com/$REPO/releases/latest/download/Joshu.apk"
+else
+  echo "Skipped the Android build (see message above); the rest of the release is published."
+fi
+
 echo "Published Orbit $VERSION: https://github.com/$REPO/releases/tag/$TAG"
 echo "Installer: https://github.com/$REPO/releases/latest/download/Joshu.dmg"

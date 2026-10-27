@@ -12,6 +12,7 @@ import {
 } from '@/lib/emailExpenses'
 import { store, useRecords, useSetting, Rec } from '@/lib/store'
 import { Txn, Task, MONEY_CATEGORIES } from '@/lib/models'
+import { learnCategory } from '@/lib/merchantRules'
 import {
   iso, parse, startOfDay, addDays, addMonths, sameDay, isToday, startOfMonth, daysInMonth, startOfWeek, dayKey,
   relativeDay, fmtDay, fromInputs, toDateInput, relativeTime,
@@ -288,7 +289,7 @@ function TxnMenu({ txn, at, onClose }: { txn: Rec<Txn>; at: { x: number; y: numb
       <div className="sep" />
       <div className="label">Category</div>
       {MONEY_CATEGORIES.map((c) => (
-        <button key={c} onClick={act(() => store.update<Txn>(txn.id, { category: c }))}>
+        <button key={c} onClick={act(() => { store.update<Txn>(txn.id, { category: c }); if (t.amount < 0) learnCategory(t.title, c) })}>
           <span style={{ width: 13, display: 'inline-flex' }}>{t.category === c && <Check size={13} />}</span>{c}
         </button>
       ))}

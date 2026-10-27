@@ -226,6 +226,53 @@ public class OrbitNativePlugin extends Plugin {
         call.resolve(ret);
     }
 
+    // MARK: Streaming HTTP (Joshu's AI server, which a web page can't call directly)
+
+    /** POSTs `body` to `url` and streams the answer back: a "head" event (status), "chunk" events (base64), then resolves. */
+    @PluginMethod
+    public void httpStream(PluginCall call) {
+        final String id = call.getString("id", "");
+        final String url = call.getString("url", "");
+        final String body = call.getString("body", "");
+        final JSObject headers = call.getObject("headers", new JSObject());
+        new Thread(() -> {
+            java.net.HttpURLConnection conn = null;
+            try {
+                conn = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                conn.setRequestMethod("POST");
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(30_000);
+                conn.setReadTimeout(300_000);
+                java.util.Iterator<String> keys = headers.keys();
+                while (keys.hasNext()) { String k = keys.next(); conn.setRequestProperty(k, headers.getString(k)); }
+                try (OutputStream out = conn.getOutputStream()) { out.write(body.getBytes(StandardCharsets.UTF_8)); }
+                int status = conn.getResponseCode();
+                JSObject head = new JSObject();
+                head.put("id", id);
+                head.put("status", status);
+                head.put("contentType", conn.getContentType() == null ? "application/json" : conn.getContentType());
+                notifyListeners("head", head);
+                java.io.InputStream in = status >= 400 ? conn.getErrorStream() : conn.getInputStream();
+                if (in != null) {
+                    byte[] buf = new byte[8192];
+                    int n;
+                    while ((n = in.read(buf)) > 0) {
+                        JSObject c = new JSObject();
+                        c.put("id", id);
+                        c.put("data", Base64.encodeToString(buf, 0, n, Base64.NO_WRAP));
+                        notifyListeners("chunk", c);
+                    }
+                    in.close();
+                }
+                call.resolve();
+            } catch (Exception e) {
+                call.reject("Network problem: " + e.getMessage());
+            } finally {
+                if (conn != null) conn.disconnect();
+            }
+        }).start();
+    }
+
     // MARK: Speech in (Android's speech recognizer) and out (text to speech)
 
     private SpeechRecognizer recognizer;
@@ -248,14 +295,30 @@ public class OrbitNativePlugin extends Plugin {
         else call.reject("Joshu needs the microphone to hear you.");
     }
 
+    private final int[] quietStreams = { android.media.AudioManager.STREAM_MUSIC, android.media.AudioManager.STREAM_NOTIFICATION, android.media.AudioManager.STREAM_SYSTEM };
+    private boolean muted = false;
+
+    /** Listening for "Hey Joshu" restarts the recogniser often: silence its start beep while it does. */
+    private void mute(boolean on) {
+        if (muted == on) return;
+        muted = on;
+        android.media.AudioManager am = (android.media.AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+        if (am == null) return;
+        for (int stream : quietStreams) {
+            try { am.adjustStreamVolume(stream, on ? android.media.AudioManager.ADJUST_MUTE : android.media.AudioManager.ADJUST_UNMUTE, 0); } catch (Exception ignored) {}
+        }
+    }
+
     private void startListening(PluginCall call) {
+        final boolean quiet = call.getBoolean("quiet", false);
         main.post(() -> {
+            if (quiet) mute(true);
             if (!SpeechRecognizer.isRecognitionAvailable(getContext())) { call.reject("Speech recognition isn't available on this phone."); return; }
             if (recognizer != null) recognizer.destroy();
             recognizer = SpeechRecognizer.createSpeechRecognizer(getContext());
             recognizer.setRecognitionListener(new RecognitionListener() {
                 boolean finished = false;
-                @Override public void onReadyForSpeech(Bundle b) {}
+                @Override public void onReadyForSpeech(Bundle b) { if (quiet) main.postDelayed(() -> mute(false), 350); }
                 @Override public void onBeginningOfSpeech() {}
                 @Override public void onRmsChanged(float rms) {
                     JSObject d = new JSObject(); d.put("level", rms); notifyListeners("level", d);
@@ -263,11 +326,13 @@ public class OrbitNativePlugin extends Plugin {
                 @Override public void onBufferReceived(byte[] b) {}
                 @Override public void onEndOfSpeech() {}
                 @Override public void onError(int error) {
+                    mute(false);
                     if (finished) return;
                     finished = true;
                     call.reject(error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ? "No match" : "Speech error " + error);
                 }
                 @Override public void onResults(Bundle results) {
+                    mute(false);
                     if (finished) return;
                     finished = true;
                     ArrayList<String> r = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
@@ -328,6 +393,7 @@ public class OrbitNativePlugin extends Plugin {
 
     @Override
     protected void handleOnDestroy() {
+        mute(false);
         if (recognizer != null) recognizer.destroy();
         if (tts != null) tts.shutdown();
         if (loopback != null) try { loopback.close(); } catch (Exception ignored) {}

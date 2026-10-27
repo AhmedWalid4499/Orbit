@@ -4,6 +4,7 @@
 //   box = base64(nonce ‖ AES-256-GCM ciphertext ‖ tag), mac = hex HMAC-SHA256(key, plaintext)
 // The plaintext is JSON with sorted keys, written exactly like Apple's JSONSerialization.
 import { secrets } from './secrets'
+import { isPro } from './pro'
 
 const DEVICE_ONLY = new Set(['sync-passphrase', 'vault-mac', 'github-user', 'google-client-id'])
 type Bytes = Uint8Array<ArrayBuffer>
@@ -164,7 +165,8 @@ export async function forget(): Promise<void> {
 export function status() {
   const names = secrets.names()
   return {
-    anthropic: names.includes('anthropic-api-key'),
+    // "Can use the AI": Joshu Pro on this account, or your own key.
+    anthropic: names.includes('anthropic-api-key') || isPro(),
     googleClient: names.includes('google-client-id') && names.includes('google-client-secret'),
     passphrase: names.includes('sync-passphrase'),
     gmail: names.filter((n) => n.startsWith('gmail:')).map((n) => n.slice(6)).sort(),

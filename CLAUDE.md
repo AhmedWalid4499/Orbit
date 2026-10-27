@@ -26,10 +26,12 @@ The owner installs updates through the in-app updater, which reads GitHub Releas
 
 ## Android app
 
-`android/` is Joshu for Android: a Vite + Capacitor app that reuses the Windows renderer (`windows/src/renderer/src`, imported as `@/`) with its own phone shell, bridge and screens in `android/src` (`~/`). `android/src/bridge.ts` implements the same `window.orbit` API as the Windows preload (Claude, Google sign-in, key vault, updates), so shared screens run unchanged; Android-only pieces (Keystore-encrypted secrets, Google loopback sign-in, reading bank SMS, speech) are in `android/native/app/src/main/java/com/personal/orbit/OrbitNativePlugin.java`. A Vite plugin shows "Orbit" as "Joshu" in the shared screens at build time; don't rename anything internal. Phone layout overrides for desktop screens live in `android/src/mobile.css`.
-- Build: `scripts/build-android.sh` → `build/Orbit.apk` (version from `VERSION`). It uses `~/.local/android-tools` (JDK 21 + Android SDK) and signs with the release key in `~/Library/Application Support/Orbit/android/` (password in the Keychain, "Orbit Android keystore"). Every update must be signed with that same key.
+`android/` is Joshu for Android (show only "Joshu" to users): a Vite + Capacitor app that reuses the Windows renderer (`windows/src/renderer/src`, imported as `@/`) with its own phone shell, bridge and screens in `android/src` (`~/`). `android/src/bridge.ts` implements the same `window.orbit` API as the Windows preload (Claude, Google sign-in, key vault, updates), so shared screens run unchanged; Android-only pieces (Keystore-encrypted secrets, Google loopback sign-in, reading bank SMS, speech) are in `android/native/app/src/main/java/com/personal/orbit/OrbitNativePlugin.java`. A Vite plugin shows "Orbit" as "Joshu" in the shared screens at build time; don't rename anything internal. Phone layout overrides for desktop screens live in `android/src/mobile.css`.
+- Build: `scripts/build-android.sh` → `build/Joshu.apk` (version from `VERSION`, app id `com.personal.joshu`). It uses `~/.local/android-tools` (JDK 21 + Android SDK) and signs with the release key in `~/Library/Application Support/Joshu/android/` (password in the Keychain, "Joshu Android keystore"). Every update must be signed with that same key.
+- `scripts/release.sh` builds and uploads `Joshu.apk` too; `ORBIT_SKIP_ANDROID=1` carries the previous APK over unchanged.
 - Preview: `npm --prefix android run dev`, open `http://localhost:5199/?demo` at phone width.
-- The app looks for `Orbit.apk` on the latest GitHub release to offer updates.
+- The app looks for `Joshu.apk` on the latest GitHub release to offer updates.
+- AI: Joshu Pro through `supabase/functions/claude` (the account's `entitlements` row, set from the admin page), or the owner's own key. The function has no browser CORS, so `android/src/pro.ts` streams it through the native plugin.
 
 ## Widgets
 

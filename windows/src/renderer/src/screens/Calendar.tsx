@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, ChevronDown, Plus, CalendarDays, Clock, Trash2 } from 'lucide-react'
 import './Calendar.css'
 import { useRecords, store, Rec } from '@/lib/store'
+import { useExternalEvents } from '@/lib/externalEvents'
 import { CalEvent, AREA_COLOR, areaOf, Area } from '@/lib/models'
 import {
   iso, parse, startOfDay, addDays, addMinutes, addMonths, sameDay, isToday, startOfMonth, startOfWeek,
@@ -15,7 +16,7 @@ const HOURS = Array.from({ length: 18 }, (_, i) => i + 6) // 6am … 11pm
 const HOUR_H = 76
 const FIRST_HOUR = HOURS[0]
 
-interface Entry { id: string; title: string; start: Date; end: Date; area: Area }
+interface Entry { id: string; title: string; start: Date; end: Date; area: Area; color?: string; calendar?: string }
 
 function hourLabel(h: number): string {
   if (h === 12) return 'Noon'
@@ -59,6 +60,7 @@ export default function CalendarScreen() {
   const [now, setNow] = useState(new Date())
   const scrollRef = useRef<HTMLDivElement>(null)
   const raw = useRecords<CalEvent>('event')
+  const outside = useExternalEvents()
 
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 60_000); return () => clearInterval(t) }, [])
 
@@ -73,7 +75,9 @@ export default function CalendarScreen() {
     const start = parse(r.data.start), end = parse(r.data.end)
     if (!start || !end) return []
     return [{ id: r.id, title: r.data.title || 'Untitled', start, end: end > start ? end : addMinutes(start, 30), area: areaOf(r.data.area) }]
-  }).sort((a, b) => a.start.getTime() - b.start.getTime()), [raw])
+  }).concat(outside.filter((e) => !e.allDay).map((e) => ({ id: e.id, title: e.title, start: e.start, end: e.end > e.start ? e.end : addMinutes(e.start, 30),
+    area: 'work' as Area, color: e.color, calendar: e.calendar })))
+    .sort((a, b) => a.start.getTime() - b.start.getTime()), [raw, outside])
 
   // Open week/day views around 7am.
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = HOUR_H * (7 - FIRST_HOUR) }, [mode])
@@ -190,12 +194,13 @@ function DayColumn({ day, entries, now, selectedSlot, onSlot, onSelect }: {
         const h = Math.max(28, (e.end.getTime() - e.start.getTime()) / 3_600_000 * HOUR_H - 4)
         return (
           <div key={e.id} className="cal-event" title={e.title}
-            style={{ top: yOf(e.start) + 2, left: 4 + l * w, width: Math.max(20, w - 4), height: h, padding: h > 40 ? '8px 12px' : '4px 12px' }}
+            style={{ top: yOf(e.start) + 2, left: 4 + l * w, width: Math.max(20, w - 4), height: h, padding: h > 40 ? '8px 12px' : '4px 12px',
+              ...(e.color ? { background: e.color, color: 'var(--sticker-ink)' } : {}) }}
             onClick={(ev) => { ev.stopPropagation(); onSelect(e.id) }}>
             <span className="t" style={{ whiteSpace: h > 60 ? 'normal' : 'nowrap' }}>{e.title}</span>
             {h > 56 && <span className="time">{fmtTime(e.start)} – {fmtTime(e.end)}</span>}
             <span className="spacer" />
-            {h > 92 && <span><AreaPill area={e.area} compact /></span>}
+            {h > 92 && (e.calendar ? <span className="time">{e.calendar}</span> : <span><AreaPill area={e.area} compact /></span>)}
           </div>
         )
       })}
@@ -216,7 +221,7 @@ function MonthGrid({ days, month, entries, onOpenDay }: { days: Date[]; month: D
             title={`Open ${fmtDay(day, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`}>
             <span className={`num ${isToday(day) ? 'today' : ''}`}>{day.getDate()}</span>
             {list.slice(0, 3).map((e) => (
-              <span key={e.id} className="ev"><i style={{ background: AREA_COLOR[e.area] }} />{fmtTime(e.start)} {e.title}</span>
+              <span key={e.id} className="ev"><i style={{ background: e.color ?? AREA_COLOR[e.area] }} />{fmtTime(e.start)} {e.title}</span>
             ))}
             {list.length > 3 && <span className="muted" style={{ fontSize: 10, fontWeight: 600 }}>+{list.length - 3} more</span>}
           </div>
@@ -266,11 +271,12 @@ function EventDetail({ entry, onDone }: { entry: Entry; onDone: () => void }) {
       <h2 className="display" style={{ fontSize: 22, margin: 0 }}>{entry.title}</h2>
       <div className="row"><CalendarDays size={15} />{fmtDay(entry.start)}</div>
       <div className="row"><Clock size={15} />{fmtTime(entry.start)} – {fmtTime(entry.end)}</div>
+      {entry.calendar ? <div className="row muted"><span style={{ width: 10, height: 10, borderRadius: '50%', background: entry.color }} />{entry.calendar}</div> : <>
       <AreaPicker value={entry.area} onChange={(a) => store.update<CalEvent>(entry.id, { area: a })} />
       <button className="btn-soft" style={{ alignSelf: 'flex-start', color: 'var(--critical)' }}
         onClick={() => { store.remove(entry.id); onDone() }}>
         <Trash2 size={14} />Delete event
-      </button>
+      </button></>}
     </div>
   )
 }

@@ -1,5 +1,6 @@
 // Ideas, like IdeasView.swift on the Mac: writing projects and the ideas in them. Jot an idea down, open it to keep
 // writing, and let it grow into smaller ideas (parentUUID is the idea it grew from; "" for a top-level one).
+import { GrowButton } from '../components/GrowIdeas'
 import { useState } from 'react'
 import { Plus, Pencil, Pin, PinOff, Lightbulb, GitBranch, CornerDownRight, ChevronLeft, Archive, Trash2 } from 'lucide-react'
 import { store, useRecords, Rec } from '@/lib/store'
@@ -220,6 +221,7 @@ function IdeaSheet({ first, ideas, projects, onClose }: { first: string; ideas: 
           onChange={(e) => touch({ body: e.target.value })} style={{ fontSize: 15, lineHeight: 1.5, minHeight: 180 }} />
 
         <div className="row" style={{ gap: 6, fontSize: 14, fontWeight: 600 }}><GitBranch size={15} />Grown from this</div>
+        <GrowButton idea={idea} />
         {branches.map((b) => {
           const n = ideas.filter((x) => x.data.parentUUID === b.id).length
           return (

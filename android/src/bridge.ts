@@ -10,7 +10,7 @@ import * as google from './google'
 import * as vault from './vault'
 
 const RELEASES = 'https://api.github.com/repos/AhmedWalid4499/Orbit/releases/latest'
-export const APK_NAME = 'Orbit.apk'
+export const APK_NAME = 'Joshu.apk'
 
 type UpdateState = { state: string; version?: string; progress?: number; message?: string }
 const updateSubs = new Set<(s: UpdateState) => void>()
@@ -28,7 +28,7 @@ const newer = (a: string, b: string): boolean => {
   return false
 }
 
-/** Looks for a newer Orbit.apk on the GitHub release the Mac and Windows updaters read. */
+/** Looks for a newer Joshu.apk on the GitHub release the Mac and Windows updaters read. */
 export async function checkForUpdates(quiet = false): Promise<void> {
   if (!quiet) sendUpdate({ state: 'checking' })
   try {

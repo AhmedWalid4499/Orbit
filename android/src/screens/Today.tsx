@@ -1,11 +1,12 @@
 // Today on a phone (the iPhone's PhoneToday): the Windows dashboard's cards, one column, scrolling.
 import { useMemo } from 'react'
-import { Timer, Moon, TrendingUp, Sun, Flame, CreditCard, Library } from 'lucide-react'
+import { Timer, Moon, TrendingUp } from 'lucide-react'
 import type { Nav } from '@/App'
 import { useRecords, useSetting } from '@/lib/store'
 import { FocusSession, DayPlan, Task, CalEvent, Habit, Txn, Note, Book, Bucket } from '@/lib/models'
-import { parse, startOfDay, addDays, isToday, sameDay, dayKey, startOfMonth, fmtDay, relativeTime } from '@/lib/dates'
-import { Card, SectionHeader, StatTile, EmptyHint, useMoney } from '@/components/ui'
+import { parse, startOfDay, addDays, isToday, sameDay, dayKey, startOfMonth, fmtDay, fmtTime, relativeTime } from '@/lib/dates'
+import { useExternalEvents, externalEvents, ExternalEvent } from '@/lib/externalEvents'
+import { Card, SectionHeader, EmptyHint, useMoney } from '@/components/ui'
 import { TaskRow } from '@/components/TaskRow'
 import { BookCover } from '@/screens/Reading'
 import { useKeys } from '@/lib/ai'
@@ -13,6 +14,9 @@ import { useInbox } from '@/lib/inbox'
 import { openFocus, focusToday } from '@/lib/focus'
 import { planFor, todayKey } from '@/lib/dayPlan'
 import { TopThreeCard, PlanTomorrowCard } from '@/screens/PlanTomorrow'
+import UpNext from '../components/UpNext'
+import CheckInCard from '../components/CheckInCard'
+import DaySummaryCard from '../components/DaySummaryCard'
 import { AgendaRow, HabitChip, LookingForward, MoodCard, ClockWeather, QuickAdd, BriefCard, InboxCard, AddTaskInline } from '@/screens/Today'
 
 export default function Today({ nav }: { nav: Nav }) {
@@ -49,52 +53,37 @@ export default function Today({ nav }: { nav: Nav }) {
   const next = agenda.find((e) => parse(e.data.start)! > new Date())
   const overdue = tasks.filter((t) => !t.data.isDone && t.data.due && parse(t.data.due)! < today).length
   const minutes = focusToday(focus)
+  useExternalEvents()
+  const google = externalEvents(today, tomorrow)
 
   return (
     <div className="page col phone-today" style={{ gap: 14 }}>
-      <div className="col" style={{ gap: 4 }}>
-        <h1 className="page-title" style={{ fontSize: 30 }}>{fmtDay(today)}</h1>
-        <div className="secondary" style={{ fontSize: 14 }}>
-          {greeting} {next ? `Next up: ${next.data.title} ${relativeTime(parse(next.data.start)!)}.` : 'Nothing else on the calendar today.'}
-          {overdue > 0 && ` ${overdue} overdue.`}
+      {/* Like the iPhone: greeting and date, the weather, actions, quick add, then four small numbers */}
+      <div className="col" style={{ gap: 2 }}>
+        <div style={{ fontSize: 17, fontWeight: 700 }}>{greeting.replace(/\.$/, '')}</div>
+        <div className="secondary" style={{ fontSize: 13 }}>
+          {fmtDay(today)}{next ? ` · Next: ${next.data.title} ${relativeTime(parse(next.data.start)!)}` : ''}{overdue > 0 && ` · ${overdue} overdue`}
         </div>
       </div>
+      <div className="today-clock"><ClockWeather /></div>
       <div className="row today-actions">
         <button onClick={nav.openReview}><TrendingUp size={14} />Week</button>
         <button onClick={nav.openPlan}><Moon size={14} />Plan tomorrow</button>
         <button onClick={() => openFocus(null)}><Timer size={14} />Focus{minutes > 0 && ` · ${minutes}m`}</button>
       </div>
-      <div className="col today-clock" style={{ gap: 10 }}><ClockWeather /><QuickAdd /></div>
+      <div className="today-clock"><QuickAdd /></div>
 
-      <div className="today-tiles">
-        <StatTile value={String(dueToday.length)} label="Due today" icon={<Sun size={12} />} color="var(--peach)" onClick={() => nav.go('tasks')} />
-        <StatTile value={`${habits.filter((h) => h.data.doneDays.includes(dayKey(today))).length}/${habits.length}`} label="Habits today"
-          icon={<Flame size={12} />} color="var(--lime)" onClick={() => nav.go('habits')} />
-        <StatTile value={money(spent)} label="Spent this month" icon={<CreditCard size={12} />} color="var(--cyan)" onClick={() => nav.go('money')} />
-        <StatTile value={`${readThisYear}/${goal}`} label="Books this year" icon={<Library size={12} />} color="var(--purple)" onClick={() => nav.go('reading')} />
+      <div className="today-glance">
+        <Mini value={String(dueToday.length)} label="Due" color="var(--peach)" onClick={() => nav.go('tasks')} />
+        <Mini value={`${habits.filter((h) => h.data.doneDays.includes(dayKey(today))).length}/${habits.length}`} label="Habits" color="var(--lime)" onClick={() => nav.go('habits')} />
+        <Mini value={new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(Math.max(budget - spent, 0))} label="Left" color="var(--cyan)" onClick={() => nav.go('money')} />
+        <Mini value={`${readThisYear}/${goal}`} label="Books" color="var(--purple)" onClick={() => nav.go('reading')} />
       </div>
 
       <BriefCard hasKey={keys.anthropic} />
       {todayPlan && todayPlan.data.top.length > 0 && <TopThreeCard plan={todayPlan} onPlan={nav.openPlan} />}
 
-      <Card className="col" padding={16}>
-        <SectionHeader title="Due today" trailing="All tasks" onTrailing={() => nav.go('tasks')} />
-        <AddTaskInline />
-        <div className="col" style={{ gap: 6 }}>
-          {dueToday.length === 0 && <EmptyHint text="Nothing due. Nice." />}
-          {dueToday.map((t) => <TaskRow key={t.id} rec={t} showDue={parse(t.data.due)! < today} />)}
-        </div>
-      </Card>
-
-      <Card className="col" padding={16}>
-        <SectionHeader title="Agenda" trailing="Calendar" onTrailing={() => nav.go('calendar')} />
-        <div className="col" style={{ gap: 8 }}>
-          {agenda.length === 0 && <EmptyHint text="Nothing scheduled today." />}
-          {agenda.map((e) => <AgendaRow key={e.id} e={e} />)}
-          {tomorrowEvents.length > 0 && <div className="muted" style={{ fontSize: 11, fontWeight: 600, marginTop: 6 }}>Tomorrow</div>}
-          {tomorrowEvents.slice(0, 4).map((e) => <AgendaRow key={e.id} e={e} dim />)}
-        </div>
-      </Card>
+      <UpNext onTasks={() => nav.go('tasks')} onCalendar={() => nav.go('calendar')} />
 
       <Card className="col" padding={14}>
         <SectionHeader title="Habits" trailing={habits.length ? 'View all' : 'Add habit'} onTrailing={() => nav.go('habits')} />
@@ -102,6 +91,9 @@ export default function Today({ nav }: { nav: Nav }) {
           <div className="row" style={{ gap: 8, overflowX: 'auto' }}>{habits.map((h) => <HabitChip key={h.id} h={h} />)}</div>
         )}
       </Card>
+
+      <CheckInCard onOpenJournal={nav.openJournal} />
+      {hour >= 17 && <DaySummaryCard />}
 
       <div className="row" style={{ gap: 12, alignItems: 'stretch' }}>
         <button className="card col" style={{ flex: 1, minWidth: 0, background: 'var(--lime)', color: 'var(--sticker-ink)', padding: 14, gap: 6, textAlign: 'left' }} onClick={() => nav.go('money')}>
@@ -138,6 +130,30 @@ export default function Today({ nav }: { nav: Nav }) {
           <LookingForward dreams={dreams} />
         </Card>
       )}
+    </div>
+  )
+}
+
+function Mini({ value, label, color, onClick }: { value: string; label: string; color: string; onClick: () => void }) {
+  return (
+    <button className="mini" style={{ background: color }} onClick={onClick}>
+      <span className="display clamp1">{value}</span>
+      <span>{label}</span>
+    </button>
+  )
+}
+
+/** A Google Calendar event in the agenda, coloured like its calendar. */
+function GoogleRow({ g }: { g: ExternalEvent }) {
+  const now = new Date()
+  return (
+    <div className="row inner" style={{ padding: 10, gap: 12, opacity: g.end < now ? 0.5 : 1 }}>
+      <div style={{ width: 60, textAlign: 'right', flex: 'none', fontSize: 12, fontWeight: 600 }}>
+        {g.allDay ? 'All day' : <>{fmtTime(g.start)}<div className="muted" style={{ fontSize: 10, fontWeight: 400 }}>{fmtTime(g.end)}</div></>}
+      </div>
+      <span style={{ width: 4, height: 30, borderRadius: 2, background: g.color, flex: 'none' }} />
+      <span className="clamp1" style={{ flex: 1, fontWeight: 500, fontSize: 13 }}>{g.title}</span>
+      <span className="muted clamp1" style={{ fontSize: 11, maxWidth: 90 }}>{g.calendar}</span>
     </div>
   )
 }

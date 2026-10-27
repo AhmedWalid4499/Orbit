@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">Joshu</string>
     <string name="title_activity_main">Joshu</string>
-    <string name="package_name">com.personal.orbit</string>
+    <string name="package_name">com.personal.joshu</string>
+    <!-- Sign-in links come back on the same scheme as the Mac and iPhone (allowed in the Joshu account settings) -->
     <string name="custom_url_scheme">com.personal.orbit</string>
 </resources>

@@ -7,6 +7,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(OrbitNativePlugin.class);
+        registerPlugin(GoodreadsPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

@@ -2,7 +2,7 @@
 // PhoneRoot: Today, Tasks, Money, the assistant and More), plus the Android-only pieces.
 import { useEffect, useState, ReactNode } from 'react'
 import { App as CapApp } from '@capacitor/app'
-import { Sun, ListChecks, CreditCard, Sparkles, LayoutGrid, ChevronLeft, Settings as Gear } from 'lucide-react'
+import { Sun, ListChecks, CreditCard, LayoutGrid, ChevronLeft, Settings as Gear, Plus, IdCard, TrendingUp, Search as SearchIcon } from 'lucide-react'
 import * as cloud from '@/lib/cloud'
 import { store, useSetting } from '@/lib/store'
 import { demoRecords, demoProfileCard } from '@/lib/demo'
@@ -12,18 +12,23 @@ import { onOpenAsk } from '@/lib/askBus'
 import { useAssistantName } from '@/lib/ai'
 import { ReadingTimerPill, FinishedReading } from '@/components/ReadingTimer'
 import { FocusPill, FocusStartSheet, FocusDoneDialog } from '@/components/Focus'
-import Splash from '@/components/Splash'
+import Splash from './components/Splash'
+import { Orb } from './components/Orb'
+import SearchSheet from './components/Search'
+import { Modal } from '@/components/ui'
+import { QuickAdd } from '@/screens/Today'
 import { PlanTomorrowSheet } from '@/screens/PlanTomorrow'
 import { useProfilePhoto } from '@/lib/profileCard'
 import SignIn from '@/screens/SignIn'
 import Today from './screens/Today'
 import CalendarScreen from '@/screens/Calendar'
-import Tasks from '@/screens/Tasks'
+import PhoneTasks from './screens/PhoneTasks'
+import Welcome, { usesJoshuWithoutAccount, setUsesJoshuWithoutAccount } from './screens/Welcome'
 import Habits from '@/screens/Habits'
 import Bucket from '@/screens/Bucket'
 import Money from '@/screens/Money'
 import Notes from '@/screens/Notes'
-import Reading from '@/screens/Reading'
+import PhoneReading from './screens/PhoneReading'
 import Documents from '@/screens/Documents'
 import Review from '@/screens/Review'
 import MyCard from '@/screens/MyCard'
@@ -32,6 +37,12 @@ import { isNative } from './native'
 import { checkForUpdates } from './bridge'
 import { checkBankTexts } from './sms'
 import { scheduleReminders } from './reminders'
+import { refreshGoogleCalendar } from './gcal'
+import { refreshPro } from './pro'
+import { checkSpendingAlerts } from './spendingAlerts'
+import { onVoiceStart, startWake } from './voice'
+import VoiceOrb from './components/VoiceOrb'
+import { LocalNotifications } from '@capacitor/local-notifications'
 import Assistant from './screens/Assistant'
 import More, { MoreTab, MORE_TITLES } from './screens/More'
 import Settings from './screens/Settings'
@@ -41,6 +52,7 @@ import GitHub from './screens/GitHub'
 import Jobs from './screens/Jobs'
 import Insights from './screens/Insights'
 import Bills from './screens/Bills'
+import MoneyBar from './screens/MoneyBar'
 import Accounts from './screens/Accounts'
 
 const DEMO = new URLSearchParams(location.search).has('demo')
@@ -50,6 +62,9 @@ type Main = 'today' | 'tasks' | 'money' | 'assistant' | 'more'
 export default function App() {
   const [ready, setReady] = useState(false)
   const [signedIn, setSignedIn] = useState(!!cloud.getSession())
+  // Joshu without an account (v1.40.1): data stays on this phone until you sign in.
+  const [local, setLocal] = useState(usesJoshuWithoutAccount())
+  const [auth, setAuth] = useState(false)
   const [splash, setSplash] = useState(() => !(DEMO && new URLSearchParams(location.search).has('nosplash')))
 
   useEffect(() => {
@@ -66,30 +81,41 @@ export default function App() {
   useEffect(() => {
     if (!ready || DEMO) return
     if (signedIn) {
-      store.start().then(() => syncVault()).then(() => { startEmailExpensesTimer(); checkBankTexts(); scheduleReminders() })
+      setUsesJoshuWithoutAccount(false); setLocal(false); setAuth(false)
+      store.start().then(() => store.adoptLocal()).then(() => refreshPro()).then(() => syncVault()).then(() => { startEmailExpensesTimer(); checkBankTexts().then(() => checkSpendingAlerts()); scheduleReminders(); refreshGoogleCalendar() })
       if (isNative) checkForUpdates(true)
-    } else store.stop()
-  }, [ready, signedIn])
+    } else if (local) store.startLocal()
+    else store.stop()
+  }, [ready, signedIn, local])
+
+  // Android back button on the sign-in screen goes back to Welcome.
+  useEffect(() => {
+    if (!isNative || signedIn || local || !auth) return
+    const h = CapApp.addListener('backButton', () => setAuth(false))
+    return () => { h.then((x) => x.remove()) }
+  }, [signedIn, local, auth])
 
   // Coming back to the app: sync, pick up new bank texts, refresh reminders.
   useEffect(() => {
     if (!isNative || DEMO) return
     const h = CapApp.addListener('resume', () => {
       if (!cloud.getSession()) return
-      store.sync().then(() => { checkBankTexts(); scheduleReminders() })
+      refreshPro(); store.sync().then(() => { checkBankTexts().then(() => checkSpendingAlerts()); scheduleReminders(); refreshGoogleCalendar() })
     })
     return () => { h.then((x) => x.remove()) }
   }, [])
 
   return (
     <>
-      {ready && (signedIn ? <Shell /> : <div className="signin-wrap"><SignIn platform="android" /></div>)}
+      {ready && (signedIn || local ? <Shell onSignIn={() => { setUsesJoshuWithoutAccount(false); setLocal(false); setAuth(true) }} />
+        : auth ? <div className="signin-wrap"><SignIn platform="android" /><button className="link signin-back" onClick={() => setAuth(false)}>‹ Back</button></div>
+        : <Welcome onSignIn={() => setAuth(true)} onCreateAccount={() => setAuth(true)} onCarryOn={() => setLocal(true)} />)}
       {splash && <Splash onDone={() => setSplash(false)} />}
     </>
   )
 }
 
-function Shell() {
+function Shell({ onSignIn }: { onSignIn: () => void }) {
   const [main, setMain] = useState<Main>('today')
   const [page, setPage] = useState<MoreTab | null>(null)
   const [settings, setSettings] = useState(false)
@@ -98,6 +124,8 @@ function Shell() {
   const [card, setCard] = useState(false)
   const [journalRequest, setJournalRequest] = useState(0)
   const [seed, setSeed] = useState<string | undefined>()
+  const [adding, setAdding] = useState(false)
+  const [searching, setSearching] = useState(false)
   const assistant = useAssistantName()
   const userName = useSetting<string>('userName', '')
   const photo = useProfilePhoto()
@@ -108,12 +136,25 @@ function Shell() {
   }
   const nav: Nav = { go: open, openJournal: () => { setJournalRequest((n) => n + 1); open('notes') }, openReview: () => setReview(true), openPlan: () => setPlan(true) }
   useEffect(() => onOpenAsk((s) => { setSeed(s); setMain('assistant') }), [])
+  // "Hey Joshu": the assistant answers, so it's opened under the orb.
+  useEffect(() => { onVoiceStart(() => { setPage(null); setMain('assistant') }); startWake() }, [])
+  // Tapping a notification opens its section (spending alerts → Money).
+  useEffect(() => {
+    if (!isNative) return
+    const h = LocalNotifications.addListener('localNotificationActionPerformed', (a) => {
+      const route = a.notification.extra?.route
+      if (route === 'money' || route === 'tasks' || route === 'today') { setPage(null); setMain(route) }
+    })
+    return () => { h.then((x) => x.remove()) }
+  }, [])
 
   // Android back button: close the open sheet or page before leaving the app.
   useEffect(() => {
     if (!isNative) return
     const h = CapApp.addListener('backButton', () => {
       if (settings) setSettings(false)
+      else if (adding) setAdding(false)
+      else if (searching) setSearching(false)
       else if (review) setReview(false)
       else if (plan) setPlan(false)
       else if (card) setCard(false)
@@ -123,34 +164,35 @@ function Shell() {
       else CapApp.minimizeApp()
     })
     return () => { h.then((x) => x.remove()) }
-  }, [settings, review, plan, card, page, main])
+  }, [settings, adding, searching, review, plan, card, page, main])
 
   const title = main === 'more' && page ? MORE_TITLES[page] : null
 
   return (
     <div className="phone">
+      {/* The iPhone's bar: quick add, the assistant's orb and your avatar menu; running timers in a strip below */}
       <header className="phone-bar">
         {title
           ? <button className="row back" onClick={() => setPage(null)}><ChevronLeft size={20} /> More</button>
           : <div className="logo">joshu<i /></div>}
         <span className="spacer" />
-        <FocusPill />
-        <ReadingTimerPill onOpen={() => open('reading')} />
-        <button className="icon-btn" aria-label="Settings" onClick={() => setSettings(true)}><Gear size={17} /></button>
-        <button className="avatar" aria-label="My card" onClick={() => setCard(true)}
-          style={photo ? { background: `center / cover url(${photo})` } : undefined}>{photo ? '' : initials}</button>
+        <button className="icon-btn" aria-label="Quick add" onClick={() => setAdding(true)}><Plus size={19} /></button>
+        <button className="orb-btn" aria-label={assistant} onClick={() => setMain('assistant')}><Orb size={34} /></button>
+        <ProfileMenu initials={initials} photo={photo} onCard={() => setCard(true)} onReview={() => setReview(true)}
+          onSearch={() => setSearching(true)} onSettings={() => setSettings(true)} />
       </header>
+      <div className="timer-strip"><FocusPill /><ReadingTimerPill onOpen={() => open('reading')} /></div>
       <main className="phone-main">
         {main === 'today' && <Today nav={nav} />}
-        {main === 'tasks' && <Tasks />}
-        {main === 'money' && <Money />}
+        {main === 'tasks' && <PhoneTasks />}
+        {main === 'money' && <div className="money-wrap"><MoneyBar /><Money /></div>}
         {main === 'assistant' && <Assistant seed={seed} onSeedUsed={() => setSeed(undefined)} />}
         {main === 'more' && !page && <More onOpen={(t) => setPage(t)} onSettings={() => setSettings(true)} onCard={() => setCard(true)} onReview={() => setReview(true)} onPlan={() => setPlan(true)} />}
         {main === 'more' && page === 'calendar' && <CalendarScreen />}
         {main === 'more' && page === 'habits' && <Habits />}
         {main === 'more' && page === 'bucket' && <Bucket />}
         {main === 'more' && page === 'notes' && <Notes openJournalRequest={journalRequest} />}
-        {main === 'more' && page === 'reading' && <Reading />}
+        {main === 'more' && page === 'reading' && <PhoneReading />}
         {main === 'more' && page === 'documents' && <Documents />}
         {main === 'more' && page === 'ideas' && <Ideas />}
         {main === 'more' && page === 'goals' && <Goals />}
@@ -164,15 +206,22 @@ function Shell() {
         <TabButton on={main === 'today'} icon={<Sun size={21} />} label="Today" onClick={() => { setMain('today'); setPage(null) }} />
         <TabButton on={main === 'tasks'} icon={<ListChecks size={21} />} label="Tasks" onClick={() => setMain('tasks')} />
         <TabButton on={main === 'money'} icon={<CreditCard size={21} />} label="Money" onClick={() => setMain('money')} />
-        <TabButton on={main === 'assistant'} icon={<Sparkles size={21} />} label={assistant} onClick={() => setMain('assistant')} />
+        <TabButton on={main === 'assistant'} icon={<Orb size={22} spark={false} />} label={assistant} onClick={() => setMain('assistant')} />
         <TabButton on={main === 'more'} icon={<LayoutGrid size={21} />} label="More" onClick={() => { if (main === 'more') setPage(null); setMain('more') }} />
       </nav>
-      <Settings open={settings} onClose={() => setSettings(false)} />
+      <Settings open={settings} onClose={() => setSettings(false)} onSignIn={() => { setSettings(false); onSignIn() }} />
+      <SearchSheet open={searching} onClose={() => setSearching(false)} onGo={(d) => open(d)} />
+      <Modal open={adding} onClose={() => setAdding(false)}>
+        <h2 className="display" style={{ fontSize: 24, margin: '0 0 6px' }}>Quick add</h2>
+        <p className="secondary" style={{ fontSize: 13, marginTop: 0 }}>Type anything: a task, an event, an expense. {assistant} sorts it into the right place.</p>
+        <div className="today-clock"><QuickAdd /></div>
+      </Modal>
       <Review open={review} onClose={() => setReview(false)} />
       <MyCard open={card} onClose={() => setCard(false)} />
       <FinishedReading />
       <PlanTomorrowSheet open={plan} onClose={() => setPlan(false)} />
       <FocusStartSheet />
+      <VoiceOrb />
       <FocusDoneDialog />
     </div>
   )
@@ -184,5 +233,35 @@ function TabButton({ on, icon, label, onClick }: { on: boolean; icon: ReactNode;
       <span className="tab-icon">{icon}</span>
       <span className="clamp1">{label}</span>
     </button>
+  )
+}
+
+/** Your avatar: My Card, Week in review, Search and Settings, like the iPhone's profile menu. */
+function ProfileMenu({ initials, photo, onCard, onReview, onSearch, onSettings }: {
+  initials: string; photo: string | null; onCard: () => void; onReview: () => void; onSearch: () => void; onSettings: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    const close = () => setOpen(false)
+    window.addEventListener('pointerdown', close)
+    return () => window.removeEventListener('pointerdown', close)
+  }, [open])
+  const item = (icon: ReactNode, label: string, fn: () => void) => (
+    <button onPointerDown={(e) => e.stopPropagation()} onClick={() => { setOpen(false); fn() }}>{icon}{label}</button>
+  )
+  return (
+    <div style={{ position: 'relative' }}>
+      <button className="avatar" aria-label="Profile and settings" onPointerDown={(e) => e.stopPropagation()} onClick={() => setOpen(!open)}
+        style={photo ? { background: `center / cover url(${photo})` } : undefined}>{photo ? '' : initials}</button>
+      {open && (
+        <div className="pop-menu" onPointerDown={(e) => e.stopPropagation()}>
+          {item(<IdCard size={16} />, 'My Card', onCard)}
+          {item(<TrendingUp size={16} />, 'Week in review', onReview)}
+          {item(<SearchIcon size={16} />, 'Search', onSearch)}
+          {item(<Gear size={16} />, 'Settings', onSettings)}
+        </div>
+      )}
+    </div>
   )
 }

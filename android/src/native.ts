@@ -17,6 +17,7 @@ interface OrbitNative {
   stopListening(): Promise<void>
   speak(o: { text: string; lang?: string }): Promise<void>
   stopSpeaking(): Promise<void>
+  share(o: { text?: string; title?: string; image?: string }): Promise<void>
   httpStream(o: { id: string; url: string; headers: Record<string, string>; body: string }): Promise<void>
   addListener(event: 'head', fn: (d: { id: string; status: number; contentType: string }) => void): Promise<PluginListenerHandle>
   addListener(event: 'chunk', fn: (d: { id: string; data: string }) => void): Promise<PluginListenerHandle>

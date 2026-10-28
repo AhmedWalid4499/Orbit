@@ -1,8 +1,9 @@
 // Insights (the Mac's InsightsDashboard): this week against last, and the trends behind it, across tasks, focus,
 // reading, money, habits and mood. Charts are plain SVG/divs.
 import { ReactNode } from 'react'
-import { CreditCard, CircleCheck, Timer, Repeat, Smile, CalendarDays, Sparkles } from 'lucide-react'
+import { CreditCard, CircleCheck, Timer, Repeat, Smile, CalendarDays, Sparkles, Heart, Footprints, BedDouble, Flame, Dumbbell } from 'lucide-react'
 import { useRecords, useSetting } from '@/lib/store'
+import { PtTitle } from '../components/PtCommon'
 import { Task, Txn, Habit, Note, Book, ReadingSession, FocusSession, AREA_COLOR, areaOf, MOOD_FACES, sessionMinutes } from '@/lib/models'
 import { parse, startOfDay, startOfWeek, startOfMonth, addDays, addMonths, dayKey } from '@/lib/dates'
 import { focusMinutes } from '@/lib/focus'
@@ -86,8 +87,8 @@ export default function Insights() {
     <div className="page">
       <div className="col" style={{ gap: 16, paddingBottom: 32 }}>
         <div>
-          <h1 className="page-title">Insights</h1>
-          <div className="secondary" style={{ fontSize: 13, marginTop: 4 }}>This week compared with last, and the trends behind it.</div>
+          <PtTitle>Insights</PtTitle>
+          <div className="secondary" style={{ fontSize: 13, marginTop: 14 }}>This week compared with last, and the trends behind it.</div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -98,6 +99,8 @@ export default function Insights() {
           <Tile value={avgMood === null ? '—' : `${MOOD_FACES[Math.round(avgMood)]} ${avgMood.toFixed(1)}`} label="Mood, 30 days" color="var(--peach)" />
           <Tile value={habitRate === null ? '—' : `${habitRate}%`} label="Habits kept, 30 days" color="var(--lime)" />
         </div>
+
+        <HealthCard />
 
         <ChartCard title="Spending by month" subtitle={`Last 6 months, against your ${money(budget)} budget`}>
           <Bars bars={monthBars} height={170} rule={budget > 0 ? budget : undefined} format={money} />
@@ -331,6 +334,85 @@ function MoodWeekdays({ points }: { points: MoodPoint[] }) {
           <span className="muted" style={{ fontSize: 11 }}>{addDays(sunday, d.weekday).toLocaleDateString(undefined, { weekday: 'narrow' })}</span>
         </div>
       ))}
+    </div>
+  )
+}
+
+// MARK: Health (HealthCard in Health.swift)
+
+interface HealthDay { steps: number; activeKcal: number; sleepMinutes: number; workouts: number; workoutMinutes: number; restingHR: number }
+
+/** The demo week (HealthStore.demo on the Mac and iPhone). */
+function demoHealth(): Record<string, HealthDay> {
+  const steps = [8432, 5120, 11203, 6890, 9354, 4321, 7810]
+  const out: Record<string, HealthDay> = {}
+  for (let i = 0; i < 7; i++) {
+    out[dayKey(addDays(new Date(), -i))] = { steps: steps[i], activeKcal: 380 + i * 23, sleepMinutes: [412, 376, 455, 398, 430, 350, 401][i],
+      workouts: [1, 0, 1, 0, 1, 0, 0][i], workoutMinutes: [45, 0, 60, 0, 35, 0, 0][i], restingHR: 61 + (i % 3) }
+  }
+  return out
+}
+
+/** Apple Health's daily summary, which the iPhone keeps in the synced "health.daily" setting. Android shows it read-only. */
+function useHealthDays(): Record<string, HealthDay> {
+  const settings = useRecords<{ key: string; value: unknown }>('setting')
+  if (new URLSearchParams(location.search).has('demo')) return demoHealth()
+  const raw = settings.find((r) => r.data.key === 'health.daily')?.data.value
+  if (!raw) return {}
+  try { return (typeof raw === 'string' ? JSON.parse(raw) : raw) as Record<string, HealthDay> } catch { return {} }
+}
+
+function HealthCard() {
+  const days = useHealthDays()
+  const has = Object.values(days).some((d) => d && (d.steps || d.activeKcal || d.sleepMinutes || d.workouts || d.workoutMinutes || d.restingHR))
+  if (!has) return null
+  const t = days[dayKey(new Date())] ?? { steps: 0, activeKcal: 0, sleepMinutes: 0, workouts: 0, workoutMinutes: 0, restingHR: 0 }
+  const workouts = Array.from({ length: 7 }, (_, i) => days[dayKey(addDays(new Date(), -i))]?.workouts ?? 0).reduce((n, w) => n + w, 0)
+  const week = Array.from({ length: 7 }, (_, i) => addDays(startOfDay(new Date()), i - 6)).map((d) => ({ d, steps: days[dayKey(d)]?.steps ?? 0 }))
+  const top = niceMax(Math.max(...week.map((w) => w.steps)))
+  const stat = (value: string, label: string, icon: ReactNode, color: string) => (
+    <div className="row" style={{ gap: 10, minWidth: 0 }}>
+      <span style={{ width: 30, height: 30, borderRadius: '50%', background: color, color: 'var(--sticker-ink)', flex: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{icon}</span>
+      <div style={{ minWidth: 0 }}>
+        <div className="clamp1" style={{ fontSize: 16, fontWeight: 700 }}>{value}</div>
+        <div className="secondary clamp1" style={{ fontSize: 11 }}>{label}</div>
+      </div>
+    </div>
+  )
+  return (
+    <div className="col" style={{ gap: 14, padding: 18, borderRadius: 22, background: 'var(--card)' }}>
+      <div className="row" style={{ gap: 10 }}>
+        <span style={{ width: 28, height: 28, borderRadius: 7, background: '#fff', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.08)', flex: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Heart size={16} fill="#FF2D55" color="#FF2D55" />
+        </span>
+        <span className="display" style={{ fontSize: 22 }}>Health</span>
+        <span className="spacer" />
+        <span className="muted" style={{ fontSize: 11 }}>From your iPhone</span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {stat(t.steps.toLocaleString(), 'Steps today', <Footprints size={14} strokeWidth={2.5} />, 'var(--mint)')}
+        {stat(t.sleepMinutes > 0 ? `${Math.floor(t.sleepMinutes / 60)}h ${t.sleepMinutes % 60}m` : '—', 'Sleep last night', <BedDouble size={14} strokeWidth={2.5} />, 'var(--purple)')}
+        {stat(String(t.activeKcal), 'Active kcal', <Flame size={14} strokeWidth={2.5} />, 'var(--orange)')}
+        {stat(String(workouts), 'Workouts this week', <Dumbbell size={14} strokeWidth={2.5} />, 'var(--cyan)')}
+      </div>
+      <div className="row" style={{ alignItems: 'stretch', gap: 6 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ position: 'relative', height: 92 }}>
+            {[0, 0.5, 1].map((f) => <div key={f} style={{ position: 'absolute', left: 0, right: 0, top: 92 - f * 92, borderTop: '1px solid var(--line)' }} />)}
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-end', gap: 6 }}>
+              {week.map((w) => (
+                <div key={w.d.getTime()} style={{ flex: 1, height: `${(w.steps / top) * 100}%`, borderRadius: '5px 5px 0 0', background: 'var(--mint)', opacity: w.steps >= 8000 ? 1 : 0.45 }} />
+              ))}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+            {week.map((w) => <span key={w.d.getTime()} className="muted" style={{ flex: 1, fontSize: 10 }}>{w.d.toLocaleDateString(undefined, { weekday: 'narrow' })}</span>)}
+          </div>
+        </div>
+        <div className="muted" style={{ position: 'relative', width: 40, height: 92, fontSize: 10, flex: 'none' }}>
+          {[0, 0.5, 1].map((f) => <span key={f} style={{ position: 'absolute', left: 0, top: 92 - f * 92 - 6 }}>{compact(top * f)}</span>)}
+        </div>
+      </div>
     </div>
   )
 }

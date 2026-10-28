@@ -1,6 +1,6 @@
 // Ideas › Grow with AI (IdeaStore.grow in IdeasView.swift): the assistant, as a writing partner, suggests a few
 // directions an idea could grow in; each is saved as a branch (a child idea) you can keep or delete.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { store, Rec } from '@/lib/store'
 import { iso } from '@/lib/dates'
 import { structured, useKeys } from '@/lib/ai'
@@ -42,23 +42,31 @@ ALREADY GROWN FROM IT: ${existing.length ? existing.join('; ') : '(nothing)'}`,
   return found.length
 }
 
-/** "Grow with AI" for the idea sheet, next to "Grown from this". */
+// The last error per idea, so the message can sit under the header while the button sits in it.
+const errors = new Map<string, string>()
+const errorSubs = new Set<() => void>()
+const setError = (id: string, e: string) => { if (e) errors.set(id, e); else errors.delete(id); errorSubs.forEach((f) => f()) }
+
+/** "Grow with AI", on the right of "Grown from this" (only when the assistant is available, as on iPhone). */
 export function GrowButton({ idea }: { idea: Rec<Idea> }) {
   const keys = useKeys()
   const [growing, setGrowing] = useState(false)
-  const [error, setError] = useState('')
-  if (!keys.anthropic) return <div className="muted" style={{ fontSize: 12 }}>Growing ideas with AI is part of Joshu Pro.</div>
+  if (!keys.anthropic) return null
 
   const grow = async () => {
-    setGrowing(true); setError('')
-    try { await growIdea(idea.id) } catch (e) { setError(e instanceof Error ? e.message : String(e)) } finally { setGrowing(false) }
+    setGrowing(true); setError(idea.id, '')
+    try { await growIdea(idea.id) } catch (e) { setError(idea.id, e instanceof Error ? e.message : String(e)) } finally { setGrowing(false) }
   }
   return (
-    <div className="col" style={{ gap: 6, alignItems: 'flex-start' }}>
-      <button className="btn-soft" style={{ minHeight: 40 }} disabled={growing} onClick={grow}>
-        <Orb size={18} busy={growing} spark={false} />{growing ? 'Growing…' : 'Grow with AI'}
-      </button>
-      {error && <div style={{ fontSize: 12, color: 'var(--orange)' }}>{error}</div>}
-    </div>
+    <button className="btn-soft" style={{ minHeight: 40, fontWeight: 500 }} disabled={growing} onClick={grow}>
+      <Orb size={18} busy={growing} spark={false} />{growing ? 'Growing…' : 'Grow with AI'}
+    </button>
   )
+}
+
+export function GrowError({ ideaID }: { ideaID: string }) {
+  const [, tick] = useState(0)
+  useEffect(() => { const f = () => tick((n) => n + 1); errorSubs.add(f); return () => { errorSubs.delete(f) } }, [])
+  const e = errors.get(ideaID)
+  return e ? <div style={{ fontSize: 12, color: 'var(--orange)' }}>{e}</div> : null
 }

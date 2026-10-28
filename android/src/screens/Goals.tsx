@@ -3,10 +3,10 @@
 // dream happen (bucketUUID). Ahead or behind the even pace to the deadline.
 import { useState } from 'react'
 import { Plus, Library, Banknote, Flame, ListChecks, Flag, X } from 'lucide-react'
-import { store, useRecords, Rec } from '@/lib/store'
+import { store, useRecords, useSetting, Rec } from '@/lib/store'
 import { Book, Habit, Txn, Bucket } from '@/lib/models'
 import { iso, parse, startOfDay, addDays, dayKey, daysBetween, toDateInput, fromInputs } from '@/lib/dates'
-import { Card, EmptyHint, Modal, CheckCircle, useMoney } from '@/components/ui'
+import { Card, EmptyHint, Modal, CheckCircle, useMoney, defaultCurrency } from '@/components/ui'
 
 type Kind = 'books' | 'save' | 'habit' | 'steps'
 export interface Goal {
@@ -15,10 +15,10 @@ export interface Goal {
 }
 
 const KINDS: { id: Kind; title: string; tint: string; icon: (s: number) => JSX.Element }[] = [
-  { id: 'books', title: 'Read books', tint: 'var(--purple)', icon: (s) => <Library size={s} /> },
+  { id: 'books', title: 'Read books', tint: '#D9C8FF', icon: (s) => <Library size={s} /> },
   { id: 'save', title: 'Save money', tint: 'var(--mint)', icon: (s) => <Banknote size={s} /> },
   { id: 'habit', title: 'Keep a habit', tint: 'var(--peach)', icon: (s) => <Flame size={s} /> },
-  { id: 'steps', title: 'Steps', tint: 'var(--lime)', icon: (s) => <ListChecks size={s} /> },
+  { id: 'steps', title: 'Steps', tint: '#F3DE9E', icon: (s) => <ListChecks size={s} /> },
 ]
 const kindOf = (k: string) => KINDS.find((x) => x.id === k) ?? KINDS[3]
 
@@ -68,8 +68,9 @@ const newGoal = (title: string, kind: Kind, target: number, extra: Partial<Goal>
 
 // MARK: Screen
 
-export default function Goals() {
-  const goals = useRecords<Goal>('goal').sort((a, b) => (b.data.createdAt ?? '').localeCompare(a.data.createdAt ?? ''))
+/** Bucket list › Goals on the iPhone (GoalsSection in GoalsView.swift): header, starters when empty, open goals, then reached ones. */
+export function GoalsSection() {
+  const goals = useRecords<Goal>('goal').slice().sort((a, b) => (b.data.createdAt ?? '').localeCompare(a.data.createdAt ?? ''))
   const s: Sources = { books: useRecords<Book>('book'), txns: useRecords<Txn>('transaction'), habits: useRecords<Habit>('habit') }
   const [editing, setEditing] = useState<Rec<Goal> | null>(null)
   const [adding, setAdding] = useState(false)
@@ -78,47 +79,54 @@ export default function Goals() {
 
   const now = new Date(), y = now.getFullYear()
   const june = new Date(y, 5, 30) > now ? new Date(y, 5, 30) : new Date(y + 1, 5, 30)
-  const starters: { label: string; make: () => Goal }[] = [
+  const starters: { label: string; kind: Kind; make: () => Goal }[] = [
     // A reading goal for the year counts from January.
-    { label: 'Read 24 books this year', make: () => newGoal('Read 24 books this year', 'books', 24, { start: iso(new Date(y, 0, 1)), deadline: iso(new Date(y, 11, 31, 12)) }) },
-    { label: `Save ${money(50000)} by June`, make: () => newGoal(`Save ${money(50000)} by June`, 'save', 50000, { deadline: iso(new Date(june.getFullYear(), 5, 30, 12)) }) },
-    ...(s.habits[0] ? [{ label: `${s.habits[0].data.name} 30 days`, make: () => newGoal(`${s.habits[0].data.name} 30 days`, 'habit', 30, { habitUUID: s.habits[0].id }) }] : []),
+    { label: 'Read 24 books this year', kind: 'books', make: () => newGoal('Read 24 books this year', 'books', 24, { start: iso(new Date(y, 0, 1)), deadline: iso(new Date(y, 11, 31, 12)) }) },
+    { label: `Save ${money(50000)} by June`, kind: 'save', make: () => newGoal(`Save ${money(50000)} by June`, 'save', 50000, { deadline: iso(new Date(june.getFullYear(), 5, 30, 12)) }) },
+    ...(s.habits[0] ? [{ label: `${s.habits[0].data.name} 30 days`, kind: 'habit' as Kind, make: () => newGoal(`${s.habits[0].data.name} 30 days`, 'habit', 30, { habitUUID: s.habits[0].id }) }] : []),
   ]
 
   return (
-    <div className="page">
-      <div className="col" style={{ gap: 16 }}>
-        <div className="row" style={{ gap: 12 }}>
-          <div style={{ minWidth: 0 }}>
-            <h1 className="page-title">Goals</h1>
-            <div className="secondary" style={{ fontSize: 13, marginTop: 4 }}>Progress fills in from your books, money and habits.</div>
-          </div>
-          <span className="spacer" />
-          <button className="btn-soft" style={{ minHeight: 40 }} onClick={() => setAdding(true)}><Plus size={14} />Add</button>
+    <div className="col" style={{ gap: 16 }}>
+      <div className="row" style={{ gap: 12, alignItems: 'flex-start' }}>
+        <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span className="display" style={{ fontSize: 24 }}>Goals</span>
+          <span className="secondary" style={{ fontSize: 13 }}>Progress fills in from your books, money and habits.</span>
         </div>
-
-        {!goals.length && (
-          <Card>
-            <div className="col" style={{ gap: 10 }}>
-              <EmptyHint icon={<Flag size={15} />} text="No goals yet. Try one of these:" />
-              {starters.map((x) => (
-                <button key={x.label} className="btn-soft" style={{ minHeight: 40, justifyContent: 'flex-start' }}
-                  onClick={() => store.create<Goal>('goal', x.make())}>{x.label}</button>
-              ))}
-            </div>
-          </Card>
-        )}
-
-        {open.map((g) => <GoalCard key={g.id} goal={g} p={progress(g.data, s)} onOpen={() => setEditing(g)} />)}
-        {done.length > 0 && (
-          <>
-            <div className="secondary" style={{ fontSize: 13, fontWeight: 600, marginTop: 6 }}>Reached ({done.length})</div>
-            {done.map((g) => <GoalCard key={g.id} goal={g} p={progress(g.data, s)} onOpen={() => setEditing(g)} />)}
-          </>
-        )}
+        <span className="spacer" />
+        <button className="btn-soft" style={{ minHeight: 38 }} onClick={() => setAdding(true)}><Plus size={14} />Add goal</button>
       </div>
+
+      {!goals.length && (
+        <Card>
+          <div className="col" style={{ gap: 10 }}>
+            <EmptyHint icon={<Flag size={15} />} text="No goals yet. Try one of these:" />
+            {starters.map((x) => (
+              <button key={x.label} className="btn-soft" style={{ minHeight: 40, justifyContent: 'flex-start', background: 'var(--canvas)' }}
+                onClick={() => store.create<Goal>('goal', x.make())}>{kindOf(x.kind).icon(14)}{x.label}</button>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {open.map((g) => <GoalCard key={g.id} goal={g} p={progress(g.data, s)} onOpen={() => setEditing(g)} />)}
+      {done.length > 0 && (
+        <>
+          <div className="secondary" style={{ fontSize: 13, fontWeight: 600, marginTop: 6 }}>Reached ({done.length})</div>
+          {done.map((g) => <GoalCard key={g.id} goal={g} p={progress(g.data, s)} onOpen={() => setEditing(g)} />)}
+        </>
+      )}
       {adding && <Editor goal={null} onClose={() => setAdding(false)} />}
       {editing && <Editor goal={editing} onClose={() => setEditing(null)} />}
+    </div>
+  )
+}
+
+/** Goals on their own page (on the iPhone they live under Bucket list › Goals). */
+export default function Goals() {
+  return (
+    <div className="page">
+      <GoalsSection />
     </div>
   )
 }
@@ -188,6 +196,7 @@ function Editor({ goal, onClose }: { goal: Rec<Goal> | null; onClose: () => void
   const [steps, setSteps] = useState<string[]>(d?.steps ?? [])
   const [newStep, setNewStep] = useState('')
 
+  const currency = useSetting<string>('currencyCode', defaultCurrency())
   const num = Number(target.replace(/,/g, '')) || 0
   const valid = !!title.trim() && (kind === 'steps' ? steps.length > 0 : kind === 'habit' ? !!habitUUID && num > 0 : num > 0)
 
@@ -216,6 +225,7 @@ function Editor({ goal, onClose }: { goal: Rec<Goal> | null; onClose: () => void
       <div className="col" style={{ gap: 14 }}>
         <h2 className="display" style={{ fontSize: 26, margin: 0 }}>{goal ? 'Edit goal' : 'New goal'}</h2>
         <input className="field" autoFocus={!goal} placeholder="Read 24 books, save for a car…" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <span className="secondary" style={{ fontSize: 13, marginBottom: -6 }}>Tracks</span>
         <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
           {KINDS.map((k) => (
             <button key={k.id} className="pill" onClick={() => setKind(k.id)}
@@ -227,14 +237,17 @@ function Editor({ goal, onClose }: { goal: Rec<Goal> | null; onClose: () => void
 
         {kind === 'habit' && (
           <select className="field" style={{ minHeight: 40 }} value={habitUUID} onChange={(e) => setHabitUUID(e.target.value)}>
-            <option value="">Choose a habit…</option>
+            <option value="">Choose…</option>
             {habits.map((h) => <option key={h.id} value={h.id}>{h.data.name}</option>)}
           </select>
         )}
         {kind !== 'steps' && (
           <>
-            <input className="field" inputMode="decimal" value={target} onChange={(e) => setTarget(e.target.value)}
-              placeholder={kind === 'books' ? 'Books, e.g. 24' : kind === 'save' ? 'Amount, e.g. 50000' : 'Days, e.g. 30'} />
+            <label className="row" style={{ gap: 12, fontSize: 13 }}>
+              <span className="secondary">{kind === 'books' ? 'Books' : kind === 'save' ? `Amount (${currency})` : 'Days'}</span><span className="spacer" />
+              <input className="field" style={{ width: 160 }} inputMode="decimal" value={target} onChange={(e) => setTarget(e.target.value)}
+                placeholder={kind === 'books' ? '24' : kind === 'save' ? '50000' : '30'} />
+            </label>
             <label className="row" style={{ gap: 12, fontSize: 13 }}>
               <span className="secondary">{since}</span><span className="spacer" />
               <input type="date" className="field" style={{ width: 160 }} value={start} onChange={(e) => setStart(e.target.value)} />
@@ -245,7 +258,7 @@ function Editor({ goal, onClose }: { goal: Rec<Goal> | null; onClose: () => void
         {kind === 'steps' && (
           <div className="col" style={{ gap: 8 }}>
             <select className="field" style={{ minHeight: 40 }} value={bucketUUID} onChange={(e) => setBucketUUID(e.target.value)}>
-              <option value="">No bucket-list dream</option>
+              <option value="">None</option>
               {dreams.map((b) => <option key={b.id} value={b.id}>{b.data.title}</option>)}
             </select>
             {steps.map((s) => (
@@ -255,7 +268,7 @@ function Editor({ goal, onClose }: { goal: Rec<Goal> | null; onClose: () => void
               </div>
             ))}
             <div className="row" style={{ gap: 8 }}>
-              <input className="field" style={{ flex: 1 }} placeholder="Add a step: book flights…" value={newStep}
+              <input className="field" style={{ flex: 1 }} placeholder="Book flights, save for tickets…" value={newStep}
                 onChange={(e) => setNewStep(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addStep() }} />
               <button className="btn-soft" style={{ minHeight: 40 }} disabled={!newStep.trim()} onClick={addStep}>Add</button>
             </div>
@@ -273,8 +286,8 @@ function Editor({ goal, onClose }: { goal: Rec<Goal> | null; onClose: () => void
         <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
           {goal && <button className="btn-soft" style={{ color: 'var(--critical)' }} onClick={() => { store.remove(goal.id); onClose() }}>Delete</button>}
           {goal?.data.doneAt && <button className="btn-soft" onClick={() => { store.update<Goal>(goal.id, { doneAt: null }); onClose() }}>Reopen</button>}
-          {!goal && <button className="btn-soft" onClick={onClose}>Cancel</button>}
           <span className="spacer" />
+          <button className="btn-soft" onClick={onClose}>Cancel</button>
           <button className="btn-primary" style={{ width: 110 }} disabled={!valid} onClick={save}>Save</button>
         </div>
       </div>

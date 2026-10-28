@@ -8,6 +8,7 @@ import { Txn } from '@/lib/models'
 import { iso, parse, startOfMonth, addMonths, relativeTime } from '@/lib/dates'
 import { Modal, Segmented, useMoney } from '@/components/ui'
 import { BankAccount } from '../bank'
+import type { Period } from '../lib/budgetPeriod'
 
 type T = Txn & { account?: string }
 type Kind = 'card' | 'account' | 'wallet' | 'cash'
@@ -67,6 +68,43 @@ export default function Accounts() {
             <AccountCard a={a.data} spent={totals(a.id, txns, month, next).spent} />
           </button>
         ))}
+      </div>
+      {openRec && <AccountPage account={openRec} txns={txns} onClose={() => setOpen(null)} />}
+      {adding && <Editor account={null} count={accounts.length} onClose={() => setAdding(false)} />}
+    </div>
+  )
+}
+
+/** Money › Overview on the phone (AccountsStrip): "Your banks" and a sideways row of cards, spent in the budget month on screen. */
+export function AccountsStrip({ period }: { period: Period }) {
+  const accounts = useRecords<BankAccount>('account').sort((a, b) => (a.data.createdAt ?? '').localeCompare(b.data.createdAt ?? ''))
+  const txns = useRecords<T>('transaction')
+  const [open, setOpen] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
+  const openRec = accounts.find((a) => a.id === open)
+  return (
+    <div className="col" style={{ gap: 10 }}>
+      <div className="row">
+        <div className="display" style={{ fontSize: 22 }}>Your banks</div>
+        <span className="spacer" />
+        <button className="btn-soft" style={{ minHeight: 38 }} onClick={() => setAdding(true)}><Plus size={14} />Add</button>
+      </div>
+      {/* Sizes in PhoneMoney.css (pm-acct-*), so the phone's width overrides in mobile.css leave the cards alone. */}
+      <div className="pm-acct-strip">
+        {accounts.map((a) => (
+          <button key={a.id} className="pm-acct-card" onClick={() => setOpen(a.id)}>
+            <AccountCard a={a.data} spent={totals(a.id, txns, period.start, period.end).spent} />
+          </button>
+        ))}
+        {!accounts.length && (
+          <div className="col pm-acct-empty">
+            <CreditCard size={22} />
+            <div style={{ fontSize: 14, fontWeight: 600 }}>Each bank and card gets its own page here.</div>
+            <div className="secondary" style={{ fontSize: 12 }}>
+              They appear by themselves from your bank texts, with the balance your bank last texted. You can also add one.
+            </div>
+          </div>
+        )}
       </div>
       {openRec && <AccountPage account={openRec} txns={txns} onClose={() => setOpen(null)} />}
       {adding && <Editor account={null} count={accounts.length} onClose={() => setAdding(false)} />}

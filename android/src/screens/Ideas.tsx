@@ -1,11 +1,12 @@
 // Ideas, like IdeasView.swift on the Mac: writing projects and the ideas in them. Jot an idea down, open it to keep
 // writing, and let it grow into smaller ideas (parentUUID is the idea it grew from; "" for a top-level one).
-import { GrowButton } from '../components/GrowIdeas'
+import { GrowButton, GrowError } from '../components/GrowIdeas'
 import { useState } from 'react'
-import { Plus, Pencil, Pin, PinOff, Lightbulb, GitBranch, CornerDownRight, ChevronLeft, Archive, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Pin, PinOff, Lightbulb, GitBranch, CornerDownRight, ChevronLeft, Archive, Trash2, MoreHorizontal } from 'lucide-react'
 import { store, useRecords, Rec } from '@/lib/store'
 import { iso, parse, relativeTime } from '@/lib/dates'
 import { Modal } from '@/components/ui'
+import { PtTitle } from '../components/PtCommon'
 
 export interface IdeaProject { title: string; summary: string; colorIndex: number; archived: boolean; createdAt: string; updatedAt: string }
 export interface Idea { projectUUID: string; parentUUID: string; title: string; body: string; pinned: boolean; createdAt: string; updatedAt: string }
@@ -71,7 +72,7 @@ export default function Ideas() {
   return (
     <div className="page">
       <div className="col" style={{ gap: 16 }}>
-        <h1 className="page-title">Ideas</h1>
+        <PtTitle>Ideas</PtTitle>
         {/* Projects */}
         <div className="row" style={{ gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
           {live.map((p) => {
@@ -108,15 +109,17 @@ export default function Ideas() {
             <div className="col" style={{ gap: 4 }}>
               <div className="row" style={{ gap: 6 }}>
                 <div className="display" style={{ fontSize: 26, minWidth: 0 }}>{selected.data.title}</div>
-                <button className="icon-btn" style={{ width: 40, height: 40, flex: 'none' }} onClick={() => setEditingProject(selected)} title="Edit project"><Pencil size={15} /></button>
+                <button className="muted" style={{ width: 32, height: 40, flex: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                  onClick={() => setEditingProject(selected)} title="Edit project"><Pencil size={15} /></button>
               </div>
               {selected.data.summary && <div className="secondary" style={{ fontSize: 14 }}>{selected.data.summary}</div>}
               <div className="muted" style={{ fontSize: 12 }}>
                 {top.length} idea{top.length === 1 ? '' : 's'} · {mine.length - top.length} grown from them
               </div>
             </div>
-            <div className="row card" style={{ gap: 10, padding: 12, alignItems: 'flex-end' }}>
-              <textarea className="plain" rows={Math.min(4, Math.max(1, newIdea.split('\n').length))} placeholder={`A new idea for ${selected.data.title}…`}
+            <div className="row card" style={{ gap: 10, padding: 12, alignItems: 'center', borderRadius: 16 }}>
+              <Lightbulb size={17} className="muted" style={{ flex: 'none' }} />
+              <textarea className="plain pt-idea-input" rows={Math.min(4, Math.max(1, newIdea.split('\n').length))} placeholder={`A new idea for ${selected.data.title}…`}
                 value={newIdea} onChange={(e) => setNewIdea(e.target.value)} style={{ flex: 1, fontSize: 15, resize: 'none', background: 'transparent', border: 'none', outline: 'none', color: 'var(--ink)', padding: '8px 0' }} />
               <button className="btn-primary" style={{ minHeight: 40 }} disabled={!newIdea.trim()} onClick={add}>Add</button>
             </div>
@@ -174,6 +177,7 @@ export default function Ideas() {
 function IdeaSheet({ first, ideas, projects, onClose }: { first: string; ideas: Rec<Idea>[]; projects: Rec<IdeaProject>[]; onClose: () => void }) {
   const [trail, setTrail] = useState<string[]>([first])
   const [branch, setBranch] = useState('')
+  const [menu, setMenu] = useState(false)
   const id = trail[trail.length - 1]
   const idea = ideas.find((i) => i.id === id)
   if (!idea) return null
@@ -202,8 +206,8 @@ function IdeaSheet({ first, ideas, projects, onClose }: { first: string; ideas: 
 
   return (
     <Modal open onClose={onClose} width={640}>
-      <div className="col" style={{ gap: 14 }}>
-        <div className="row" style={{ gap: 6, paddingRight: 36 }}>
+      {/* Above the column, so the sheet's floating close button doesn't narrow everything below it. */}
+      <div className="row pt-sheet-head" style={{ gap: 6, display: 'flex', marginRight: 6 }}>
           {trail.length > 1 && <button className="icon-btn" style={{ width: 40, height: 40, flex: 'none' }} onClick={back} title="Back"><ChevronLeft size={16} /></button>}
           <div style={{ minWidth: 0, flex: 1 }}>
             <div className="muted clamp1" style={{ fontSize: 12, fontWeight: 600 }}>{project?.data.title ?? 'Idea'}</div>
@@ -211,8 +215,15 @@ function IdeaSheet({ first, ideas, projects, onClose }: { first: string; ideas: 
           </div>
           <button className="icon-btn" style={{ width: 40, height: 40, flex: 'none' }} onClick={() => touch({ pinned: !idea.data.pinned })}
             title={idea.data.pinned ? 'Unpin' : 'Pin to the top'}>{idea.data.pinned ? <PinOff size={15} /> : <Pin size={15} />}</button>
-          <button className="icon-btn" style={{ width: 40, height: 40, flex: 'none', color: 'var(--critical)' }} onClick={remove} title="Delete idea"><Trash2 size={15} /></button>
-        </div>
+          <button className="icon-btn" style={{ width: 40, height: 40, flex: 'none' }} onClick={() => setMenu(!menu)} title="More"><MoreHorizontal size={16} /></button>
+          <button className="btn-primary" style={{ minHeight: 40 }} onClick={() => { touch(); onClose() }}>Done</button>
+      </div>
+      <div className="col" style={{ gap: 14 }}>
+        {menu && (
+          <button className="btn-soft" style={{ alignSelf: 'flex-end', color: 'var(--critical)' }} onClick={() => { setMenu(false); remove() }}>
+            <Trash2 size={14} />Delete idea
+          </button>
+        )}
         <textarea key={`t${idea.id}`} className="plain display" rows={2} placeholder="Idea" defaultValue={idea.data.title}
           onChange={(e) => touch({ title: e.target.value })}
           style={{ fontSize: 24, resize: 'none', background: 'transparent', border: 'none', outline: 'none', color: 'var(--ink)', padding: 0 }} />
@@ -220,8 +231,11 @@ function IdeaSheet({ first, ideas, projects, onClose }: { first: string; ideas: 
           placeholder="Keep writing… what happens, who's in it, why it matters, a line of dialogue."
           onChange={(e) => touch({ body: e.target.value })} style={{ fontSize: 15, lineHeight: 1.5, minHeight: 180 }} />
 
-        <div className="row" style={{ gap: 6, fontSize: 14, fontWeight: 600 }}><GitBranch size={15} />Grown from this</div>
-        <GrowButton idea={idea} />
+        <div className="row" style={{ gap: 6, fontSize: 14, fontWeight: 600 }}>
+          <GitBranch size={15} />Grown from this<span className="spacer" />
+          <GrowButton idea={idea} />
+        </div>
+        <GrowError ideaID={idea.id} />
         {branches.map((b) => {
           const n = ideas.filter((x) => x.data.parentUUID === b.id).length
           return (
@@ -236,12 +250,11 @@ function IdeaSheet({ first, ideas, projects, onClose }: { first: string; ideas: 
             </button>
           )
         })}
-        <div className="row" style={{ gap: 8 }}>
-          <input className="field" style={{ flex: 1 }} placeholder="Grow it: a new thought from this idea…" value={branch}
+        <div className="row" style={{ gap: 8, padding: 12, borderRadius: 14, border: '1px dashed var(--line)' }}>
+          <Plus size={14} className="muted" style={{ flex: 'none' }} />
+          <input className="plain" style={{ flex: 1, fontSize: 14 }} placeholder="Grow it: a new thought from this idea…" value={branch} enterKeyHint="done"
             onChange={(e) => setBranch(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addBranch() }} />
-          <button className="btn-soft" style={{ minHeight: 40 }} disabled={!branch.trim()} onClick={addBranch}><Plus size={14} /></button>
         </div>
-        <button className="btn-primary" style={{ minHeight: 44 }} onClick={onClose}>Done</button>
       </div>
     </Modal>
   )

@@ -1,18 +1,23 @@
-// Connections (the iPhone's PhoneConnections): Google (Gmail and Calendar), GitHub, bank texts and Goodreads.
-// Google sign-ins and the GitHub token can also arrive from your account's key sync, so this mostly shows what's
-// connected. Apple-only connections (Calendar, Reminders, Health, Wallet) are listed as living on iPhone and Mac.
+// Settings › Connections (the iPhone's PhoneConnections + OtherConnections): Google (Gmail and Calendar), GitHub,
+// bank texts (Android's own: read from your bank's SMS), reading (Goodreads shelves and updates), the AI key, and
+// what connects on the iPhone or Mac. Google sign-ins and the GitHub token can also arrive from your account's
+// key sync, so this mostly shows what's connected.
 import { useEffect, useState, ReactNode } from 'react'
-import { Mail, Code2, MessageSquareText, Plus, Check, Trash2, ArrowUpRight, Apple } from 'lucide-react'
-import { Modal, Card } from '@/components/ui'
+import { Plus, ArrowUpRight, Hourglass, MessageSquareText, Apple, HeartPulse, Youtube, Linkedin, CalendarDays, Github, Sparkles } from 'lucide-react'
+import { Modal } from '@/components/ui'
 import { useKeys, refreshKeys } from '@/lib/ai'
+import { store, useSetting } from '@/lib/store'
 import { emailExpensesEnabled, setEmailExpensesEnabled, startEmailExpensesTimer } from '@/lib/emailExpenses'
 import { setExternalEvents } from '@/lib/externalEvents'
+import { syncVault, vaultState, onVaultChange } from '@/lib/vault'
+import * as cloud from '@/lib/cloud'
 import { secrets, loadSecrets } from '../secrets'
-import { syncVault } from '@/lib/vault'
 import { refreshGoogleCalendar } from '../gcal'
 import { smsEnabled, onSmsChange } from '../sms'
+import { isPro } from '../pro'
 import { loadGitHub, clearGitHubCache, cleanUsername } from '../lib/github'
-import GoodreadsSettings from '../components/GoodreadsSettings'
+import GoodreadsSettings, { GoodreadsLogo } from '../components/GoodreadsSettings'
+import { Group, Cell, Tile, ToggleCell, SheetNav } from '../components/psKit'
 
 /** Same name as the Mac's @AppStorage("googleCalendarEnabled"); on unless turned off. */
 const GCAL_KEY = 'googleCalendarEnabled'
@@ -23,27 +28,64 @@ function setGoogleCalendarEnabled(on: boolean): void {
   else setExternalEvents([])
 }
 
+/** Connections on its own (kept for anything that opens it directly). Settings shows `ConnectionsPage` as a page. */
 export default function Connections({ open, onClose, onBankTexts }: { open: boolean; onClose: () => void; onBankTexts?: () => void }) {
   return (
     <Modal open={open} onClose={onClose} width={560}>
-      <h2 className="page-title" style={{ fontSize: 28, marginBottom: 18 }}>Connections</h2>
-      <GoogleSection />
-      <GitHubSection />
-      <Group title="Bank texts"><BankTextsRow onOpen={onBankTexts} /></Group>
-      <Group title="Reading">
-        <GoodreadsSettings />
-        <Footnote>Apple Books and Kindle are imported by Joshu on your Mac, and the books then appear here on their own.</Footnote>
-      </Group>
-      <Group title="On iPhone and Mac" footer="Apple Calendar, Reminders, Health and Wallet connect in Joshu on your iPhone or Mac. What they add to your account shows here too.">
-        {['Apple Calendar', 'Apple Reminders', 'Health', 'Wallet'].map((name) => (
-          <Row key={name} icon={<Apple size={15} />} tint="var(--card-hover)" title={name} detail="On iPhone and Mac" />
-        ))}
-      </Group>
+      <div className="ps-root ps-grouped">
+        <SheetNav title="Connections" onDone={onClose} />
+        <div className="ps-body"><ConnectionsPage onBankTexts={onBankTexts} /></div>
+      </div>
     </Modal>
   )
 }
 
+export function ConnectionsPage({ onBankTexts }: { onBankTexts?: () => void }) {
+  const [vs, setVs] = useState(vaultState())
+  useEffect(() => { const off = onVaultChange(() => setVs(vaultState())); return () => { off() } }, [])
+  const waiting = !!cloud.getSession() && vs.state === 'needsPassphrase'
+  return (
+    <>
+      {waiting && (
+        <Group>
+          <Cell icon={<Hourglass size={18} className="ps-chev" />} title={<span style={{ fontSize: 14, fontWeight: 400 }}>
+            Waiting for your sign-ins. Unlock your keys in Settings › Account & sync (or open Joshu on your Mac once) and they'll appear here.</span>} />
+        </Group>
+      )}
+      <GoogleSection />
+      <GitHubSection />
+      <Group title="Bank texts" footer="On Android, Joshu reads your bank's text messages on this phone. On iPhone a Shortcuts automation does the same job.">
+        <BankTextsRow onOpen={onBankTexts} />
+      </Group>
+      <ReadingSection />
+      <AISection />
+      <Group title="On iPhone and Mac" icons footer="These connect in Joshu on your iPhone or Mac. What they add to your account shows here too.">
+        <Cell icon={<Tile color="var(--cyan)" large><Apple size={16} /></Tile>} title="Apple Calendar & Reminders" sub="Events and reminders added there come here through your account." />
+        <Cell icon={<Tile color="var(--pink)" large><HeartPulse size={16} /></Tile>} title="Health" sub="Steps, sleep and workouts, on iPhone." />
+        <Cell icon={<Tile color="#FF0033" ink="#fff" large><Youtube size={16} /></Tile>} title="YouTube" sub="Your channel's subscribers and latest videos." />
+        <Cell icon={<Tile color="#0A66C2" ink="#fff" large><Linkedin size={16} /></Tile>} title="LinkedIn" sub="Your profile. Job alerts from LinkedIn's emails show under More › Jobs here." />
+        <Cell icon={<Tile color="#0078D4" ink="#fff" large><CalendarDays size={16} /></Tile>} title="Outlook calendar" sub="Shows next to your other calendars." />
+      </Group>
+    </>
+  )
+}
+
 // MARK: Google
+
+/** Gmail's envelope, in its colours. */
+function GmailLogo({ size = 32 }: { size?: number }) {
+  return (
+    <span className="ps-tile lg" style={{ width: size, height: size, background: '#fff', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.08)' }}>
+      <svg viewBox="0 0 48 36" width={size * 0.62} height={size * 0.47}>
+        <path fill="#4285F4" d="M3 36h8V16.6L0 8.5V33a3 3 0 0 0 3 3z" />
+        <path fill="#34A853" d="M37 36h8a3 3 0 0 0 3-3V8.5l-11 8.1z" />
+        <path fill="#FBBC04" d="M37 2.6v14L48 8.5V4.1c0-3.7-4.2-5.8-7.2-3.6z" />
+        <path fill="#EA4335" d="M11 16.6v-14l13 9.7 13-9.7v14l-13 9.7z" />
+        <path fill="#C5221F" d="M0 4.1v4.4l11 8.1v-14L7.2.5C4.2-1.7 0 .4 0 4.1z" />
+      </svg>
+    </span>
+  )
+}
 
 function GoogleSection() {
   const keys = useKeys()
@@ -68,31 +110,31 @@ function GoogleSection() {
     await refreshKeys()
     refreshGoogleCalendar(true)
   }
-  const addButton = keys.googleClient && (
-    <button className="btn-soft" style={{ alignSelf: 'flex-start' }} disabled={busy} onClick={add}>
-      <Plus size={13} /> {busy ? 'Waiting for Google…' : keys.gmail.length ? 'Add another Gmail account' : 'Add Gmail account'}
-    </button>
-  )
 
   return (
-    <Group title="Google">
+    <Group title="Google" icons footer={keys.gmail.length > 0
+      ? 'Inbox summaries send the sender, subject and a short preview of the last two days of mail (no promotions or social) to Anthropic. Expense import also sends the text of emails that look like receipts.'
+      : !keys.googleClient ? 'Google sign-in arrives with your keys from your Joshu account (Account & sync). Once it is here you can add Gmail accounts.' : undefined}>
       {keys.gmail.length === 0 ? (
-        <Row icon={<Mail size={15} />} tint="var(--pink)" title="Gmail"
-          detail="Connect Gmail and your assistant summarises your inbox on Today. Accounts you added on your Mac come here on their own." />
+        <Cell top icon={<GmailLogo />} title="Gmail" sub="Connect Gmail and your assistant summarises your inbox on Today. Accounts you added on your Mac come here on their own." />
       ) : keys.gmail.map((email) => (
-        <Row key={email} icon={<Mail size={15} />} tint="var(--pink)" title={email}
-          detail={<span className="row" style={{ gap: 4, color: 'var(--good)' }}><Check size={12} /> Connected</span>}
-          trailing={<button className="btn-soft" aria-label={`Remove ${email}`} onClick={() => remove(email)}><Trash2 size={12} /> Remove</button>} />
+        <Cell key={email} icon={<GmailLogo />} title={<span className="clamp1">{email}</span>} sub={<span className="ps-good">Connected</span>}
+          trailing={<button className="ps-soft ps-danger" aria-label={`Remove ${email}`} onClick={() => remove(email)}>Remove</button>} />
       ))}
-      {addButton}
-      {!keys.googleClient && (
-        <Footnote>Google sign-in arrives with your keys from your Joshu account (Settings › AI). Once it's here you can add Gmail accounts.</Footnote>
+      {keys.googleClient && (
+        <Cell onClick={busy ? undefined : add} icon={<span className="ps-tile lg" style={{ color: '#0a84ff' }}><Plus size={20} /></span>}
+          title={<span className="ps-blue" style={{ fontSize: 16 }}>{busy ? 'Waiting for Google…' : keys.gmail.length ? 'Add another Gmail account' : 'Add Gmail account'}</span>} />
       )}
       {keys.gmail.length > 0 && <>
-        <Toggle label="Show Google Calendar events" on={calendar} onChange={(on) => { setGoogleCalendarEnabled(on); setCalendar(on) }} />
-        <Toggle label="Add receipts from email to Money" on={expenses} onChange={(on) => { setEmailExpensesEnabled(on); setExpenses(on); if (on) startEmailExpensesTimer() }} />
+        <ToggleCell title="Show Google Calendar events" on={calendar} onChange={(on) => { setGoogleCalendarEnabled(on); setCalendar(on) }} />
+        <ToggleCell title="Add receipts from email to Money" on={expenses} onChange={(on) => { setEmailExpensesEnabled(on); setExpenses(on); if (on) startEmailExpensesTimer() }} />
       </>}
-      {error && <span style={{ fontSize: 12, color: 'var(--critical)' }}>{error}</span>}
+      {keys.gmail.length > 0 && (
+        <Cell top title={<span style={{ fontSize: 15 }}>Inbox summary</span>}
+          sub={keys.anthropic ? 'Your assistant reads the last two days of mail when you open Today and lists who is waiting on you, bills, deliveries and alerts.'
+            : 'With Joshu Pro, your assistant summarises your inbox: who is waiting on you, bills, deliveries and alerts.'} />
+      )}
+      {error && <Cell title={<span className="ps-bad" style={{ fontSize: 13, fontWeight: 400 }}>{error}</span>} />}
     </Group>
   )
 }
@@ -121,6 +163,7 @@ function GitHubSection() {
       await window.orbit.setSecret('github-user', d.profile.login || u)
       await window.orbit.setSecret('github-token', t)
       setUser(d.profile.login || u); setHasToken(!!t); setDraftUser(''); setDraftToken('')
+      syncVault().catch(() => {})
     } catch (e: any) { setError(e?.message ?? String(e)) }
     setBusy(false)
   }
@@ -132,33 +175,32 @@ function GitHubSection() {
   }
 
   if (!ready) return null
+  const logo = <Tile color="var(--inverse)" ink="var(--on-inverse)" large><Github size={16} /></Tile>
   return (
-    <Group title="GitHub">
+    <Group title="GitHub" icons>
       {user ? (
-        <Row icon={<Code2 size={15} />} tint="var(--inverse)" ink="var(--on-inverse)" title={`@${user}`}
-          detail={hasToken ? 'Private repos and contributions included' : 'Public data only'}
-          trailing={<button className="btn-soft" onClick={disconnect}>Disconnect</button>} />
+        <Cell icon={logo} title={`@${user}`} sub={hasToken ? 'Private repos and contributions included' : 'Public data only'}
+          trailing={<button className="ps-soft" onClick={disconnect}>Disconnect</button>} />
       ) : (
-        <div className="col" style={{ gap: 10 }}>
-          <Row icon={<Code2 size={15} />} tint="var(--inverse)" ink="var(--on-inverse)" title="Connect GitHub"
-            detail="Your projects, pull requests, issues and activity, next to the rest of your day." />
-          <input className="field" style={{ background: 'var(--canvas)' }} placeholder="GitHub username" autoCapitalize="none" autoCorrect="off"
-            value={draftUser} onChange={(e) => setDraftUser(e.target.value)} />
-          <input className="field" style={{ background: 'var(--canvas)' }} type="password" placeholder="Paste your token (ghp_…), optional"
-            value={draftToken} onChange={(e) => setDraftToken(e.target.value)} />
-          <Footnote>With just your username, Joshu shows your public work. To include private repos and your contribution graph, give it a token.
-            It's kept encrypted on this phone and only used to read your GitHub data.</Footnote>
-          <div className="row" style={{ gap: 8 }}>
-            <button className="btn-soft" onClick={() => window.orbit.openExternal('https://github.com/settings/tokens/new?description=Joshu&scopes=repo,read:user')}>
-              <ArrowUpRight size={13} /> Open GitHub
-            </button>
-            <span className="spacer" />
-            <button className="btn-primary" disabled={!cleanUsername(draftUser) || busy} onClick={connect}>
-              {busy ? 'Connecting…' : draftToken.trim() ? 'Connect' : 'Skip, public only'}
-            </button>
+        <>
+          <Cell top icon={logo} title="Connect GitHub" sub="Your projects, pull requests, issues and activity, next to the rest of your day." />
+          <div className="ps-cell col">
+            <input className="ps-field" placeholder="GitHub username" autoCapitalize="none" autoCorrect="off" value={draftUser} onChange={(e) => setDraftUser(e.target.value)} />
+            <input className="ps-field" type="password" placeholder="Paste your token (ghp_…), optional" value={draftToken} onChange={(e) => setDraftToken(e.target.value)} />
+            <span className="ps-cell-sub">With just your username, Joshu shows your public work. To include private repos and your contribution graph, give it a token.
+              It's kept encrypted on this phone and only used to read your GitHub data.</span>
+            <div className="ps-btnrow">
+              <button className="ps-soft" onClick={() => window.orbit.openExternal('https://github.com/settings/tokens/new?description=Joshu&scopes=repo,read:user')}>
+                <ArrowUpRight size={14} /> Make a token
+              </button>
+              <span className="spacer" />
+              <button className="ps-primary" disabled={!cleanUsername(draftUser) || busy} onClick={connect}>
+                {busy ? 'Connecting…' : draftToken.trim() ? 'Connect' : 'Skip, public only'}
+              </button>
+            </div>
+            {error && <span className="ps-bad" style={{ fontSize: 12 }}>{error}</span>}
           </div>
-          {error && <span style={{ fontSize: 12, color: 'var(--critical)' }}>{error}</span>}
-        </div>
+        </>
       )}
     </Group>
   )
@@ -171,48 +213,65 @@ function BankTextsRow({ onOpen }: { onOpen?: () => void }) {
   useEffect(() => onSmsChange(() => tick((n) => n + 1)), [])
   const on = smsEnabled()
   return (
-    <Row icon={<MessageSquareText size={15} />} tint="var(--lime)" title="Bank texts"
-      detail={on ? <span style={{ color: 'var(--good)' }}>Logging card payments from your bank's texts</span> : 'Log card payments, transfers and salary from your bank\'s text messages'}
-      trailing={onOpen && <button className={on ? 'btn-soft' : 'btn-primary'} onClick={onOpen}>{on ? 'Options' : 'Set up'}</button>} />
+    <Cell icon={<Tile color="var(--lime)" large><MessageSquareText size={16} /></Tile>} title="Bank texts"
+      sub={on ? <span className="ps-good">Logging payments from your bank's texts</span> : "Log card payments, transfers and salary from your bank's text messages"}
+      trailing={onOpen && <button className={on ? 'ps-soft' : 'ps-primary'} onClick={onOpen}>{on ? 'Options' : 'Set up'}</button>} />
   )
 }
 
-// MARK: Pieces
+// MARK: Reading
 
-function Group({ title, footer, children }: { title: string; footer?: string; children: ReactNode }) {
+function ReadingSection() {
+  const profile = useSetting<string>('goodreadsUser', '')
+  const [draft, setDraft] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [confirm, setConfirm] = useState(false)
   return (
-    <div className="col" style={{ gap: 6, marginBottom: 18 }}>
-      <span className="muted" style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4, paddingLeft: 4 }}>{title}</span>
-      <Card padding={14}><div className="col" style={{ gap: 12 }}>{children}</div></Card>
-      {footer && <span className="muted" style={{ fontSize: 12, paddingLeft: 4 }}>{footer}</span>}
-    </div>
+    <Group title="Reading" icons footer="Apple Books and Kindle are imported by Joshu on your Mac, and the books then appear here on their own.">
+      <Cell icon={<GoodreadsLogo size={32} />} title="Goodreads shelves"
+        sub={profile ? <span className="ps-good">Shelves sync from your profile</span> : 'Not connected'}
+        trailing={profile
+          ? confirm
+            ? <button className="ps-soft ps-danger" onClick={() => { store.setSetting('goodreadsUser', ''); setConfirm(false) }}>Disconnect?</button>
+            : <button className="ps-soft" onClick={() => setConfirm(true)}>Disconnect</button>
+          : <button className="ps-primary" onClick={() => setAdding(!adding)}>Connect</button>} />
+      {!profile && adding && (
+        <div className="ps-cell col">
+          <input className="ps-field" placeholder="Profile link or user ID" autoCapitalize="none" autoCorrect="off" value={draft} onChange={(e) => setDraft(e.target.value)} />
+          <span className="ps-cell-sub">Your public Goodreads shelves come into Reading. Joshu on your Mac or iPhone fetches them.</span>
+          <button className="ps-primary" style={{ alignSelf: 'flex-end' }} disabled={!/\d/.test(draft)}
+            onClick={() => { store.setSetting('goodreadsUser', draft.trim()); setDraft(''); setAdding(false) }}>Connect</button>
+        </div>
+      )}
+      <div className="ps-cell col" style={{ padding: 0 }}><GoodreadsSettings plain /></div>
+    </Group>
   )
 }
 
-function Row({ icon, tint, ink = 'var(--sticker-ink)', title, detail, trailing }: {
-  icon: ReactNode; tint: string; ink?: string; title: string; detail?: ReactNode; trailing?: ReactNode
-}) {
+// MARK: AI
+
+function AISection() {
+  const keys = useKeys()
+  const own = !!secrets.get('anthropic-api-key')
+  const [confirm, setConfirm] = useState(false)
+  const remove = async () => {
+    await window.orbit.setSecret('anthropic-api-key', '')
+    await refreshKeys()
+    setConfirm(false)
+  }
   return (
-    <div className="row" style={{ gap: 12, alignItems: 'center', minWidth: 0 }}>
-      <span style={{ width: 32, height: 32, borderRadius: 9, background: tint, color: ink, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>{icon}</span>
-      <div className="col" style={{ gap: 2, flex: 1, minWidth: 0 }}>
-        <strong className="clamp1" style={{ fontSize: 15, fontWeight: 500 }}>{title}</strong>
-        {detail && <span className="secondary" style={{ fontSize: 12 }}>{detail}</span>}
-      </div>
-      {trailing}
-    </div>
+    <Group title="AI" icons footer={own ? "Removing your key deletes it from this phone. Add it again in Settings › AI." : undefined}>
+      <Cell icon={<Tile color="#D97757" ink="#fff" large><Sparkles size={16} /></Tile>} title="Claude"
+        sub={own ? <span className="ps-good">Your own Anthropic key powers the assistant</span>
+          : isPro() ? <span className="ps-good">Through Joshu Pro, nothing to set up</span>
+          : keys.anthropic ? <span className="ps-good">Connected</span> : 'Not connected'}
+        trailing={own && (confirm
+          ? <button className="ps-soft ps-danger" onClick={remove}>Remove key?</button>
+          : <button className="ps-soft" onClick={() => setConfirm(true)}>Disconnect</button>)} />
+    </Group>
   )
 }
 
-function Toggle({ label, on, onChange }: { label: string; on: boolean; onChange: (on: boolean) => void }) {
-  return (
-    <label className="row" style={{ gap: 10, fontSize: 14, minHeight: 32 }}>
-      <span style={{ flex: 1 }}>{label}</span>
-      <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} />
-    </label>
-  )
-}
-
-function Footnote({ children }: { children: ReactNode }) {
+export function Footnote({ children }: { children: ReactNode }) {
   return <span className="muted" style={{ fontSize: 12 }}>{children}</span>
 }

@@ -1,13 +1,14 @@
 // Tasks on the phone, like PhoneTasks.swift on iPhone: the Mac's filters as chips (plus Shared lists), one Area menu,
 // the smart add bar, and swipe actions on each row (right: Done; left: Focus, Tomorrow, Delete).
 import { useEffect, useRef, useState, ReactNode } from 'react'
-import { Sun, CalendarDays, Inbox, CheckCircle2, Users, ChevronDown, Plus, Mic, Square, Check, Undo2, Trash2, ArrowRight, Timer, BadgeCheck } from 'lucide-react'
+import { Sun, CalendarDays, Inbox, CheckCircle2, Users, ChevronDown, Plus, Mic, Square, Check, Undo2, Trash2, ArrowRight, Timer, BadgeCheck,
+  Repeat as RepeatIcon, AlarmClock, MapPin, Footprints } from 'lucide-react'
 import { store, useRecords, Rec } from '@/lib/store'
-import { Task, Area, AREAS, AREA_COLOR, areaOf, cap } from '@/lib/models'
-import { iso, parse, startOfDay, addDays, relativeDay } from '@/lib/dates'
-import { EmptyHint } from '@/components/ui'
-import { TaskRow, toggleTask } from '@/components/TaskRow'
-import { openFocus } from '@/lib/focus'
+import { Task, Area, AREAS, AREA_COLOR, Repeat, areaOf, cap } from '@/lib/models'
+import { iso, parse, startOfDay, addDays, addMonths, relativeDay, sameDay, fmtTime, toDateInput, toTimeInput, fromInputs } from '@/lib/dates'
+import { EmptyHint, AreaPill, AreaPicker, CheckCircle, Modal } from '@/components/ui'
+import { openFocus, useActiveFocus } from '@/lib/focus'
+import { PtSwitch } from '../components/PtCommon'
 import { parseTask } from '@/screens/Tasks'
 import { isNative, native } from '../native'
 import { useSharedLists, refresh as refreshShared } from '../lib/sharedLists'
@@ -22,6 +23,9 @@ const FILTERS: { id: Filter; title: string; icon: ReactNode }[] = [
   { id: 'completed', title: 'Done', icon: <CheckCircle2 size={12} strokeWidth={2.5} /> },
   { id: 'shared', title: 'Shared lists', icon: <Users size={12} strokeWidth={2.5} /> },
 ]
+
+/** A task with the reminder fields the Mac encodes (TaskItem.remindAt and its place reminder). */
+type PTask = Task & { remindAt?: string | null; place?: { name: string; lat: number; lon: number; onLeave: boolean } | null }
 
 const AREA_KEY = 'tasksArea'
 const readArea = (): Area | null => {
@@ -214,7 +218,7 @@ function SwipeTask({ rec, showDue }: { rec: Rec<Task>; showDue: boolean }) {
   ]
   return (
     <SwipeRow leading={leading} trailing={trailing}>
-      <TaskRow rec={rec} showDue={showDue} />
+      <PhoneTaskRow rec={rec} showDue={showDue} />
     </SwipeRow>
   )
 }
@@ -320,5 +324,160 @@ function SwipeRow({ leading, trailing, children }: { leading: SwipeAction[]; tra
         {children}
       </div>
     </div>
+  )
+}
+
+// MARK: The row (TaskRow in TodayView.swift)
+
+/** Marks a task done; a repeating one gets its next occurrence with the same reminders (TaskItem.complete on the Mac). */
+function completeTask(rec: Rec<PTask>): void {
+  const t = rec.data
+  store.update<PTask>(rec.id, { isDone: true, completedAt: iso(new Date()) })
+  const due = parse(t.due)
+  const repeat = t.repeat ?? 'none'
+  if (!due || repeat === 'none') return
+  const next = repeat === 'daily' ? addDays(due, 1) : repeat === 'weekly' ? addDays(due, 7) : addMonths(due, 1)
+  const remind = parse(t.remindAt ?? null)
+  const remindNext = remind ? new Date(startOfDay(next).getTime() + (remind.getTime() - startOfDay(remind).getTime())) : null
+  store.create<PTask>('task', {
+    title: t.title, notes: t.notes ?? '', area: areaOf(t.area), due: iso(next), priority: t.priority ?? 0,
+    isDone: false, completedAt: null, createdAt: iso(new Date()), repeat,
+    remindAt: remindNext ? iso(remindNext) : null, place: t.place ?? { name: '', lat: 0, lon: 0, onLeave: false },
+  })
+}
+
+function toggleTask(rec: Rec<PTask>): void {
+  if (rec.data.isDone) store.update<PTask>(rec.id, { isDone: false, completedAt: null })
+  else completeTask(rec)
+}
+
+const hasPlace = (t: PTask) => !!t.place && !!t.place.name && (t.place.lat !== 0 || t.place.lon !== 0)
+
+function PhoneTaskRow({ rec, showDue }: { rec: Rec<Task>; showDue: boolean }) {
+  const t = rec.data as PTask
+  const [editing, setEditing] = useState(false)
+  const focus = useActiveFocus()
+  const focusing = !!focus && focus.data.taskUUID === rec.id
+  const due = parse(t.due)
+  const overdue = !!due && !t.isDone && due < startOfDay(new Date())
+  const repeat = t.repeat ?? 'none'
+  const remind = parse(t.remindAt ?? null)
+  const place = hasPlace(t) && !t.isDone
+  const meta = (showDue && due) || repeat !== 'none' || (remind && !t.isDone) || place
+  return (
+    <>
+      <div className="row task-row" style={{ gap: 12, padding: '8px 12px', background: 'var(--canvas)', borderRadius: 12, minHeight: 48 }}>
+        <CheckCircle on={t.isDone} onClick={() => toggleTask(rec as Rec<PTask>)} />
+        <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => setEditing(true)}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: t.isDone ? 'var(--ink3)' : 'var(--ink)', textDecoration: t.isDone ? 'line-through' : 'none' }}>
+            {t.title || 'Untitled'}
+          </div>
+          {meta && (
+            <div className="row" style={{ gap: 8, fontSize: 11, marginTop: 3, flexWrap: 'wrap', color: 'var(--ink3)' }}>
+              {showDue && due && <span className="row" style={{ gap: 3, color: overdue ? 'var(--critical)' : 'var(--ink3)' }}><CalendarDays size={11} />{relativeDay(due)}</span>}
+              {repeat !== 'none' && <span className="row" style={{ gap: 3 }}><RepeatIcon size={11} />{cap(repeat)}</span>}
+              {remind && !t.isDone && (
+                <span className="row" style={{ gap: 3 }}><AlarmClock size={11} />{sameDay(remind, new Date()) ? fmtTime(remind) : `${relativeDay(remind)} ${fmtTime(remind)}`}</span>
+              )}
+              {place && <span className="row" style={{ gap: 3 }}>{t.place!.onLeave ? <Footprints size={11} /> : <MapPin size={11} />}{t.place!.name}</span>}
+            </div>
+          )}
+        </div>
+        {focusing && <Timer size={13} strokeWidth={2.5} color="var(--orange)" aria-label="Focusing on this" />}
+        {t.priority > 0 && (
+          <span style={{ fontWeight: 800, fontSize: 13, color: t.priority === 3 ? 'var(--critical)' : 'var(--ink2)' }}>{'!'.repeat(t.priority)}</span>
+        )}
+        <AreaPill area={areaOf(t.area)} compact />
+      </div>
+      {editing && <PhoneTaskEditor rec={rec as Rec<PTask>} onClose={() => setEditing(false)} />}
+    </>
+  )
+}
+
+// MARK: The editor (TaskEditor in TasksView.swift, with ReminderSection)
+
+const REPEATS: { id: Repeat; title: string }[] = [
+  { id: 'none', title: 'Never' }, { id: 'daily', title: 'Daily' }, { id: 'weekly', title: 'Weekly' }, { id: 'monthly', title: 'Monthly' },
+]
+const PRIORITIES = ['None', 'Low', 'Medium', 'High']
+
+function PhoneTaskEditor({ rec, onClose }: { rec: Rec<PTask>; onClose: () => void }) {
+  const live = useRecords<PTask>('task').find((r) => r.id === rec.id) ?? rec
+  const t = live.data
+  const set = (patch: Partial<PTask>) => store.update<PTask>(rec.id, patch)
+  const due = parse(t.due)
+  const remind = parse(t.remindAt ?? null)
+  // The due day at 9:00, or an hour from now.
+  const defaultRemind = () => {
+    if (due && due > new Date()) { const d = startOfDay(due); d.setHours(9, 0, 0, 0); return d }
+    return new Date(Date.now() + 3600_000)
+  }
+  return (
+    <Modal open onClose={onClose} width={520}>
+      {/* Above the column, so the sheet's floating close button doesn't narrow everything below it. */}
+      <div className="pt-sheet-head" style={{ paddingRight: 40 }}>
+        <input className="plain display" style={{ fontSize: 26, width: '100%' }} value={t.title} placeholder="Title" onChange={(e) => set({ title: e.target.value })} />
+      </div>
+      <div className="col" style={{ gap: 18 }}>
+        <AreaPicker value={areaOf(t.area)} onChange={(a) => set({ area: a })} />
+        <div className="pt-form">
+          <span className="k">Due</span>
+          <div className="row" style={{ gap: 10 }}>
+            <PtSwitch label="Due date" on={!!due} onChange={(on) => set({ due: on ? iso(startOfDay(new Date())) : null })} />
+            {due && <input type="date" className="field" style={{ width: 'auto', padding: '6px 10px' }} value={toDateInput(due)}
+              onChange={(e) => e.target.value && set({ due: iso(fromInputs(e.target.value)) })} />}
+          </div>
+          <span className="k">Priority</span>
+          <div className="seg" style={{ display: 'flex', background: 'var(--card)', borderRadius: 10, padding: 2 }}>
+            {PRIORITIES.map((p, i) => (
+              <button key={p} onClick={() => set({ priority: i })} style={{
+                flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                background: (t.priority ?? 0) === i ? 'var(--canvas)' : 'transparent', color: 'var(--ink)',
+                boxShadow: (t.priority ?? 0) === i ? '0 1px 3px rgba(0,0,0,0.12)' : 'none',
+              }}>{p}</button>
+            ))}
+          </div>
+          <span className="k">Repeat</span>
+          <select className="field" style={{ width: 'auto', padding: '6px 10px' }} value={t.repeat ?? 'none'} onChange={(e) => set({ repeat: e.target.value as Repeat })}>
+            {REPEATS.map((r) => <option key={r.id} value={r.id}>{r.title}</option>)}
+          </select>
+        </div>
+
+        <div className="col" style={{ gap: 10 }}>
+          <span className="secondary" style={{ fontSize: 13 }}>Remind me</span>
+          <div className="row" style={{ gap: 10, fontSize: 13 }}>
+            <AlarmClock size={15} />
+            <span style={{ flex: 1 }}>At a time</span>
+            <PtSwitch label="Remind me at a time" on={!!remind} onChange={(on) => set({ remindAt: on ? iso(remind ?? defaultRemind()) : null })} />
+          </div>
+          {remind && (
+            <div className="row" style={{ gap: 8 }}>
+              <input type="date" className="field" style={{ flex: 1, padding: '6px 10px' }} value={toDateInput(remind)}
+                onChange={(e) => e.target.value && set({ remindAt: iso(fromInputs(e.target.value, toTimeInput(remind))) })} />
+              <input type="time" className="field" style={{ width: 140, flex: 'none', padding: '6px 10px' }} value={toTimeInput(remind)}
+                onChange={(e) => e.target.value && set({ remindAt: iso(fromInputs(toDateInput(remind), e.target.value)) })} />
+            </div>
+          )}
+          {hasPlace(t) && (
+            <div className="row" style={{ gap: 8, fontSize: 13 }}>
+              <MapPin size={15} />
+              <span style={{ flex: 1, minWidth: 0 }}>{t.place!.name} · {t.place!.onLeave ? 'When I leave' : 'When I arrive'}</span>
+              <button className="btn-soft" style={{ color: 'var(--critical)' }} onClick={() => set({ place: { name: '', lat: 0, lon: 0, onLeave: false } })}>Remove</button>
+            </div>
+          )}
+          {hasPlace(t) && <span className="muted" style={{ fontSize: 11 }}>Place reminders go off on your iPhone.</span>}
+        </div>
+
+        <div className="col" style={{ gap: 8 }}>
+          <span className="secondary" style={{ fontSize: 13 }}>Notes</span>
+          <textarea className="field" rows={5} style={{ fontSize: 14 }} value={t.notes ?? ''} onChange={(e) => set({ notes: e.target.value })} />
+        </div>
+        <div className="row">
+          <button className="btn-soft" style={{ color: 'var(--critical)' }} onClick={() => { store.remove(rec.id); onClose() }}>Delete</button>
+          <span className="spacer" />
+          <button className="btn-primary" style={{ width: 120, minHeight: 44 }} onClick={onClose}>Done</button>
+        </div>
+      </div>
+    </Modal>
   )
 }

@@ -6,9 +6,9 @@
 import { store, Rec } from '@/lib/store'
 import { iso } from '@/lib/dates'
 import type { Msg, Block } from '@/lib/ai'
-import type { Undo } from '@/lib/askTools'
+import type { Undo, ChatPlace } from './assistantTools'
 
-export interface Item { id: string; role: 'user' | 'assistant' | 'action'; text: string; symbol: string; undone: boolean; files?: string[]; androidUndo?: Undo }
+export interface Item { id: string; role: 'user' | 'assistant' | 'action'; text: string; symbol: string; undone: boolean; files?: string[]; place?: ChatPlace; androidUndo?: Undo }
 export interface Convo { id: string; system: string; messages: Msg[]; items: Item[]; container?: string }
 interface ChatRec { title: string; updatedAt: string; payload: string }
 
@@ -22,8 +22,14 @@ function withoutFiles(messages: Msg[]): Msg[] {
   return messages.map((m) => typeof m.content === 'string' ? m : {
     ...m,
     content: m.content.map((b: Block) => b.type === 'image' || b.type === 'document'
-      ? { type: 'text', text: `[${b.type === 'image' ? 'An image' : `A file${b.title ? ` (${b.title})` : ''}`} was attached here]` } : b),
+      ? { type: 'text', text: `[${b.title || (b.type === 'image' ? 'An image' : 'A file')} was attached here on another device.]` } : b),
   })
+}
+
+/** Base64 of the messages without files; very long chats share what you see only (the Mac's 800 KB limit). */
+function sharedMessages(messages: Msg[]): string {
+  const json = JSON.stringify(withoutFiles(messages))
+  return toB64(json.length > 800_000 ? '[]' : json)
 }
 
 export function listChats(): Rec<ChatRec>[] {
@@ -36,7 +42,8 @@ export function openChat(id: string): Convo | null {
   try {
     const p = JSON.parse(r.data.payload)
     const messages: Msg[] = p.messages ? JSON.parse(fromB64(p.messages)) : []
-    const items: Item[] = (p.items ?? []).map((i: any) => ({ id: i.id, role: i.role, text: i.text ?? '', symbol: i.symbol ?? '', undone: !!i.undone, files: i.files, androidUndo: i.androidUndo }))
+    const items: Item[] = (p.items ?? []).map((i: any) => ({ id: i.id, role: i.role, text: i.text ?? '', symbol: i.symbol ?? '', undone: !!i.undone,
+      files: i.files ?? undefined, place: i.place ?? undefined, androidUndo: i.androidUndo }))
     // A conversation saved mid tool-call can't be continued as is: keep what was said, drop the dangling call.
     const last = messages[messages.length - 1]
     if (last?.role === 'assistant' && Array.isArray(last.content) && last.content.some((b) => b.type === 'tool_use')) messages.pop()
@@ -51,9 +58,9 @@ export function saveChat(c: Convo): void {
   const payload = JSON.stringify({
     system: c.system,
     ...(c.container ? { container: c.container } : {}),
-    messages: toB64(JSON.stringify(withoutFiles(c.messages))),
+    messages: sharedMessages(c.messages),
     items: c.items.map((i) => ({ id: i.id.toUpperCase(), role: i.role, text: i.text, symbol: i.symbol, undone: i.undone,
-      ...(i.files ? { files: i.files } : {}), ...(i.androidUndo ? { androidUndo: i.androidUndo } : {}) })),
+      ...(i.files ? { files: i.files } : {}), ...(i.place ? { place: i.place } : {}), ...(i.androidUndo ? { androidUndo: i.androidUndo } : {}) })),
   })
   const data = { title, updatedAt: iso(new Date()), payload }
   store.put(c.id, 'chat', data)

@@ -47,18 +47,26 @@ export default function MoneyBar({ period: shown, onShift }: { period?: Period; 
       <WeeklyMoneyCard />
 
       <MoneyRulesSheet open={rules} onClose={() => setRules(false)} />
-      <Modal open={confirm} onClose={() => setConfirm(false)}>
-        <div className="col" style={{ gap: 14 }}>
-          <h2 className="display" style={{ fontSize: 24, margin: 0 }}>Start a new budget month today?</h2>
-          <div className="secondary" style={{ fontSize: 13 }}>{newMonthMessage()}</div>
-          <button className="btn-primary" style={{ minHeight: 44 }} onClick={() => { startNewMonth(); setConfirm(false) }}>Start new month</button>
-          {own.custom && (
-            <button className="btn-soft" style={{ minHeight: 44, justifyContent: 'center' }}
-              onClick={() => { backToCalendarMonths(); setConfirm(false) }}>Go back to calendar months</button>
-          )}
-          <button className="btn-soft" style={{ minHeight: 44, justifyContent: 'center' }} onClick={() => setConfirm(false)}>Cancel</button>
-        </div>
-      </Modal>
+      <NewMonthSheet open={confirm} onClose={() => setConfirm(false)} />
     </div>
+  )
+}
+
+/** "Start a new budget month today?" (newBudgetMonthDialog on the Mac and iPhone): payday resets Left to spend. */
+export function NewMonthSheet({ open, onClose, onStarted }: { open: boolean; onClose: () => void; onStarted?: () => void }) {
+  const custom = useBudgetPeriod().custom
+  return (
+    <Modal open={open} onClose={onClose}>
+      <div className="col" style={{ gap: 14 }}>
+        <h2 className="display" style={{ fontSize: 24, margin: 0 }}>Start a new budget month today?</h2>
+        <div className="secondary" style={{ fontSize: 13 }}>{newMonthMessage()}</div>
+        <button className="btn-primary" style={{ minHeight: 44 }} onClick={() => { startNewMonth(); onStarted?.(); onClose() }}>Start new month</button>
+        {custom && (
+          <button className="btn-soft" style={{ minHeight: 44, justifyContent: 'center' }}
+            onClick={() => { backToCalendarMonths(); onStarted?.(); onClose() }}>Go back to calendar months</button>
+        )}
+        <button className="btn-soft" style={{ minHeight: 44, justifyContent: 'center' }} onClick={onClose}>Cancel</button>
+      </div>
+    </Modal>
   )
 }

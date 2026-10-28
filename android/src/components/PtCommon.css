@@ -1,0 +1,36 @@
+/* Shared pieces of the phone sections (Tasks, Reading, Ideas, Insights, GitHub, LinkedIn, Documents): the iPhone's
+   large inline title under the back button, sticker tiles, chips and the Pro upsell. */
+.pt-page { display: flex; flex-direction: column; gap: 16px; }
+.pt-page > * { flex-shrink: 0; }
+.pt-title { font: 800 34px/1.1 var(--ui); letter-spacing: -0.5px; margin: 2px 0 0; color: var(--ink); overflow-wrap: anywhere; }
+.pt-sub { font-size: 13px; color: var(--ink2); margin-top: -8px; }
+
+.pt-chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
+.pt-chips::-webkit-scrollbar { display: none; }
+.pt-chip { display: inline-flex; align-items: center; gap: 5px; flex: none; white-space: nowrap; font: 600 13px/1.2 var(--ui); padding: 8px 12px;
+  border-radius: 999px; background: var(--card); color: var(--ink); }
+.pt-chip.on { background: var(--inverse); color: var(--on-inverse); }
+.pt-chip.sm { font-size: 12px; padding: 6px 12px; }
+
+.pt-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.pt-tile { border-radius: 18px; padding: 16px; color: var(--sticker-ink); min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.pt-tile .v { font: 700 26px/1.1 var(--display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pt-tile .l { font-size: 12px; font-weight: 600; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.pt-upsell { display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: var(--radius); border: 1.5px dashed var(--line); }
+.pt-upsell .t { font-size: 15px; font-weight: 600; }
+.pt-upsell .d { font-size: 12px; color: var(--ink2); }
+
+.pt-sheet-title { font: 700 26px/1.15 var(--display); margin: 0; padding-right: 40px; }
+/* First thing in a sheet: at least as tall as the floating close button, so what follows gets the full width. */
+.pt-sheet-head { display: block; min-height: 32px; margin: 0 0 14px; }
+.pt-form { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px 12px; align-items: center; font-size: 13px; }
+.pt-form > .k { color: var(--ink2); }
+.pt-switch { position: relative; width: 46px; height: 28px; flex: none; border-radius: 999px; background: var(--line); transition: background 0.15s; }
+.pt-switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); transition: transform 0.15s; }
+.pt-switch.on { background: var(--good); }
+.pt-switch.on::after { transform: translateX(18px); }
+
+/* Ideas: the add field's hint stays on one line, cut short like a SwiftUI TextField's. */
+.pt-idea-input::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

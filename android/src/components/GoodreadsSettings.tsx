@@ -14,7 +14,8 @@ export function GoodreadsLogo({ size = 28 }: { size?: number }) {
   )
 }
 
-export default function GoodreadsSettings() {
+/** `plain`: no card of its own (inside a Settings list row). */
+export default function GoodreadsSettings({ plain }: { plain?: boolean } = {}) {
   const gr = useGoodreads()
   const [working, setWorking] = useState(false)
 
@@ -24,7 +25,7 @@ export default function GoodreadsSettings() {
   }
 
   return (
-    <div className="card col" style={{ gap: 10, padding: 14 }}>
+    <div className={plain ? 'col' : 'card col'} style={{ gap: 10, padding: plain ? '12px 16px' : 14 }}>
       <div className="row" style={{ gap: 12, alignItems: 'center' }}>
         <GoodreadsLogo />
         <div className="col" style={{ gap: 2, flex: 1, minWidth: 0 }}>

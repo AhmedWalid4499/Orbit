@@ -95,7 +95,13 @@ function describe(s: Status): string {
 
 // MARK: Screen
 
+/** The Bills screen under More: the section with a page title. */
 export default function Bills() {
+  return <div className="page"><BillsSection page /></div>
+}
+
+/** Money › Bills on the phone (BillsView): "Bills" with what's left to pay, Add bill, and one row per bill. */
+export function BillsSection({ page = false }: { page?: boolean }) {
   const bills = useRecords<Bill>('bill')
   const txns = useRecords<T>('transaction')
   const money = useMoney()
@@ -111,18 +117,18 @@ export default function Bills() {
   const left = cycles.reduce((s, { b, c }) => s + (c.status.kind !== 'paid' && startOfMonth(c.due).getTime() === thisMonth ? b.data.amount : 0), 0)
 
   return (
-    <div className="page">
+    <>
       <div className="col" style={{ gap: 16 }}>
-        <div className="row" style={{ gap: 12 }}>
+        <div className="row" style={{ gap: 12, alignItems: 'flex-start' }}>
           <div style={{ minWidth: 0 }}>
-            <h1 className="page-title">Bills</h1>
+            {page ? <h1 className="page-title">Bills</h1> : <div className="display" style={{ fontSize: 24, lineHeight: 1.15 }}>Bills</div>}
             <div className="secondary" style={{ fontSize: 13, marginTop: 4 }}>
               {!bills.length ? 'Add the bills you pay every month. Joshu reminds you before each one.'
                 : left > 0 ? `${money(left)} still to pay this month` : 'All paid this month'}
             </div>
           </div>
           <span className="spacer" />
-          <button className="btn-soft" style={{ minHeight: 40 }} onClick={() => setAdding('')}><Plus size={14} />Add</button>
+          <button className="btn-soft" style={{ minHeight: 40 }} onClick={() => setAdding('')}><Plus size={14} />{page ? 'Add' : 'Add bill'}</button>
         </div>
 
         {!bills.length && (
@@ -134,7 +140,7 @@ export default function Bills() {
               </div>
               <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
                 {['Rent', 'Internet', 'Phone', 'Electricity'].map((n) => (
-                  <button key={n} className="btn-soft" style={{ minHeight: 40 }} onClick={() => setAdding(n)}>{n}</button>
+                  <button key={n} className="btn-soft" style={{ minHeight: 40, background: 'var(--canvas)' }} onClick={() => setAdding(n)}>{n}</button>
                 ))}
               </div>
             </div>
@@ -156,15 +162,15 @@ export default function Bills() {
       {editing && <Editor bill={editing} onClose={() => setEditing(null)} />}
       {asking && <AmountSheet name={asking.bill.data.name} onClose={() => setAsking(null)}
         onSave={(v) => { setPaid(asking.bill, asking.due, true, txns, v); setAsking(null) }} />}
-    </div>
+    </>
   )
 }
 
 function BillRow({ bill, cycle, onEdit, onToggle }: { bill: Rec<Bill>; cycle: Cycle; onEdit: () => void; onToggle: () => void }) {
   const money = useMoney()
   const s = cycle.status
-  const tint = s.kind === 'paid' ? 'var(--mint)' : s.kind === 'late' ? 'var(--peach)' : s.days <= (bill.data.remindDays ?? 3) ? 'var(--lime)' : null
-  const chip = tint ? 'rgba(255,255,255,0.6)' : 'var(--canvas)'
+  const tint = s.kind === 'paid' ? 'var(--mint)' : s.kind === 'late' ? 'var(--peach)' : s.days <= (bill.data.remindDays ?? 3) ? '#F3DE9E' : null
+  const chip = tint ? 'rgba(255,255,255,0.55)' : 'var(--canvas)'
   return (
     <div className="row" style={{ gap: 12, padding: 14, borderRadius: 16, alignItems: 'flex-start',
       background: tint ?? 'var(--card)', color: tint ? 'var(--sticker-ink)' : 'var(--ink)' }}>

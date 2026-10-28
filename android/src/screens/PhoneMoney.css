@@ -1,0 +1,134 @@
+/* Money on the phone (PhoneMoney.swift and the Mac views it shows). Sizes follow the iPhone: 16px gutters, 16px between blocks. */
+.pm { display: flex; flex-direction: column; gap: 16px; padding: 4px 16px 24px; }
+.pm > * { flex-shrink: 0; }
+
+/* ‹ October 2026 › */
+.pm-month { display: flex; align-items: center; gap: 8px; }
+.pm-month > span { flex: 1; min-width: 0; text-align: center; font-size: 22px; line-height: 1.2; }
+.pm-month > button { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink); flex: none; }
+
+/* Left to spend (BalanceCard) */
+.pm-balance { display: flex; flex-direction: column; gap: 18px; padding: 22px; border-radius: 22px; color: var(--sticker-ink);
+  background: linear-gradient(135deg, var(--lime), var(--mint)); }
+.pm-balance-title { font-size: 14px; font-weight: 600; }
+.pm-balance-icon { width: 32px; height: 32px; border-radius: 50%; background: rgba(255, 255, 255, 0.5); display: inline-flex; align-items: center; justify-content: center; }
+.pm-balance-value { font-size: 40px; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pm-balance-caption { font-size: 12px; font-weight: 500; opacity: 0.75; }
+
+/* Spent / Income */
+.pm-minis { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.pm-mini { display: flex; flex-direction: column; gap: 6px; padding: 16px; border-radius: 20px; color: var(--sticker-ink); min-width: 0; }
+.pm-mini-title { font-size: 13px; font-weight: 600; }
+.pm-mini-value { font-size: 24px; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pm-mini-caption { font-size: 11px; font-weight: 500; opacity: 0.75; }
+
+/* iOS segmented control: grey track, white selected segment */
+.pm-seg { display: flex; padding: 3px; border-radius: 999px; background: var(--card); }
+.pm-seg button { flex: 1; min-width: 0; padding: 7px 4px; border-radius: 999px; font-size: 13px; font-weight: 500; color: var(--ink); white-space: nowrap; }
+.pm-seg button.on { background: var(--canvas); font-weight: 600; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12); }
+@media (prefers-color-scheme: dark) { .pm-seg button.on { background: var(--card-hover); } }
+
+/* Add, Receipt, Budgets, New month, Statement: one sideways row */
+.pm-actions { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
+.pm-actions::-webkit-scrollbar { display: none; }
+.pm-actions .btn-soft { min-height: 38px; font-size: 14px; }
+.pm-statement { display: contents; }
+.pm-statement > button { display: none !important; }
+
+/* Your banks (AccountsStrip in Accounts.tsx) */
+.pm-acct-strip { display: flex; gap: 14px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 4px 16px; align-items: stretch; }
+.pm-acct-strip::-webkit-scrollbar { display: none; }
+.pm-acct-card { width: 300px; flex: none; display: block; text-align: left; }
+.pm-acct-empty { width: 300px; height: 180px; flex: none; gap: 8px; padding: 18px; border-radius: 24px; border: 1.5px dashed var(--line); }
+
+/* Auto-log card payments */
+.pm-autolog { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 18px; background: var(--card); color: var(--ink); text-align: left; width: 100%; }
+.pm-autolog-icon { width: 38px; height: 38px; border-radius: 50%; background: var(--lime); color: var(--sticker-ink); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+
+/* Cards (Card(padding: 14)) */
+.pm-card { display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: var(--radius); background: var(--card); }
+.pm-card-title { font-size: 20px; line-height: 1.2; }
+.pm-empty { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink3); padding: 6px 0; }
+
+/* Daily spending */
+.pm-chart { display: flex; gap: 6px; height: 150px; }
+.pm-chart-axis { display: flex; flex-direction: column; justify-content: space-between; font-size: 10px; color: var(--ink3); text-align: right; flex: none; min-width: 26px; transform: translateY(-5px); padding-bottom: 0; }
+.pm-chart-axis span:last-child { transform: translateY(10px); }
+.pm-chart-plot { position: relative; flex: 1; min-width: 0; }
+.pm-chart-grid { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between; }
+.pm-chart-grid i { display: block; height: 1px; background: var(--line); }
+.pm-chart-bars { position: absolute; inset: 0; display: flex; align-items: flex-end; gap: 2px; }
+.pm-chart-bars span { flex: 1; min-width: 0; border-radius: 3px 3px 0 0; min-height: 0; }
+.pm-chart-x { display: flex; justify-content: space-between; padding-left: 32px; font-size: 10px; color: var(--ink3); }
+
+/* By category */
+.pm-progress { height: 4px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.pm-progress > div { height: 100%; border-radius: 999px; background: var(--ink); }
+
+/* Transactions */
+.pm-day { font-size: 12px; font-weight: 600; color: var(--ink3); padding-top: 4px; }
+.pm-txn { display: flex; align-items: center; gap: 12px; padding: 6px 10px; border-radius: 12px; background: var(--canvas); color: var(--ink); text-align: left; width: 100%; }
+.pm-txn-icon { width: 34px; height: 34px; border-radius: 50%; color: var(--sticker-ink); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+
+/* Money coach: the dark card */
+.pm-coach { display: flex; flex-direction: column; gap: 12px; padding: 20px; border-radius: 22px; background: #141416; color: #f4f4f5; }
+.pm-coach-refresh { width: 28px; height: 28px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); color: #f4f4f5; display: inline-flex; align-items: center; justify-content: center; }
+.pm-tip { display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 14px; background: rgba(255, 255, 255, 0.07); }
+.pm-saving { font-size: 11px; font-weight: 700; color: var(--sticker-ink); background: var(--lime); border-radius: 999px; padding: 3px 7px; white-space: nowrap; flex: none; }
+.pm-discuss { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; background: var(--lime); color: var(--sticker-ink); font-size: 13px; font-weight: 600; }
+
+/* Calendar */
+.pm-cal-row, .pm-cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.pm-cal-wd { text-align: center; font-size: 12px; font-weight: 600; color: var(--ink2); }
+.pm-cal-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 5px 0; border-radius: 10px; background: var(--card); color: var(--ink); min-width: 0; box-shadow: inset 0 0 0 0 var(--ink); }
+.pm-cal-cell.on { box-shadow: inset 0 0 0 1.5px var(--ink); }
+.pm-cal-num { width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 500; }
+.pm-cal-num.today { background: var(--lime); color: var(--sticker-ink); font-weight: 700; }
+.pm-cal-dots { display: flex; gap: 2px; height: 5px; }
+.pm-cal-dots i { width: 5px; height: 5px; border-radius: 50%; }
+.pm-cal-spent { font-size: 9px; font-weight: 500; color: var(--ink2); white-space: nowrap; line-height: 1.2; }
+.pm-cal-legend { display: flex; flex-wrap: wrap; gap: 16px; padding-top: 4px; font-size: 11px; color: var(--ink2); }
+.pm-cal-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.pm-cal-legend i { width: 8px; height: 8px; border-radius: 50%; }
+.pm-due { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 10px; background: var(--canvas); }
+.pm-due > i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+
+/* Subscriptions */
+.pm-tiles { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.pm-tile { display: flex; flex-direction: column; gap: 4px; padding: 16px; border-radius: 18px; color: var(--sticker-ink); min-width: 0; }
+.pm-sub { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 14px; background: var(--card); color: var(--ink); text-align: left; width: 100%; }
+.pm-badge { font-size: 10px; font-weight: 600; color: var(--sticker-ink); padding: 2px 6px; border-radius: 999px; }
+
+/* Sheets */
+.pm-sheet { gap: 14px; }
+.pm-sheet-title { font-size: 24px; margin: 0; line-height: 1.15; padding-right: 36px; }
+.pm-wide { width: 100%; justify-content: center; min-height: 44px; }
+.pm-input { font-size: 16px; padding: 12px; }
+.pm-menu-row { display: flex; align-items: center; gap: 12px; min-height: 50px; padding: 0 16px; border-radius: 14px; background: var(--card); color: var(--ink); font-size: 16px; font-weight: 500; }
+.pm-list { display: flex; flex-direction: column; border-radius: 14px; background: var(--card); overflow: hidden; }
+.pm-list-row { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 14px; color: var(--ink); font-size: 15px; text-align: left; width: 100%; }
+.pm-list-row + .pm-list-row { border-top: 0.5px solid var(--line); }
+.pm-list-row.pm-indent { padding-left: 42px; font-size: 14px; min-height: 42px; }
+.pm-toggle-row { display: flex; align-items: center; justify-content: space-between; min-height: 44px; color: var(--ink); font-size: 15px; width: 100%; }
+.pm-switch { width: 46px; height: 28px; border-radius: 999px; background: var(--line); position: relative; flex: none; transition: background 0.15s; display: inline-block; }
+.pm-switch i { position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); transition: transform 0.15s; }
+.pm-switch.on { background: var(--good); }
+.pm-switch.on i { transform: translateX(18px); }
+.pm-field { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px; background: var(--card); min-height: 46px; }
+.pm-field > span { font-size: 14px; color: var(--ink2); flex: none; }
+.pm-field > input, .pm-field > select { flex: 1; min-width: 0; text-align: right; font-size: 15px; font-weight: 500; color: var(--ink); }
+.pm-field > select { text-align-last: right; appearance: none; }
+.pm-field > em { font-style: normal; color: var(--ink2); font-size: 15px; flex: none; }
+.pm-receipt { max-height: 260px; max-width: 100%; object-fit: contain; border-radius: 14px; align-self: center; }
+.pm-panel { padding: 16px; border-radius: 18px; background: var(--card); }
+.pm-tile-icon { width: 32px; height: 32px; border-radius: 9px; color: var(--sticker-ink); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.pm-dot-icon { width: 26px; height: 26px; border-radius: 50%; color: var(--sticker-ink); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.pm-chip { font-size: 12px; font-weight: 500; padding: 5px 10px; border-radius: 999px; background: var(--canvas); }
+.pm-caps { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.pm-search { display: flex; align-items: center; gap: 8px; background: var(--card); border-radius: 12px; padding: 9px 12px; }
+.pm-spin { animation: pm-spin 1s linear infinite; }
+@keyframes pm-spin { to { transform: rotate(360deg); } }
+/* The sheet's close button floats in the shared Modal, which would narrow these flex sheets: pin it to the corner instead. */
+.modal:has(> .pm-sheet) { position: relative; }
+.modal:has(> .pm-sheet) > .icon-btn:first-child { position: absolute; float: none; top: 20px; right: 16px; z-index: 1; }
+.pm-panel .btn-soft { background: var(--canvas); }

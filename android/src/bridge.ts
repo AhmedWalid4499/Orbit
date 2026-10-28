@@ -3,7 +3,7 @@
 import { App as CapApp } from '@capacitor/app'
 import { Browser } from '@capacitor/browser'
 import supabase from '../../Support/Supabase.json'
-import { isNative } from './native'
+import { native, isNative } from './native'
 import { loadSecrets } from './secrets'
 import * as claude from './claude'
 import * as google from './google'
@@ -53,6 +53,15 @@ const authSubs = new Set<(url: string) => void>()
 let pendingLink: string | null = null
 
 export function installBridge(): void {
+  // The web view has no navigator.share: hand sharing to Android's share sheet.
+  if (isNative && !(navigator as any).share) {
+    ;(navigator as any).share = async (d: { title?: string; text?: string; url?: string; files?: File[] }) => {
+      const image = d.files?.find((f) => f.type.startsWith('image/'))
+      const data = image ? await new Promise<string>((res) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] ?? ''); r.readAsDataURL(image) }) : undefined
+      await native.share({ title: d.title, text: [d.text, d.url].filter(Boolean).join('\n'), image: data })
+    }
+    ;(navigator as any).canShare = () => true
+  }
   if (isNative) {
     CapApp.addListener('appUrlOpen', ({ url }) => {
       if (authSubs.size) authSubs.forEach((f) => f(url)); else pendingLink = url

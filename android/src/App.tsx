@@ -17,21 +17,17 @@ import { Orb } from './components/Orb'
 import SearchSheet from './components/Search'
 import { Modal } from '@/components/ui'
 import { QuickAdd } from '@/screens/Today'
-import { PlanTomorrowSheet } from '@/screens/PlanTomorrow'
 import { useProfilePhoto } from '@/lib/profileCard'
 import SignIn from '@/screens/SignIn'
 import Today from './screens/Today'
-import CalendarScreen from '@/screens/Calendar'
 import PhoneTasks from './screens/PhoneTasks'
 import Welcome, { usesJoshuWithoutAccount, setUsesJoshuWithoutAccount } from './screens/Welcome'
-import Habits from '@/screens/Habits'
-import Bucket from '@/screens/Bucket'
-import Money from '@/screens/Money'
-import Notes from '@/screens/Notes'
+import Tour, { tourSeen } from './screens/Tour'
+import SetupFlow, { setupNeeded, checkFreshAccount, onOnboardingChange } from './screens/SetupFlow'
+import CaptureSheet from './components/CaptureSheet'
+import { ProWelcomeHost } from './components/ProWelcome'
 import PhoneReading from './screens/PhoneReading'
-import Documents from '@/screens/Documents'
-import Review from '@/screens/Review'
-import MyCard from '@/screens/MyCard'
+import PhoneDocuments from './screens/PhoneDocuments'
 import type { Tab as SharedTab, Nav } from '@/App'
 import { isNative } from './native'
 import { checkForUpdates } from './bridge'
@@ -44,7 +40,15 @@ import { onVoiceStart, startWake } from './voice'
 import VoiceOrb from './components/VoiceOrb'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import Assistant from './screens/Assistant'
-import More, { MoreTab } from './screens/More'
+import { MoreTab } from './screens/More'
+import PhoneMore from './screens/PhoneMore'
+import PhoneCard from './screens/PhoneCard'
+import PhoneReview from './screens/PhoneReview'
+import PhonePlan from './screens/PhonePlan'
+import PhoneCalendar from './screens/PhoneCalendar'
+import PhoneHabits from './screens/PhoneHabits'
+import PhoneNotes from './screens/PhoneNotes'
+import PhoneBucket from './screens/PhoneBucket'
 import Settings from './screens/Settings'
 import Ideas from './screens/Ideas'
 import Goals from './screens/Goals'
@@ -52,7 +56,7 @@ import GitHub from './screens/GitHub'
 import Jobs from './screens/Jobs'
 import Insights from './screens/Insights'
 import Bills from './screens/Bills'
-import MoneyBar from './screens/MoneyBar'
+import PhoneMoney from './screens/PhoneMoney'
 import Accounts from './screens/Accounts'
 
 const DEMO = new URLSearchParams(location.search).has('demo')
@@ -64,7 +68,9 @@ export default function App() {
   const [signedIn, setSignedIn] = useState(!!cloud.getSession())
   // Joshu without an account (v1.40.1): data stays on this phone until you sign in.
   const [local, setLocal] = useState(usesJoshuWithoutAccount())
-  const [auth, setAuth] = useState(false)
+  // First launch: the tour, then (for a brand-new account) the step-by-step setup, as on the iPhone.
+  const [tour, setTour] = useState(() => !DEMO && !tourSeen())
+  const [setup, setSetup] = useState(() => !DEMO && setupNeeded())
   const [splash, setSplash] = useState(() => !(DEMO && new URLSearchParams(location.search).has('nosplash')))
 
   useEffect(() => {
@@ -78,22 +84,25 @@ export default function App() {
     return cloud.onSessionChange(() => setSignedIn(!!cloud.getSession()))
   }, [])
 
+  useEffect(() => onOnboardingChange(() => { setTour(!DEMO && !tourSeen()); setSetup(!DEMO && setupNeeded()) }), [])
+
   useEffect(() => {
     if (!ready || DEMO) return
     if (signedIn) {
-      setUsesJoshuWithoutAccount(false); setLocal(false); setAuth(false)
-      store.start().then(() => store.adoptLocal()).then(() => refreshPro()).then(() => syncVault()).then(() => { startEmailExpensesTimer(); checkBankTexts().then(() => checkSpendingAlerts()); scheduleReminders(); refreshGoogleCalendar() })
+      setUsesJoshuWithoutAccount(false); setLocal(false)
+      const fresh = checkFreshAccount(cloud.getSession()!.userID)
+      store.start().then(() => { fresh() }).then(() => store.adoptLocal()).then(() => refreshPro()).then(() => syncVault()).then(() => { startEmailExpensesTimer(); checkBankTexts().then(() => checkSpendingAlerts()); scheduleReminders(); refreshGoogleCalendar() })
       if (isNative) checkForUpdates(true)
     } else if (local) store.startLocal()
     else store.stop()
   }, [ready, signedIn, local])
 
-  // Android back button on the sign-in screen goes back to Welcome.
+  // Android back button in the tour and setup goes back a page (they listen for Escape).
   useEffect(() => {
-    if (!isNative || signedIn || local || !auth) return
-    const h = CapApp.addListener('backButton', () => setAuth(false))
+    if (!isNative || !(tour || setup)) return
+    const h = CapApp.addListener('backButton', () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
     return () => { h.then((x) => x.remove()) }
-  }, [signedIn, local, auth])
+  }, [tour, setup])
 
   // Coming back to the app: sync, pick up new bank texts, refresh reminders.
   useEffect(() => {
@@ -107,9 +116,12 @@ export default function App() {
 
   return (
     <>
-      {ready && (signedIn || local ? <Shell onSignIn={() => { setUsesJoshuWithoutAccount(false); setLocal(false); setAuth(true) }} />
-        : auth ? <div className="signin-wrap"><SignIn platform="android" /><button className="link signin-back" onClick={() => setAuth(false)}>‹ Back</button></div>
-        : <Welcome onSignIn={() => setAuth(true)} onCreateAccount={() => setAuth(true)} onCarryOn={() => setLocal(true)} />)}
+      {ready && (tour ? <Tour onDone={() => setTour(false)} />
+        : signedIn || local
+          ? (signedIn && setup
+            ? <SetupFlow onDone={() => setSetup(false)} onSeePro={() => { localStorage.setItem('open.pro', '1'); setSetup(false) }} />
+            : <Shell onSignIn={() => { setUsesJoshuWithoutAccount(false); setLocal(false) }} />)
+          : <Welcome onCarryOn={() => setLocal(true)} />)}
       {splash && <Splash onDone={() => setSplash(false)} />}
     </>
   )
@@ -136,6 +148,8 @@ function Shell({ onSignIn }: { onSignIn: () => void }) {
   }
   const nav: Nav = { go: open, openJournal: () => { setJournalRequest((n) => n + 1); open('notes') }, openReview: () => setReview(true), openPlan: () => setPlan(true) }
   useEffect(() => onOpenAsk((s) => { setSeed(s); setMain('assistant') }), [])
+  // "See Joshu Pro" at the end of setup lands in Settings.
+  useEffect(() => { if (localStorage.getItem('open.pro')) { localStorage.removeItem('open.pro'); setSettings(true) } }, [])
   // "Hey Joshu": the assistant answers, so it's opened under the orb.
   useEffect(() => { onVoiceStart(() => { setPage(null); setMain('assistant') }); startWake() }, [])
   // Tapping a notification opens its section (spending alerts → Money).
@@ -144,6 +158,10 @@ function Shell({ onSignIn }: { onSignIn: () => void }) {
     const h = LocalNotifications.addListener('localNotificationActionPerformed', (a) => {
       const route = a.notification.extra?.route
       if (route === 'money' || route === 'tasks' || route === 'today') { setPage(null); setMain(route) }
+      else if (route === 'plan') setPlan(true)
+      else if (route === 'review') setReview(true)
+      else if (route === 'journal') nav.openJournal()
+      else if (route === 'calendar' || route === 'habits' || route === 'bucket') open(route)
     })
     return () => { h.then((x) => x.remove()) }
   }, [])
@@ -186,15 +204,15 @@ function Shell({ onSignIn }: { onSignIn: () => void }) {
       <main className="phone-main">
         {main === 'today' && <Today nav={nav} />}
         {main === 'tasks' && <PhoneTasks />}
-        {main === 'money' && <div className="money-wrap"><MoneyBar /><Money /></div>}
+        {main === 'money' && <PhoneMoney />}
         {main === 'assistant' && <Assistant seed={seed} onSeedUsed={() => setSeed(undefined)} />}
-        {main === 'more' && !page && <More onOpen={(t) => setPage(t)} onSettings={() => setSettings(true)} onCard={() => setCard(true)} onReview={() => setReview(true)} onPlan={() => setPlan(true)} />}
-        {main === 'more' && page === 'calendar' && <CalendarScreen />}
-        {main === 'more' && page === 'habits' && <Habits />}
-        {main === 'more' && page === 'bucket' && <Bucket />}
-        {main === 'more' && page === 'notes' && <Notes openJournalRequest={journalRequest} />}
+        {main === 'more' && !page && <PhoneMore onOpen={(t) => setPage(t)} onCard={() => setCard(true)} onReview={() => setReview(true)} onPlan={() => setPlan(true)} onSearch={() => setSearching(true)} onSettings={() => setSettings(true)} />}
+        {main === 'more' && page === 'calendar' && <PhoneCalendar />}
+        {main === 'more' && page === 'habits' && <PhoneHabits />}
+        {main === 'more' && page === 'bucket' && <PhoneBucket />}
+        {main === 'more' && page === 'notes' && <PhoneNotes openJournalRequest={journalRequest} />}
         {main === 'more' && page === 'reading' && <PhoneReading />}
-        {main === 'more' && page === 'documents' && <Documents />}
+        {main === 'more' && page === 'documents' && <PhoneDocuments />}
         {main === 'more' && page === 'ideas' && <Ideas />}
         {main === 'more' && page === 'goals' && <Goals />}
         {main === 'more' && page === 'bills' && <Bills />}
@@ -212,17 +230,14 @@ function Shell({ onSignIn }: { onSignIn: () => void }) {
       </nav>
       <Settings open={settings} onClose={() => setSettings(false)} onSignIn={() => { setSettings(false); onSignIn() }} />
       <SearchSheet open={searching} onClose={() => setSearching(false)} onGo={(d) => open(d)} />
-      <Modal open={adding} onClose={() => setAdding(false)}>
-        <h2 className="display" style={{ fontSize: 24, margin: '0 0 6px' }}>Quick add</h2>
-        <p className="secondary" style={{ fontSize: 13, marginTop: 0 }}>Type anything: a task, an event, an expense. {assistant} sorts it into the right place.</p>
-        <div className="today-clock"><QuickAdd /></div>
-      </Modal>
-      <Review open={review} onClose={() => setReview(false)} />
-      <MyCard open={card} onClose={() => setCard(false)} />
+      <CaptureSheet open={adding} onClose={() => setAdding(false)} />
+      <PhoneReview open={review} onClose={() => setReview(false)} onGetPro={() => { setReview(false); setSettings(true) }} />
+      <PhoneCard open={card} onClose={() => setCard(false)} />
       <FinishedReading />
-      <PlanTomorrowSheet open={plan} onClose={() => setPlan(false)} />
+      <PhonePlan open={plan} onClose={() => setPlan(false)} />
       <FocusStartSheet />
       <VoiceOrb />
+      <ProWelcomeHost onOpenAssistant={() => { setPage(null); setMain('assistant') }} />
       <FocusDoneDialog />
     </div>
   )

@@ -273,6 +273,37 @@ public class OrbitNativePlugin extends Plugin {
         }).start();
     }
 
+    // MARK: Sharing (Android's share sheet)
+
+    /** Shares text and, optionally, one image (base64 PNG/JPEG) through the system share sheet. */
+    @PluginMethod
+    public void share(PluginCall call) {
+        try {
+            String text = call.getString("text", "");
+            String title = call.getString("title", "");
+            String image = call.getString("image");
+            Intent send = new Intent(Intent.ACTION_SEND);
+            if (!text.isEmpty()) send.putExtra(Intent.EXTRA_TEXT, text);
+            if (!title.isEmpty()) send.putExtra(Intent.EXTRA_SUBJECT, title);
+            if (image != null && !image.isEmpty()) {
+                java.io.File file = new java.io.File(getContext().getCacheDir(), "joshu-share.png");
+                try (java.io.FileOutputStream out = new java.io.FileOutputStream(file)) { out.write(Base64.decode(image, Base64.DEFAULT)); }
+                Uri uri = androidx.core.content.FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", file);
+                send.setType("image/png");
+                send.putExtra(Intent.EXTRA_STREAM, uri);
+                send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            } else {
+                send.setType("text/plain");
+            }
+            Intent chooser = Intent.createChooser(send, title.isEmpty() ? null : title);
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(chooser);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("Couldn't share: " + e.getMessage());
+        }
+    }
+
     // MARK: Speech in (Android's speech recognizer) and out (text to speech)
 
     private SpeechRecognizer recognizer;

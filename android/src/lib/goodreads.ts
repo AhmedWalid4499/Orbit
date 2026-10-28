@@ -248,3 +248,174 @@ async function post(path: string, fields: Record<string, string>): Promise<boole
     return false
   }
 }
+
+// MARK: Your shelves (Goodreads in BookSources.swift, ReadingSync's Goodreads part)
+// Joshu reads your public shelf feed and merges it into the library, matched by Goodreads ID or title and author, so
+// syncing again never makes duplicates and a shelf you set in Joshu is never moved backwards (BookLibrary.merge).
+
+export interface ImportedBook {
+  title: string; author: string; status: Book['status']; rating: number; isbn: string; pages: number; year: number
+  coverURL: string; progress: number; finishedAt: string | null; addedAt: string | null; externalID: string
+}
+
+/** A numeric user ID, or one from a profile link like goodreads.com/user/show/12345-name. */
+export function goodreadsUserID(input: string): string | null {
+  const s = (input ?? '').trim()
+  const m = s.match(/(?:user\/show\/|list\/|list_rss\/)(\d+)/)
+  if (m) return m[1]
+  return /^\d+$/.test(s) ? s : null
+}
+
+async function getText(url: string): Promise<{ status: number; text: string }> {
+  if (isNative) return plugin.fetchText({ url })
+  const r = await fetch(url) // the browser preview: Goodreads usually refuses this (no CORS)
+  return { status: r.status, text: await r.text() }
+}
+
+const isoOrNull = (s: string | null | undefined): string | null => {
+  if (!s) return null
+  const d = new Date(s)
+  return isNaN(d.getTime()) ? null : d.toISOString().replace(/\.\d{3}Z$/, 'Z')
+}
+
+/** Reads the public shelf RSS feed, 100 books a page (the profile must be public). */
+export async function fetchShelves(userID: string): Promise<ImportedBook[]> {
+  const all: ImportedBook[] = []
+  for (let page = 1; page <= 30; page++) {
+    const url = `https://www.goodreads.com/review/list_rss/${userID}?shelf=%23ALL%23&per_page=100&page=${page}`
+    let res: { status: number; text: string }
+    try { res = await getText(url) } catch (e) { throw new Error(`Couldn't reach Goodreads: ${e instanceof Error ? e.message : String(e)}`) }
+    const doc = new DOMParser().parseFromString(res.text ?? '', 'text/xml')
+    const sawChannel = !!doc.querySelector('channel')
+    const items = [...doc.querySelectorAll('item')].map((it) => {
+      const get = (n: string) => it.getElementsByTagName(n)[0]?.textContent?.trim() ?? ''
+      const shelves = get('user_shelves').split(',').map((x) => x.trim())
+      const status: Book['status'] = shelves.includes('currently-reading') ? 'reading' : shelves.includes('to-read') ? 'toRead' : 'read'
+      let cover = get('book_large_image_url') || get('book_image_url')
+      if (cover.includes('nophoto')) cover = ''
+      const id = get('book_id')
+      return {
+        title: get('title'), author: get('author_name'), status, rating: Number(get('user_rating')) || 0, isbn: get('isbn'),
+        pages: Number(get('num_pages')) || 0, year: Number(get('book_published')) || 0, coverURL: cover, progress: status === 'read' ? 1 : 0,
+        finishedAt: isoOrNull(get('user_read_at')), addedAt: isoOrNull(get('user_date_added')), externalID: id ? `goodreads:${id}` : '',
+      } satisfies ImportedBook
+    })
+    if (page === 1 && items.length === 0 && !sawChannel) throw new Error("Goodreads didn't return a shelf. Check the user ID and that your profile is public.")
+    all.push(...items)
+    if (items.length < 100) break
+  }
+  return all
+}
+
+/** Goodreads › My Books › Import and export › Export library (a CSV). */
+export function parseGoodreadsCSV(text: string): ImportedBook[] {
+  const rows: string[][] = []
+  let row: string[] = [], cell = '', quoted = false
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]
+    if (quoted) {
+      if (c === '"' && text[i + 1] === '"') { cell += '"'; i++ } else if (c === '"') quoted = false; else cell += c
+    } else if (c === '"') quoted = true
+    else if (c === ',') { row.push(cell); cell = '' }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = '' }
+    else cell += c
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row) }
+  const header = rows[0]
+  if (!header || !header.includes('Title')) throw new Error("That doesn't look like a Goodreads library export.")
+  const col = (r: string[], name: string) => { const i = header.indexOf(name); return i >= 0 && i < r.length ? r[i].replace(/^[="\s]+|["\s]+$/g, '').trim() : '' }
+  const date = (s: string) => { const m = s.match(/^(\d{4})\/(\d{2})\/(\d{2})$/); return m ? isoOrNull(new Date(+m[1], +m[2] - 1, +m[3]).toISOString()) : null }
+  return rows.slice(1).flatMap((r) => {
+    const title = col(r, 'Title')
+    if (!title) return []
+    const shelf = col(r, 'Exclusive Shelf')
+    const status: Book['status'] = shelf === 'read' ? 'read' : shelf === 'currently-reading' ? 'reading' : 'toRead'
+    const id = col(r, 'Book Id')
+    return [{
+      title, author: col(r, 'Author'), status, rating: Number(col(r, 'My Rating')) || 0, isbn: col(r, 'ISBN13') || col(r, 'ISBN'),
+      pages: Number(col(r, 'Number of Pages')) || 0, year: Number(col(r, 'Original Publication Year')) || Number(col(r, 'Year Published')) || 0,
+      coverURL: '', progress: status === 'read' ? 1 : 0, finishedAt: date(col(r, 'Date Read')), addedAt: date(col(r, 'Date Added')),
+      externalID: id ? `goodreads:${id}` : '',
+    }]
+  })
+}
+
+/** BookLibrary.merge for Goodreads: adds new books and fills in existing ones; never moves a shelf backwards. */
+export function mergeGoodreads(items: ImportedBook[]): { added: number; updated: number } {
+  const existing = store.list<Book>('book')
+  const byID = new Map<string, Rec<Book>>(), byKey = new Map<string, Rec<Book>>()
+  for (const b of existing) {
+    if (b.data.externalID && !byID.has(b.data.externalID)) byID.set(b.data.externalID, b)
+    const k = matchKey(b.data.title ?? '', b.data.author ?? '')
+    if (!byKey.has(k)) byKey.set(k, b)
+  }
+  const order: Book['status'][] = ['toRead', 'reading', 'dnf', 'read']
+  const now = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')
+  let added = 0, updated = 0
+  for (const item of items) {
+    if (!item.title.trim()) continue
+    const key = matchKey(item.title, item.author)
+    const found = (item.externalID ? byID.get(item.externalID) : undefined) ?? byKey.get(key)
+    if (found) {
+      updated++
+      const b = store.get<Book>(found.id)?.data ?? found.data
+      const patch: Partial<Book> = {}
+      if (order.indexOf(item.status) > order.indexOf(b.status)) patch.status = item.status
+      if (item.externalID && !b.externalID) patch.externalID = item.externalID
+      const sources = b.sources?.length ? [...b.sources] : [b.source || 'manual']
+      if (!sources.includes('goodreads')) sources.push('goodreads')
+      patch.sources = sources
+      if (!b.rating) patch.rating = item.rating
+      if (!b.isbn) patch.isbn = item.isbn
+      if (!b.pageCount) patch.pageCount = item.pages
+      if (!b.year) patch.year = item.year
+      const cover = b.coverURL || item.coverURL || (item.isbn ? `https://covers.openlibrary.org/b/isbn/${item.isbn}-M.jpg?default=false` : '')
+      if (cover !== b.coverURL) patch.coverURL = cover
+      patch.progress = Math.max(b.progress || 0, item.progress)
+      if (!b.finishedAt && item.finishedAt) patch.finishedAt = item.finishedAt
+      store.update<Book>(found.id, patch)
+    } else {
+      added++
+      const book: Book = {
+        title: item.title.trim(), author: item.author.trim(), status: item.status, rating: item.rating, categories: [], notes: '',
+        coverURL: item.coverURL || (item.isbn ? `https://covers.openlibrary.org/b/isbn/${item.isbn}-M.jpg?default=false` : ''),
+        isbn: item.isbn, pageCount: item.pages, progress: item.progress, year: item.year, addedAt: item.addedAt ?? now,
+        startedAt: null, finishedAt: item.finishedAt, source: 'goodreads', sources: ['goodreads'], externalID: item.externalID,
+      }
+      const id = store.create<Book>('book', book)
+      const rec = store.get<Book>(id)
+      if (rec) { byKey.set(key, rec); if (item.externalID) byID.set(item.externalID, rec) }
+    }
+  }
+  return { added, updated }
+}
+
+// MARK: Daily refresh (ReadingSync: readingAutoSync, readingLastSync, lastResults)
+
+export const shelfSync = {
+  get autoSync(): boolean { return read('readingAutoSync', true) },
+  set autoSync(on: boolean) { write('readingAutoSync', on); set({}) },
+  get lastSync(): number { return read('readingLastSync', 0) },
+  get result(): string | null { return read<string | null>('goodreads.shelfResult', null) },
+  setResult(s: string | null) { write('goodreads.shelfResult', s); set({}) },
+}
+let shelfRunning = false
+export const shelfSyncRunning = (): boolean => shelfRunning
+
+/** Reads your Goodreads shelves now (or only when a day has passed, with `ifDue`). */
+export async function syncShelves(profile: string, ifDue = false): Promise<void> {
+  const id = goodreadsUserID(profile)
+  if (!id || shelfRunning) return
+  if (ifDue && (!shelfSync.autoSync || Date.now() / 1000 - shelfSync.lastSync < 20 * 3600)) return
+  shelfRunning = true; set({})
+  try {
+    const items = await fetchShelves(id)
+    const out = mergeGoodreads(items)
+    shelfSync.setResult(`Synced ${items.length} books — ${out.added} new, ${out.updated} updated. Refreshes daily.`)
+  } catch (e) {
+    shelfSync.setResult(e instanceof Error ? e.message : String(e))
+  } finally {
+    write('readingLastSync', Date.now() / 1000)
+    shelfRunning = false; set({})
+  }
+}

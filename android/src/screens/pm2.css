@@ -1,0 +1,206 @@
+/* The iPhone's More tab and its sections (PhoneMore, PhoneCalendar, PhoneHabits, PhoneNotes, PhoneBucket in iOS/OrbitPhone),
+   ported one-to-one. Everything here is prefixed pm2-. */
+:root { --pm2-lavender: #d9c8ff; --pm2-sand: #f3de9e; --pm2-silver: #d4d4d8; }
+
+.pm2 { display: flex; flex-direction: column; gap: 16px; padding: 0 16px 28px; }
+.pm2 > * { flex-shrink: 0; }
+.pm2-title { font: 800 34px/1.1 var(--ui); letter-spacing: -0.5px; margin: 2px 0 2px; }
+.pm2-display { font-family: var(--display); font-weight: 700; letter-spacing: -0.01em; }
+.pm2-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.pm2-wrap { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pm2-spacer { flex: 1; }
+.pm2-muted { color: var(--ink3); }
+.pm2-secondary { color: var(--ink2); }
+.pm2-soft { background: var(--card); color: var(--ink); border-radius: 999px; padding: 8px 14px; min-height: 38px; font-size: 13px; font-weight: 500;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; flex: none; }
+.pm2-soft:active { background: var(--card-hover); }
+.pm2-soft:disabled, .pm2-primary:disabled { opacity: 0.45; }
+.pm2-primary { background: var(--inverse); color: var(--on-inverse); border-radius: 999px; padding: 10px 18px; min-height: 42px; font-size: 13px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }
+.pm2-danger { color: var(--critical); }
+.pm2-field { background: var(--card); border: none; border-radius: 12px; padding: 12px; outline: none; width: 100%; font-size: 16px; color: var(--ink); }
+textarea.pm2-field { resize: none; font: inherit; font-size: 15px; line-height: 1.4; }
+.pm2-plain { background: transparent; border: none; outline: none; width: 100%; color: var(--ink); padding: 0; }
+.pm2-empty { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink3); padding: 6px 0; }
+.pm2-scrollx { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
+.pm2-scrollx::-webkit-scrollbar { display: none; }
+.pm2-scrollx > * { flex: none; }
+.pm2-chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 999px; background: var(--card); color: var(--ink);
+  font-size: 13px; font-weight: 600; white-space: nowrap; flex: none; }
+.pm2-chip.on { background: var(--inverse); color: var(--on-inverse); }
+.pm2-kchip { display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px; border-radius: 999px; color: var(--sticker-ink);
+  font-size: 12px; font-weight: 500; white-space: nowrap; flex: none; }
+.pm2-kchip.sel { box-shadow: inset 0 0 0 1.5px var(--ink); }
+.pm2-divider { width: 1px; height: 22px; background: var(--line); margin: 0 4px; flex: none; align-self: center; }
+.pm2-seg { display: flex; background: var(--card); border-radius: 999px; padding: 3px; gap: 2px; }
+.pm2-seg > button { flex: 1; padding: 7px 10px; border-radius: 999px; font-size: 14px; font-weight: 500; color: var(--ink); }
+.pm2-seg > button.on { background: var(--canvas); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12); font-weight: 600; }
+.pm2-search { display: flex; align-items: center; gap: 8px; background: var(--card); border-radius: 999px; padding: 10px 14px; }
+.pm2-search input { font-size: 16px; }
+.pm2-toggle { position: relative; width: 50px; height: 30px; border-radius: 999px; background: var(--card-hover); flex: none; transition: background 0.15s; }
+.pm2-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 26px; height: 26px; border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); transition: transform 0.15s; }
+.pm2-toggle.on { background: var(--good); }
+.pm2-toggle.on::after { transform: translateX(20px); }
+.pm2-sheet { display: flex; flex-direction: column; gap: 16px; }
+.pm2-sheet h2 { margin: 0; }
+.pm2-actions button { width: 100%; min-height: 48px; font-size: 16px; text-align: left; padding: 0 6px; display: flex; align-items: center; gap: 10px;
+  border-bottom: 1px solid var(--line); color: var(--ink); }
+.pm2-actions button:last-child { border-bottom: none; }
+.pm2-hdr { display: flex; align-items: center; gap: 8px; }
+.pm2-hdr > h3 { margin: 0; font-size: 22px; }
+.pm2-check { width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--ink3); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.pm2-check.on { border-color: var(--ink); background: var(--ink); color: var(--canvas); }
+
+/* A screen pushed on top (the iPhone's navigation push): fills the phone, with its own back button. */
+.backdrop.pm2-push { background: var(--canvas); align-items: stretch; justify-content: stretch; flex-direction: column; animation: pm2-push 0.2s ease-out;
+  padding-top: env(safe-area-inset-top); z-index: 45; }
+@keyframes pm2-push { from { transform: translateX(30px); opacity: 0.5; } }
+.pm2-push-bar { display: flex; align-items: center; gap: 8px; padding: 8px 16px 4px; min-height: 60px; flex: none; }
+.pm2-push-bar .pm2-back { width: 44px; height: 44px; border-radius: 50%; background: var(--canvas); box-shadow: 0 2px 14px rgba(0, 0, 0, 0.1);
+  display: inline-flex; align-items: center; justify-content: center; color: var(--ink); flex: none; }
+.pm2-push-bar .t { font-size: 16px; font-weight: 600; flex: 1; text-align: center; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 52px; }
+.pm2-push-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; padding-bottom: env(safe-area-inset-bottom); }
+
+/* MARK: More */
+.pm2-more { gap: 24px; padding-top: 4px; }
+.pm2-group { background: var(--card); border-radius: 22px; overflow: hidden; }
+.pm2-mrow { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 52px; padding: 0 16px; text-align: left; color: var(--ink); position: relative; }
+.pm2-mrow:active { background: var(--card-hover); }
+.pm2-mrow + .pm2-mrow::before { content: ''; position: absolute; top: 0; left: 60px; right: 0; height: 0.5px; background: var(--line); }
+.pm2-mrow .label { flex: 1; font-size: 16px; font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pm2-micon { width: 30px; height: 30px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; color: var(--sticker-ink); flex: none; }
+
+/* MARK: Calendar */
+.pm2-cal-nav { display: flex; align-items: center; }
+.pm2-cal-nav button { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink); }
+.pm2-cal-nav h2 { flex: 1; text-align: center; margin: 0; font-size: 22px; }
+.pm2-week { display: flex; gap: 6px; }
+.pm2-wday { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 0; border-radius: 14px; color: var(--ink); }
+.pm2-wday .n { font-family: var(--display); font-size: 18px; font-weight: 500; line-height: 1.1; }
+.pm2-wday .n.today { font-weight: 700; }
+.pm2-wday .w { font-size: 11px; font-weight: 600; opacity: 0.7; }
+.pm2-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.pm2-wday.today, .pm2-mday.today { background: var(--card); }
+.pm2-wday.sel, .pm2-mday.sel { background: var(--lime); color: var(--sticker-ink); }
+.pm2-month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.pm2-month .h { font-size: 11px; font-weight: 600; color: var(--ink3); text-align: center; }
+.pm2-mday { height: 44px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 15px; color: var(--ink); }
+.pm2-mday .dots { display: flex; gap: 2px; height: 4px; }
+.pm2-mday .dots i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
+.pm2-agenda { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 12px; background: var(--canvas); text-align: left; width: 100%; color: var(--ink); }
+.pm2-agenda .time { width: 60px; flex: none; text-align: right; display: flex; flex-direction: column; gap: 1px; }
+.pm2-agenda .time b { font-size: 12px; font-weight: 600; }
+.pm2-agenda .time span { font-size: 10px; color: var(--ink3); }
+.pm2-agenda .bar { width: 4px; height: 30px; border-radius: 2px; flex: none; }
+.pm2-now { font-size: 10px; font-weight: 700; color: #fff; background: var(--critical); border-radius: 999px; padding: 2px 6px; }
+
+/* MARK: Habits */
+.pm2-habit { border-radius: 22px; padding: 20px; color: var(--sticker-ink); display: flex; flex-direction: column; gap: 16px; user-select: none; -webkit-user-select: none; }
+.pm2-habit .ic { width: 42px; height: 42px; border-radius: 50%; background: rgba(255, 255, 255, 0.55); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.pm2-habit .streak { font-family: var(--display); font-weight: 700; font-size: 44px; line-height: 1; }
+.pm2-hday { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--sticker-ink); min-width: 0; }
+.pm2-hday .w { font-size: 11px; font-weight: 500; opacity: 0.7; }
+.pm2-hday .c { width: 34px; height: 34px; border-radius: 50%; background: rgba(255, 255, 255, 0.55); display: inline-flex; align-items: center; justify-content: center; }
+.pm2-hday .c.done { background: #111; }
+.pm2-hday .c.today { box-shadow: inset 0 0 0 1.5px #111; }
+.pm2-heat { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, auto); grid-template-columns: repeat(18, minmax(0, 1fr)); gap: 3px; }
+.pm2-heat i { aspect-ratio: 1; border-radius: 2.5px; background: rgba(255, 255, 255, 0.45); }
+.pm2-heat i.done { background: rgba(17, 17, 17, 0.85); }
+.pm2-heat i.future { background: transparent; }
+.pm2-symbols { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; }
+.pm2-symbols button { aspect-ratio: 1; max-width: 40px; border-radius: 50%; background: var(--card); display: inline-flex; align-items: center; justify-content: center; color: var(--ink); }
+.pm2-symbols button.on { color: var(--sticker-ink); }
+.pm2-stepper { display: flex; align-items: center; gap: 0; background: var(--card); border-radius: 10px; overflow: hidden; flex: none; }
+.pm2-stepper button { width: 44px; height: 34px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink); }
+.pm2-stepper button + button { border-left: 1px solid var(--line); }
+
+/* MARK: Notes */
+.pm2-swipe { position: relative; overflow: hidden; border-radius: 14px; }
+.pm2-swipe .del { position: absolute; top: 0; right: 0; bottom: 0; width: 88px; background: var(--critical); color: #fff; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 2px; font-size: 12px; font-weight: 600; }
+.pm2-swipe .front { position: relative; transition: transform 0.18s; touch-action: pan-y; }
+.pm2-note { display: flex; flex-direction: column; gap: 4px; padding: 12px; border-radius: 14px; background: var(--card); text-align: left; width: 100%; color: var(--ink); }
+.pm2-note .t { font-size: 14px; font-weight: 600; }
+.pm2-note .b { font-size: 12px; color: var(--ink2); }
+.pm2-note .d { font-size: 11px; color: var(--ink3); }
+.pm2-editor { display: flex; flex-direction: column; gap: 14px; padding: 16px 32px 32px; flex: 1; }
+.pm2-editor .title { font-family: var(--display); font-weight: 700; font-size: 32px; line-height: 1.15; resize: none; }
+.pm2-editor .body { font-family: var(--display); font-weight: 500; font-size: 17px; line-height: 1.6; flex: 1; min-height: 50vh; resize: none; }
+.pm2-editor .meta { display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--ink3); }
+.pm2-editor .meta button { color: var(--ink); display: inline-flex; width: 32px; height: 32px; align-items: center; justify-content: center; }
+.pm2-moods { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pm2-moods button { width: 38px; height: 38px; border-radius: 50%; font-size: 20px; background: color-mix(in srgb, var(--canvas) 60%, transparent); }
+.pm2-moods button.on { background: var(--lime); }
+.backdrop.pm2-push.pm2-journal { background: var(--blush); }
+.pm2-chat { display: flex; flex-direction: column; flex: 1; min-height: 0; background: color-mix(in srgb, var(--canvas) 35%, transparent); }
+.pm2-chat-head { display: flex; align-items: center; gap: 8px; padding: 16px; }
+.pm2-chat-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 0 16px 12px; }
+.pm2-bubble { max-width: calc(100% - 40px); padding: 10px 14px; border-radius: 18px; font-size: 14px; line-height: 1.45; white-space: pre-wrap;
+  user-select: text; -webkit-user-select: text; animation: pm2-rise 0.25s ease-out; }
+@keyframes pm2-rise { from { opacity: 0; transform: translateY(6px); } }
+.pm2-bubble.mine { align-self: flex-end; background: var(--inverse); color: var(--on-inverse); }
+.pm2-bubble.theirs { align-self: flex-start; background: var(--canvas); color: var(--ink); }
+.pm2-typing { align-self: flex-start; display: flex; gap: 5px; padding: 12px 14px; border-radius: 18px; background: var(--canvas); }
+.pm2-typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--ink3); animation: pm2-blink 1.2s infinite ease-in-out; }
+.pm2-typing i:nth-child(2) { animation-delay: 0.2s; }
+.pm2-typing i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes pm2-blink { 50% { opacity: 0.3; } }
+.pm2-composer { display: flex; align-items: flex-end; gap: 8px; padding: 10px; border-radius: 16px; background: var(--canvas); margin: 0 14px 14px; }
+.pm2-composer textarea { flex: 1; font-size: 15px; line-height: 1.4; max-height: 120px; resize: none; }
+.pm2-send { width: 30px; height: 30px; border-radius: 50%; background: var(--inverse); color: var(--on-inverse); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.pm2-send:disabled { opacity: 0.35; }
+.pm2-upsell { display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: var(--radius); border: 1.5px dashed var(--line); }
+
+/* MARK: Bucket list */
+.pm2-ring { position: relative; width: 54px; height: 54px; flex: none; }
+.pm2-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.pm2-ring b { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--display); font-size: 18px; }
+.pm2-tabs { display: inline-flex; align-self: flex-start; background: var(--card); border-radius: 999px; padding: 3px; max-width: 100%; }
+.pm2-tabs button { display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+.pm2-tabs button.on { background: var(--inverse); color: var(--on-inverse); }
+.pm2-trip { width: 290px; flex: none; border-radius: 20px; padding: 16px; background: var(--cyan); color: var(--sticker-ink); display: flex; flex-direction: column; gap: 10px; text-align: left; }
+.pm2-meter { height: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.5); overflow: hidden; }
+.pm2-meter > div { height: 100%; border-radius: 999px; }
+.pm2-found { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 12px; background: var(--card); }
+.pm2-forward { display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: 20px; color: var(--sticker-ink); flex: none; text-align: left; }
+.pm2-forward .n { width: 64px; display: flex; flex-direction: column; align-items: center; }
+.pm2-dream { position: relative; border-radius: 22px; padding: 18px; color: var(--sticker-ink); display: flex; flex-direction: column; gap: 10px; text-align: left; }
+.pm2-dream .ic { width: 34px; height: 34px; border-radius: 50%; background: rgba(255, 255, 255, 0.5); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.pm2-pill { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.55); font-size: 12px; font-weight: 600;
+  color: var(--sticker-ink); white-space: nowrap; flex: none; }
+.pm2-celebrate { position: absolute; top: -18px; right: -6px; font-size: 40px; animation: pm2-pop 0.35s cubic-bezier(.3, 1.6, .5, 1); pointer-events: none; }
+@keyframes pm2-pop { from { transform: scale(0.2); opacity: 0; } }
+.pm2-stat { font-size: 12px; font-weight: 600; color: var(--sticker-ink); padding: 7px 12px; border-radius: 999px; white-space: nowrap; }
+.pm2-booking { display: flex; align-items: flex-start; gap: 10px; padding: 10px; border-radius: 12px; background: var(--card); text-align: left; width: 100%; color: var(--ink); }
+.pm2-booking .ic { width: 30px; height: 30px; border-radius: 50%; background: var(--cyan); color: var(--sticker-ink); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.pm2-tag { font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 999px; background: var(--canvas); }
+.pm2-pack { display: flex; align-items: center; gap: 10px; padding: 5px 8px; min-height: 40px; }
+.pm2-grid2 { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px 12px; align-items: center; font-size: 13px; }
+.pm2-grid2 > .l { color: var(--ink2); }
+.pm2-grid2 input { font-size: 16px; }
+.pm2-input { background: var(--card); border: none; border-radius: 10px; padding: 9px 10px; outline: none; width: 100%; color: var(--ink); min-width: 0; }
+
+/* Go to */
+.pm2-map { position: relative; overflow: hidden; border-radius: 20px; background: #e8e4da; }
+.pm2-map img { position: absolute; width: 256px; height: 256px; max-width: none; user-select: none; -webkit-user-drag: none; pointer-events: none; }
+.pm2-pin { position: absolute; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; }
+.pm2-pin .head { width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--sticker-ink);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); border: 2px solid #fff; }
+.pm2-pin .tip { width: 2px; height: 8px; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); }
+.pm2-pin.sel .head { transform: scale(1.2); }
+.pm2-map .attr { position: absolute; right: 6px; bottom: 4px; font-size: 9px; color: #333; background: rgba(255, 255, 255, 0.7); padding: 0 4px; border-radius: 4px; }
+.pm2-place { display: flex; align-items: flex-start; gap: 12px; padding: 14px; border-radius: 18px; background: var(--card); text-align: left; width: 100%; color: var(--ink); }
+.pm2-place.hl { box-shadow: inset 0 0 0 2px var(--ink); }
+.pm2-place .ic { width: 40px; height: 40px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--sticker-ink); flex: none; }
+.pm2-dir { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; background: var(--canvas); color: var(--ink); font-size: 12px; font-weight: 500; white-space: nowrap; }
+.pm2-results { background: var(--card); border-radius: 12px; overflow: hidden; }
+.pm2-results button { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--line); color: var(--ink); }
+.pm2-results button:last-child { border-bottom: none; }
+
+/* Sheets: the shared Modal floats its close button, which would narrow a flex sheet beside it; pin it to the corner instead. */
+.modal:has(> .pm2-sheet) { position: relative; }
+.modal:has(> .pm2-sheet) > .icon-btn { position: absolute; top: 18px; right: 16px; float: none; z-index: 1; }
+.modal > .pm2-sheet > :first-child { padding-right: 40px; }
+.modal:has(> .pm2-sheet.pm2-own-close) > .icon-btn { display: none; }
+.modal > .pm2-sheet.pm2-own-close > :first-child { padding-right: 0; }

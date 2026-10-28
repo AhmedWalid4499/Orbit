@@ -4,16 +4,19 @@
 import { useEffect, useMemo, useRef, useState, ReactNode, CSSProperties } from 'react'
 import {
   Library, BookOpen, Bookmark, BadgeCheck, CircleX, Highlighter, Plus, RefreshCw, Search, Timer, Square, Star,
-  Copy, Check, Trash2, StickyNote, Pencil, Image as ImageIcon, Send, Laptop,
+  Copy, Check, Trash2, StickyNote, Pencil, Image as ImageIcon, Send, Laptop, CheckCircle2,
 } from 'lucide-react'
 import { store, useRecords, useSetting, Rec } from '@/lib/store'
 import { Book, BookCategory, Highlight, ReadingSession, ReadingStatus, matchKey, paletteColor, sessionMinutes } from '@/lib/models'
-import { iso, parse, startOfWeek, toDateInput, fromInputs } from '@/lib/dates'
+import { iso, parse, startOfWeek, toDateInput, fromInputs, relativeTime } from '@/lib/dates'
 import { useActiveSession, startReading, stopReading, minutesSince, readingStreak } from '@/lib/readingTimer'
 import { Modal, EmptyHint } from '@/components/ui'
 import { BookCover } from '@/screens/Reading'
-import { schedule, postReview, useGoodreads } from '../lib/goodreads'
-import GoodreadsSettings from '../components/GoodreadsSettings'
+import {
+  schedule, postReview, useGoodreads, syncShelves, shelfSync, shelfSyncRunning, goodreadsUserID, parseGoodreadsCSV, mergeGoodreads,
+} from '../lib/goodreads'
+import { PtTitle, PtSwitch } from '../components/PtCommon'
+import GoodreadsSettings, { GoodreadsLogo } from '../components/GoodreadsSettings'
 import './PhoneReading.css'
 
 // MARK: - Shelves (the Mac's ReadingStatus, in its order and wording)
@@ -61,6 +64,11 @@ export default function PhoneReading() {
   const highlights = useRecords<Highlight>('highlight').slice().sort((a, b) => (b.data.createdAt ?? '').localeCompare(a.data.createdAt ?? ''))
   const sessions = useRecords<ReadingSession>('readingSession')
   const goal = Number(useSetting<number>('readingGoal', 24)) || 24
+  const first = (useSetting<string>('userName', '') ?? '').trim().split(' ')[0]
+  const goodreadsUser = useSetting<string>('goodreadsUser', '')
+
+  // Your Goodreads shelves refresh once a day by themselves (ReadingSync.syncIfDue).
+  useEffect(() => { if (goodreadsUser) void syncShelves(goodreadsUser, true) }, [goodreadsUser])
 
   const [shelf, setShelf] = useState<string>('all')
   const [query, setQuery] = useState('')
@@ -80,11 +88,7 @@ export default function PhoneReading() {
 
   return (
     <div className="page col pr">
-      <div className="pr-search">
-        <Search size={15} color="var(--ink3)" />
-        <input className="plain" placeholder={shelf === 'highlights' ? 'Search highlights' : 'Search books'} value={query}
-          onChange={(e) => setQuery(e.target.value)} enterKeyHint="search" />
-      </div>
+      <PtTitle>{first ? `${first}'s Reading` : 'Reading'}</PtTitle>
 
       <div className="pr-stats">
         <ReadingStat value={`${readThisYear}/${goal}`} label="This year" color="var(--pink)" />
@@ -103,6 +107,12 @@ export default function PhoneReading() {
         <Chip on={shelf === 'all'} onClick={() => setShelf('all')} icon={<Library size={13} />} title="All" />
         {STATUSES.map((s) => <Chip key={s.id} on={shelf === s.id} onClick={() => setShelf(s.id)} icon={s.icon(13)} title={s.title} />)}
         <Chip on={shelf === 'highlights'} onClick={() => setShelf('highlights')} icon={<Highlighter size={13} />} title="Highlights" />
+      </div>
+
+      <div className="pr-search">
+        <Search size={15} color="var(--ink3)" />
+        <input className="plain" placeholder={shelf === 'highlights' ? 'Search highlights' : 'Search books'} value={query}
+          onChange={(e) => setQuery(e.target.value)} enterKeyHint="search" />
       </div>
 
       {shelf === 'highlights' ? (
@@ -642,32 +652,90 @@ function AddBookSheet({ books, onClose }: { books: Rec<Book>[]; onClose: () => v
 
 // MARK: - Goodreads sync
 
-/** The "Goodreads sync" sheet: sending your reading to Goodreads (sign in here) and where your shelves come from. */
+/** "Goodreads sync" (ReadingSourcesSheet on iPhone): your Goodreads shelves come in by themselves once a day, a library
+ * export can be imported, and signing in lets Joshu send your progress and reviews back. */
 function GoodreadsSheet({ books, onClose }: { books: Rec<Book>[]; onClose: () => void }) {
-  const profile = useSetting<string>('goodreadsUser', '')
-  const fromGoodreads = books.filter((b) => (b.data.sources ?? []).includes('goodreads') || b.data.source === 'goodreads').length
+  useGoodreads() // re-render as syncing runs
+  const saved = useSetting<string>('goodreadsUser', '')
+  const [profile, setProfile] = useState(saved)
+  const [busy, setBusy] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const linked = !!goodreadsUserID(saved)
+  const running = busy || shelfSyncRunning()
+  const last = shelfSync.lastSync
   const apple = books.filter((b) => (b.data.sources ?? []).includes('apple-books') || b.data.source === 'apple-books').length
   const kindle = books.filter((b) => (b.data.sources ?? []).includes('kindle') || b.data.source === 'kindle').length
+
+  const sync = async () => {
+    const p = profile.trim()
+    if (!goodreadsUserID(p)) return
+    if (p !== saved) store.setSetting('goodreadsUser', p)
+    setBusy(true)
+    await syncShelves(p)
+    setBusy(false)
+  }
+  const importCSV = async (f: File | undefined) => {
+    if (!f) return
+    try {
+      const items = parseGoodreadsCSV(await f.text())
+      const out = mergeGoodreads(items)
+      shelfSync.setResult(`Imported ${items.length} books — ${out.added} new, ${out.updated} updated.`)
+    } catch (e) { shelfSync.setResult(e instanceof Error ? e.message : String(e)) }
+  }
+
   return (
     <Modal open onClose={onClose} width={600}>
       <div className="col" style={{ gap: 16, clear: 'both' }}>
-        <h2 className="display" style={{ fontSize: 28, margin: 0 }}>Goodreads sync</h2>
-        <GoodreadsSettings />
-        <div className="card col" style={{ gap: 6, padding: 14 }}>
-          <strong style={{ fontSize: 15 }}>Your Goodreads shelves</strong>
-          <span className="secondary" style={{ fontSize: 12 }}>
-            {profile
-              ? 'Joshu reads your public Goodreads shelves and the books appear here on their own.'
-              : 'Joshu reads your public Goodreads shelves. Add your profile link in Joshu on your Mac or iPhone (Reading › Goodreads sync).'}
-          </span>
-          {fromGoodreads > 0 && <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--good)' }}>{fromGoodreads} book{fromGoodreads === 1 ? '' : 's'} from Goodreads</span>}
+        <h2 className="display" style={{ fontSize: 28, margin: 0 }}>Connect & import</h2>
+        <div className="secondary" style={{ fontSize: 12 }}>
+          Books are matched by title and author, so syncing again never creates duplicates, and shelves you set in Joshu are never moved backwards.
         </div>
-        <div className="card row" style={{ gap: 12, padding: 14, alignItems: 'flex-start' }}>
+
+        <div className="col" style={{ gap: 10, padding: 14, borderRadius: 14, background: 'var(--blush)' }}>
+          <div className="row" style={{ gap: 10 }}>
+            <span style={{ flex: 1, fontSize: 14, fontWeight: 500 }}>Refresh every day</span>
+            <PtSwitch label="Refresh every day" on={shelfSync.autoSync} onChange={(on) => { shelfSync.autoSync = on }} />
+          </div>
+          <div className="row" style={{ gap: 10 }}>
+            {last > 0 && <span className="muted" style={{ fontSize: 11 }}>Last refresh {relativeTime(new Date(last * 1000))}</span>}
+            <span className="spacer" />
+            <button className="btn-soft" style={{ background: 'var(--canvas)' }} disabled={running || !linked} onClick={sync}>{running ? 'Syncing…' : 'Sync now'}</button>
+          </div>
+        </div>
+
+        <div className="row" style={{ gap: 14, padding: 16, borderRadius: 16, background: 'var(--card)', alignItems: 'flex-start' }}>
+          <GoodreadsLogo size={38} />
+          <div className="col" style={{ gap: 8, flex: 1, minWidth: 0 }}>
+            <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 15, fontWeight: 600 }}>Goodreads</span>
+              {linked && <span className="row" style={{ gap: 4, fontSize: 11, fontWeight: 500, color: 'var(--good)' }}><CheckCircle2 size={12} />Daily sync on</span>}
+            </div>
+            <div className="secondary" style={{ fontSize: 12 }}>
+              Joshu reads your public Goodreads shelves. Paste your profile link or user ID (goodreads.com/user/show/12345-yourname).
+            </div>
+            <div className="row" style={{ gap: 8 }}>
+              <input className="field" style={{ flex: 1, minWidth: 0, background: 'var(--canvas)' }} placeholder="Profile link or user ID" value={profile}
+                autoCapitalize="none" autoCorrect="off" spellCheck={false} onChange={(e) => setProfile(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') sync() }} />
+              <button className="btn-soft" style={{ background: 'var(--canvas)' }} disabled={!goodreadsUserID(profile) || running} onClick={sync}>Sync</button>
+            </div>
+            <button className="pr-link" style={{ alignSelf: 'flex-start', fontSize: 11 }} disabled={running} onClick={() => fileRef.current?.click()}>
+              Import library export (CSV)…
+            </button>
+            <input ref={fileRef} type="file" accept=".csv,text/csv,text/plain" style={{ display: 'none' }}
+              onChange={(e) => { void importCSV(e.target.files?.[0]); e.target.value = '' }} />
+            {shelfSync.result && <div style={{ fontSize: 12, fontWeight: 500 }}>{shelfSync.result}</div>}
+          </div>
+        </div>
+
+        <GoodreadsSettings />
+
+        <div className="row" style={{ gap: 12, padding: 14, borderRadius: 14, background: 'var(--card)', alignItems: 'flex-start' }}>
           <span style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--cyan)', color: 'var(--sticker-ink)', flex: 'none',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Laptop size={16} /></span>
           <div className="col" style={{ gap: 4, minWidth: 0 }}>
             <strong style={{ fontSize: 15 }}>Apple Books and Kindle</strong>
-            <span className="secondary" style={{ fontSize: 12 }}>Joshu on your Mac imports these libraries, and the books then appear here on their own.</span>
+            <span className="secondary" style={{ fontSize: 12 }}>Android doesn't let apps read these libraries, so Joshu on your Mac imports them and the books appear here on their own.</span>
             {apple + kindle > 0 && <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--good)' }}>{apple} from Apple Books · {kindle} from Kindle</span>}
           </div>
         </div>

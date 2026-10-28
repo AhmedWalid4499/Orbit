@@ -80,6 +80,9 @@ function changeList(id: string, change: (l: SharedList) => SharedList): void {
 
 export const isAvailable = (): boolean => DEMO || !!getSession()
 
+/** The lists as last loaded (for the assistant, outside React). */
+export const sharedListsNow = (): SharedList[] => state.lists
+
 /** The lists, kept current for any component that reads them. */
 export function useSharedLists(): State {
   const [, force] = useState(0)

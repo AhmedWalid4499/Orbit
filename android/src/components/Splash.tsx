@@ -1,11 +1,11 @@
-// Launch splash, as on the Mac (SplashView.swift): the orb drops in before "joshu", hops over the word and
+// Launch splash, as on the Mac and iPhone (SplashView.swift, same sizes): the orb drops in before "joshu", hops over the word and
 // lands at the end like a full stop, with a soft three-note chime. Then the app fades in.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Orb } from './Orb'
 
 const LANDING = 1.25
 const LENGTH = 1.55
-const ORB = 26
+const ORB = 34
 
 /** The orb's offset from its resting place after the word, its squash and spin, at time t (seconds). */
 function pose(t: number, wordWidth: number) {
@@ -57,7 +57,7 @@ export default function Splash({ onDone }: { onDone: () => void }) {
       const step = (now: number) => { const s = (now - t0) / 1000; setT(s); if (s < LENGTH) raf = requestAnimationFrame(step) }
       raf = requestAnimationFrame(step)
     }
-    const ring = setTimeout(chime, reduced ? 0 : LANDING * 1000)
+    const ring = setTimeout(() => { if (localStorage.getItem('launchSound') !== 'false') chime() }, reduced ? 0 : LANDING * 1000)
     const hold = reduced ? 600 : (LENGTH + 0.45) * 1000
     const fade = setTimeout(() => setOut(true), hold)
     const done = setTimeout(onDone, hold + 350)
@@ -67,8 +67,8 @@ export default function Splash({ onDone }: { onDone: () => void }) {
   const p = pose(t, width)
   return (
     <div className={`splash ${out ? 'out' : ''}`}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, transform: `translateX(${-ORB / 2}px)` }}>
-        <span ref={word} style={{ font: '900 76px/0.9 var(--ui)', letterSpacing: -3, color: 'var(--ink)' }}>joshu</span>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, transform: `translateX(${-ORB / 2}px)` }}>
+        <span ref={word} style={{ font: '900 min(104px, 25vw)/0.9 var(--ui)', letterSpacing: -3, color: 'var(--ink)' }}>joshu</span>
         <span style={{
           display: 'inline-flex', marginBottom: 2, transformOrigin: '50% 100%',
           transform: `translate(${p.x}px, ${p.y}px) scale(${p.sx}, ${p.sy}) rotate(${p.spin}deg)`,

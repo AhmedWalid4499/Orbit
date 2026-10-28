@@ -59,6 +59,12 @@ final class Pro: ObservableObject {
         #else
         NSApp.applicationIconImage = isPro ? Self.macProIcon
             : Bundle.main.url(forResource: "AppIcon", withExtension: "icns").flatMap(NSImage.init(contentsOf:)) ?? AppIcon.make()
+        // And while Joshu is closed: the Dock asks the plug-in in Contents/PlugIns, which reads this.
+        if UserDefaults.standard.bool(forKey: "pro.dockIcon") != isPro {
+            UserDefaults.standard.set(isPro, forKey: "pro.dockIcon")
+            UserDefaults.standard.synchronize()
+            DistributedNotificationCenter.default().postNotificationName(.init("com.personal.orbit.dockIcon"), object: nil, deliverImmediately: true)
+        }
         #endif
     }
 

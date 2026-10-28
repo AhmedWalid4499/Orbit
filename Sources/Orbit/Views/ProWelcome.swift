@@ -6,6 +6,8 @@ struct ProWelcome: View {
     var onDone: () -> Void = {}
     @AppStorage("assistantName") private var assistantName = "Joshu"
     @State private var name = AssistantName.current
+    /// The name as it was: it's only saved if you change it, so this device never overwrites the one you chose elsewhere.
+    @State private var original = AssistantName.current
     @State private var shown = false
 
     private let unlocked: [(String, String, String, Color)] = [
@@ -113,7 +115,7 @@ struct ProWelcome: View {
     private func start() { AIConsent.shared.answer(true); finish(openAssistant: true) }
 
     private func finish(openAssistant: Bool) {
-        assistantName = trimmedName
+        if trimmedName != original { assistantName = trimmedName }
         Pro.shared.welcomeDone()
         onDone()
         if openAssistant {

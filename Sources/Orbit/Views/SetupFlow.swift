@@ -343,7 +343,7 @@ struct SetupFlow: View {
 
     private func finish() {
         userName = name.trimmingCharacters(in: .whitespaces).isEmpty ? userName : name.trimmingCharacters(in: .whitespaces)
-        assistantName = aiNameOrDefault
+        if aiNameOrDefault != AssistantName.current { assistantName = aiNameOrDefault }
         Income.startBudgetOnPayday()
         UserDefaults.standard.set(false, forKey: Self.key)
         onDone()

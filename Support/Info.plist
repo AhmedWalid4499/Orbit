@@ -41,6 +41,8 @@
 	<string>Joshu shows your calendar events alongside your tasks and plans.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>Joshu shows your calendar events alongside your tasks and plans.</string>
+	<key>NSDockTilePlugIn</key>
+	<string>JoshuDock.docktileplugin</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSLocationUsageDescription</key>

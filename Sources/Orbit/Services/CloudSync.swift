@@ -150,7 +150,9 @@ enum CloudAuth {
 
     static func signOut() {
         if let token = session?.accessToken {
-            var req = URLRequest(url: URL(string: "\(SupabaseConfig.url)/auth/v1/logout")!)
+            // scope=local: only this device. The default ends the account's sessions everywhere, which signed your
+            // other devices out without them noticing.
+            var req = URLRequest(url: URL(string: "\(SupabaseConfig.url)/auth/v1/logout?scope=local")!)
             req.httpMethod = "POST"
             req.setValue(SupabaseConfig.key, forHTTPHeaderField: "apikey")
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -167,7 +169,15 @@ enum CloudAuth {
     static func accessToken() async throws -> String {
         guard var s = session else { throw CloudError("Not signed in.") }
         if s.expiresAt.timeIntervalSinceNow > 60 { return s.accessToken }
-        let json = try await auth("token?grant_type=refresh_token", body: ["refresh_token": s.refreshToken])
+        let json: [String: Any]
+        do {
+            json = try await auth("token?grant_type=refresh_token", body: ["refresh_token": s.refreshToken])
+        } catch let e as CloudError {
+            // The server turned the sign-in down (signed out elsewhere, or it ran out): sign in again.
+            // Network trouble is a URLError, so it doesn't end up here and the sign-in is kept for next time.
+            session = nil
+            throw CloudError("You were signed out of Joshu on this device (\(e.message)). Sign in again to keep syncing.")
+        }
         guard let fresh = parseSession(json) else { session = nil; throw CloudError("Your Joshu sign-in expired. Sign in again in Settings › Account.") }
         s = fresh
         session = s
@@ -505,6 +515,7 @@ final class CloudSync: ObservableObject {
         var cursor = ""                              // last updated_at pulled from the server
         var known: [String: Known] = [:]             // id → what was last synced
         var vaultMac: String?                        // fingerprint of the key vault when last synced
+        var settingTimes: [String: Date]?            // setting key → when this device changed it (not yet synced)
         struct Known: Codable { var kind: String; var hash: String }
     }
     private var state = State()
@@ -666,18 +677,24 @@ final class CloudSync: ObservableObject {
     /// Returns whether everything was synced.
     @discardableResult
     func sync(context: ModelContext) async -> Bool {
-        guard !syncing, let session = CloudAuth.session else { return false }
+        guard !syncing else { return false }
+        guard let session = CloudAuth.session else {
+            // Signed in here, but the sign-in has ended (see accessToken): say so and offer to sign in again, rather
+            // than looking signed in while nothing syncs. Everything on this device stays.
+            if email != nil, !isTestDevice {
+                email = nil
+                status = "Signed out. Sign in again to keep syncing."
+                UserDefaults.standard.set(true, forKey: SignedOutWelcome.key)
+            }
+            return false
+        }
         syncing = true
         defer { syncing = false }
         do {
             assignMissingIDs(context: context)
             AssistantStore.shared.shareChats(context: context)
-            // One-time repair after 1.37.0, which opened an empty data folder and told the server everything was
-            // deleted: this device ignores those deletions and uploads its own copy of everything again.
-            let repairKey = "sync.repair137"
-            let repairing = !UserDefaults.standard.bool(forKey: repairKey) && !state.cursor.isEmpty
-            if repairing { state.known = state.known.filter { $0.value.kind == "setting" } }
-            let pulled = try await pull(context: context, ignoreDeletes: repairing)
+            noteSettingChanges()
+            let pulled = try await pull(context: context)
             lastPulled = pulled
             if pulled > 0 { AssistantStore.shared.adoptSharedChats(context: context) }
             let pushed = try await push(context: context, userID: session.userID)
@@ -686,7 +703,6 @@ final class CloudSync: ObservableObject {
             saveState()
             SpendingAlerts.check(context: context)
             lastSync = .now
-            UserDefaults.standard.set(true, forKey: repairKey)
             status = pulled + pushed == 0 ? "Up to date" : "Synced \(pulled) down, \(pushed) up"
             if UserDefaults.standard.string(forKey: ownerKey) == nil { UserDefaults.standard.set(session.userID, forKey: ownerKey) }
             return true
@@ -744,6 +760,16 @@ final class CloudSync: ObservableObject {
         return UUID(uuid: (b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], b[9], b[10], b[11], b[12], b[13], b[14], b[15])).uuidString.lowercased()
     }
 
+    /// Settings changed on this device since the last sync, and when that was noticed, so a change made on another
+    /// device later wins over it (and an earlier one doesn't).
+    private func noteSettingChanges() {
+        var times = state.settingTimes ?? [:]
+        for key in syncedSettings where times[key] == nil && UserDefaults.standard.object(forKey: key) != nil {
+            if state.known[settingID(key)]?.hash != fingerprint(settingValue(key)) { times[key] = .now }
+        }
+        state.settingTimes = times
+    }
+
     private func settingValue(_ key: String) -> [String: Any] {
         ["key": key, "value": UserDefaults.standard.object(forKey: key) ?? NSNull()]
     }
@@ -771,11 +797,16 @@ final class CloudSync: ObservableObject {
                 if kindName == "vault" || kindName == "vaultkey" { continue } // handled by syncVault
                 if kindName == "setting" {
                     guard let key = data["key"] as? String, syncedSettings.contains(key) else { continue }
-                    if state.known[id]?.hash == fingerprint(data) { continue } // our own upload coming back
+                    let core: [String: Any] = ["key": key, "value": data["value"] ?? NSNull()]
+                    if state.known[id]?.hash == fingerprint(core) { continue } // our own upload coming back
                     let localHash = fingerprint(settingValue(key))
-                    if let known = state.known[id], known.hash != localHash { continue } // changed here too: ours wins
+                    if let known = state.known[id], known.hash != localHash {
+                        // Changed here too: the later change wins (older Joshus didn't send a time; then ours wins).
+                        guard let theirs = J.date(data["at"]), let ours = state.settingTimes?[key], theirs > ours else { continue }
+                    }
                     if deleted || data["value"] is NSNull { UserDefaults.standard.removeObject(forKey: key) }
                     else { UserDefaults.standard.set(data["value"], forKey: key) }
+                    state.settingTimes?[key] = nil
                     state.known[id] = .init(kind: "setting", hash: fingerprint(settingValue(key)))
                     applied += 1
                     continue
@@ -833,7 +864,10 @@ final class CloudSync: ObservableObject {
             let d = settingValue(key)
             let h = fingerprint(d)
             if state.known[id]?.hash != h, UserDefaults.standard.object(forKey: key) != nil {
-                rows.append(["id": id, "user_id": userID, "kind": "setting", "data": d, "deleted": false])
+                // With when it changed here, so another device that also changed it can tell which is newer.
+                var data = d
+                data["at"] = J.date(state.settingTimes?[key] ?? .now)
+                rows.append(["id": id, "user_id": userID, "kind": "setting", "data": data, "deleted": false])
                 newKnown[id] = .init(kind: "setting", hash: h)
             }
         }
@@ -850,6 +884,7 @@ final class CloudSync: ObservableObject {
             _ = try await rest(comps.url!, method: "POST", body: chunk, prefer: "resolution=merge-duplicates,return=minimal")
         }
         for (id, k) in newKnown { state.known[id] = k }
+        for key in syncedSettings where newKnown[settingID(key)] != nil { state.settingTimes?[key] = nil }   // uploaded
         for id in deletions { state.known[id] = nil }
         return rows.count
     }

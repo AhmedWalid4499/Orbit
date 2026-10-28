@@ -47,6 +47,8 @@ IDENTITY="${ORBIT_SIGN_IDENTITY:-$(security find-identity -v -p codesigning | gr
 xattr -cr "$APP" # Finder/quarantine attributes make codesign refuse the bundle
 # Desktop widgets live in a signed extension inside the app; it has to be signed before the app itself.
 scripts/build-widgets.sh "$APP" "${IDENTITY:--}"
+# The Dock tile plug-in: the Joshu Pro icon in the Dock even while Joshu is closed.
+scripts/build-dock.sh "$APP" "${IDENTITY:--}"
 if [[ -n "$IDENTITY" ]]; then
   codesign --force --sign "$IDENTITY" --identifier com.personal.orbit "$APP"
   echo "Signed with $(codesign -dvv "$APP" 2>&1 | grep -m1 '^Authority=' | cut -d= -f2)"

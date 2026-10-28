@@ -6,6 +6,8 @@ struct ProLogo: View {
     var size: CGFloat = 44
     /// A square, edge-to-edge tile with no shadow: the iPhone app icon (iOS rounds the corners itself).
     var square = false
+    /// The everyday Joshu icon: the same j and orb on the lime tile.
+    var classic = false
 
     private static let rainbow: [Color] = [Color(hex: 0xC6F432), Color(hex: 0x3DDC97), Color(hex: 0x22D3EE), Color(hex: 0x8B7CF6),
                                            Color(hex: 0xF472B6), Color(hex: 0xC6F432)]
@@ -16,7 +18,8 @@ struct ProLogo: View {
             // The tile: the orb's colour wheel, with the icon's soft light from the top.
             // Softened, so the colours melt into each other like the orb's glow.
             Rectangle()
-                .fill(AngularGradient(colors: Self.rainbow, center: UnitPoint(x: 0.4, y: 0.55), angle: .degrees(200)))
+                .fill(classic ? AnyShapeStyle(Color(hex: 0xD4FF3A))
+                              : AnyShapeStyle(AngularGradient(colors: Self.rainbow, center: UnitPoint(x: 0.4, y: 0.55), angle: .degrees(200))))
                 .frame(width: size * 1.3, height: size * 1.3)
                 .blur(radius: 70 * k)
                 .frame(width: size, height: size)
@@ -48,6 +51,6 @@ struct ProLogo: View {
         .frame(width: size, height: size)
         .compositingGroup()
         .shadow(color: .black.opacity(square ? 0 : size > 60 ? 0.18 : 0.1), radius: square ? 0 : size * 0.08, y: size * 0.04)
-        .accessibilityLabel("Joshu Pro")
+        .accessibilityLabel(classic ? "Joshu" : "Joshu Pro")
     }
 }

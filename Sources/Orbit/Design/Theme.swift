@@ -244,19 +244,12 @@ enum Fmt {
     }
 }
 
-/// The app icon drawn in SwiftUI: black squircle, lime ring, pink moon.
+/// The Joshu app icon drawn in SwiftUI.
 struct OrbitMark: View {
     var size: CGFloat = 56
 
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: size * 0.225, style: .continuous).fill(Color(hex: 0x121212))
-            Circle().stroke(Theme.lime, lineWidth: size * 0.075).padding(size * 0.25)
-            Circle().fill(Theme.pink).frame(width: size * 0.16, height: size * 0.16)
-                .offset(x: size * 0.25, y: -size * 0.25)
-        }
-        .frame(width: size, height: size)
-    }
+    /// The Joshu app icon (lime tile, black j, the orb as its dot), drawn like the Pro logo.
+    var body: some View { ProLogo(size: size, classic: true) }
 }
 
 /// Your profile photo, or your initials on a gradient.

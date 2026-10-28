@@ -202,6 +202,7 @@ final class AIAssistant: ObservableObject {
         lines.append("\nMoney (budget month \(BudgetPeriod.title(period)), started \(period.start.formatted(date: .abbreviated, time: .omitted))): "
                      + "spent \(Fmt.money(spent)) of \(Fmt.money(budget)), \(Fmt.money(max(budget - spent, 0))) left to spend; day \(dayOfMonth) of \(daysInMonth). "
                      + "Only use these money numbers; spending from before this budget month doesn't count.")
+        if let income = Income.promptLine { lines.append(income) }
         let bills = (try? context.fetch(FetchDescriptor<Bill>())) ?? []
         let unpaid = bills.map { ($0, BillTracker.current($0, transactions: txns, now: now)) }
             .filter { !$0.1.isPaid && $0.1.due < today.adding(days: 8) }

@@ -18,7 +18,7 @@ enum Snapshot {
     /// In demo mode, your own settings (name, what you call your AI, budget) are covered by sample ones for this run only.
     nonisolated static func applyDemoDefaults() {
         guard isDemo else { return }
-        let sample: [String: Any] = ["userName": "Alex Morgan", "assistantName": "Joshu", "monthlyBudget": 8000.0, "budget.periodStart": 0.0, "profileCard": "", "readingGoal": 24,
+        let sample: [String: Any] = ["userName": "Alex Morgan", "assistantName": "Joshu", "monthlyBudget": 8000.0, "budget.periodStart": 0.0, "income.salary": 18000.0, "income.payday": 25, "places.home": "", "places.work": "", "profileCard": "", "readingGoal": 24,
                                      "assistant.memory": #"["Vegetarian","Gym on Tuesdays and Thursdays","Prefers cafés in Zamalek","Sister Mona, birthday 12 March"]"#]
         // Keep launch options (-open, -moneyTab…) that are already in the argument domain.
         let args = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)

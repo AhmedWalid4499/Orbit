@@ -89,3 +89,47 @@ extension View {
         }
     }
 }
+
+/// Your take-home salary and the day of the month it arrives (both optional; 0 means not set). Synced between devices.
+/// Payday also lets the budget month run payday to payday, and the assistant and money coach plan around both.
+enum Income {
+    static let salaryKey = "income.salary", paydayKey = "income.payday"
+
+    static var salary: Double { UserDefaults.standard.double(forKey: salaryKey) }
+    static var payday: Int { UserDefaults.standard.integer(forKey: paydayKey) }
+
+    /// The most recent payday on or before `now`, e.g. the 25th of last month.
+    static func lastPayday(_ day: Int, now: Date = .now) -> Date {
+        let cal = Calendar.current
+        func date(monthsBack: Int) -> Date {
+            let month = cal.date(byAdding: .month, value: -monthsBack, to: now.startOfDay)!
+            let range = cal.range(of: .day, in: .month, for: month) ?? 1..<29
+            var c = cal.dateComponents([.year, .month], from: month)
+            c.day = min(day, range.count)   // the 31st is the last day in shorter months
+            return cal.date(from: c)!
+        }
+        let thisMonth = date(monthsBack: 0)
+        return thisMonth <= now ? thisMonth : date(monthsBack: 1)
+    }
+
+    /// Budget months start on payday.
+    static func startBudgetOnPayday() {
+        guard payday > 0 else { return }
+        BudgetPeriod.anchor = lastPayday(payday)
+    }
+
+    /// "25th"
+    static func ordinal(_ n: Int) -> String {
+        let f = NumberFormatter(); f.numberStyle = .ordinal; f.locale = Locale(identifier: "en_US")
+        return f.string(from: NSNumber(value: n)) ?? "\(n)"
+    }
+
+    /// One line for the assistant, the brief and the money coach.
+    static var promptLine: String? {
+        guard salary > 0 || payday > 0 else { return nil }
+        var parts: [String] = []
+        if salary > 0 { parts.append("monthly take-home salary \(Fmt.money(salary))") }
+        if payday > 0 { parts.append("paid on day \(payday) of each month") }
+        return "Income: " + parts.joined(separator: ", ") + "."
+    }
+}

@@ -1,8 +1,8 @@
 import SwiftUI
 import SwiftData
 
-/// Setting up a new account, one question at a time (Mac and iPhone): what to call you, your preferences,
-/// what to connect, and what to call your assistant.
+/// Setting up a new account, one question at a time (Mac and iPhone): what to call you, your money (salary, payday,
+/// budget), home and work, a few preferences, what to connect, and what to call your assistant.
 struct SetupFlow: View {
     /// Set when a brand-new account signs in; cleared when the setup is finished.
     static let key = "setupNeeded"
@@ -27,13 +27,17 @@ struct SetupFlow: View {
     @AppStorage("weatherCity") private var city = ""
     @AppStorage("readingGoal") private var readingGoal = 24
     @AppStorage("hiddenTabs") private var hiddenRaw = ""
+    @AppStorage(Income.salaryKey) private var salary = 0.0
+    @AppStorage(Income.paydayKey) private var payday = 0
 
     @State private var step = 0
     @State private var name = ""
     @State private var aiName = ""
     @State private var forward = true
+    @State private var placeEditing: SavedPlaceKey?
+    @State private var placesVersion = 0
 
-    private let steps = ["You", "Preferences", "Connect", "Assistant"]
+    private let steps = ["You", "Money", "Places", "Preferences", "Connect", "Assistant"]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -42,8 +46,10 @@ struct SetupFlow: View {
                 Group {
                     switch step {
                     case 0: nameStep
-                    case 1: preferencesStep
-                    case 2: connectStep
+                    case 1: moneyStep
+                    case 2: placesStep
+                    case 3: preferencesStep
+                    case 4: connectStep
                     default: assistantStep
                     }
                 }
@@ -60,6 +66,7 @@ struct SetupFlow: View {
         .background(Theme.canvas.ignoresSafeArea())
         .sheetFrame(width: 620, height: 640)
         .interactiveDismissDisabled()
+        .savedPlaceSearch($placeEditing) { placesVersion += 1 }
         .onAppear {
             name = userName.isEmpty ? Platform.userName : userName
             aiName = assistantName
@@ -121,14 +128,14 @@ struct SetupFlow: View {
                 Text("joshu").font(.system(size: 40, weight: .black, design: .rounded)).tracking(-1)
                 OrbDot(size: 13).alignmentGuide(.lastTextBaseline) { $0[.bottom] }
             }
-            title("What should we call you?", "Joshu greets you by name and uses it in your morning brief.")
-            field("Your name", text: $name).onSubmit { if !name.isEmpty { go(1) } }
+            title("What should we call you?", "Your name or a nickname. Joshu greets you with it and uses it in your morning brief.")
+            field("Your name or nickname", text: $name).onSubmit { if !name.isEmpty { go(1) } }
         }
     }
 
-    private var preferencesStep: some View {
+    private var moneyStep: some View {
         VStack(alignment: .leading, spacing: 22) {
-            title("A few preferences", "So money, weather and reading look right from day one. You can change any of these in Settings.")
+            title("Your money", "So Joshu can keep an eye on your budget and plan around payday. Leave out anything you'd rather not share.")
             VStack(spacing: 0) {
                 prefRow("Currency", "banknote.fill", Theme.mint) {
                     Picker("", selection: $currency) {
@@ -137,13 +144,73 @@ struct SetupFlow: View {
                     .labelsHidden().fixedSize()
                 }
                 Divider()
-                prefRow("Monthly budget", "chart.pie.fill", Theme.peach) {
-                    TextField("2000", value: $budget, format: .number).multilineTextAlignment(.trailing).frame(width: 110)
+                prefRow("Monthly salary", "briefcase.fill", Theme.lime) {
+                    TextField("After tax", value: $salary, format: .number).multilineTextAlignment(.trailing).frame(width: 120)
                         #if os(iOS)
                         .keyboardType(.decimalPad)
                         #endif
                 }
                 Divider()
+                prefRow("Payday", "calendar.badge.clock", Theme.cyan) {
+                    Picker("", selection: $payday) {
+                        Text("Not set").tag(0)
+                        ForEach(1...31, id: \.self) { Text("The \(Income.ordinal($0))").tag($0) }
+                    }
+                    .labelsHidden().fixedSize()
+                }
+                Divider()
+                prefRow("Monthly budget", "chart.pie.fill", Theme.peach) {
+                    TextField("2000", value: $budget, format: .number).multilineTextAlignment(.trailing).frame(width: 120)
+                        #if os(iOS)
+                        .keyboardType(.decimalPad)
+                        #endif
+                }
+            }
+            .padding(.horizontal, 14)
+            .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Theme.card))
+            if salary > 0, budget > 0 {
+                Label("Your budget is \(Int((budget / salary * 100).rounded()))% of your salary, so about \(Fmt.money(max(salary - budget, 0))) a month is left to save or spend on bills.",
+                      systemImage: "lightbulb.fill")
+                    .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
+            }
+            if payday > 0 {
+                Label("Your budget month will run from the \(Income.ordinal(payday)) to the day before your next payday.", systemImage: "arrow.triangle.2.circlepath")
+                    .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var placesStep: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            title("Home and work", "So “remind me when I get home” just works, and Joshu knows your usual places. Your location stays on your device.")
+            VStack(spacing: 10) {
+                placeRow("home", "Home", "house.fill", Theme.lime)
+                placeRow("work", "Work", "building.2.fill", Theme.cyan)
+            }
+            .id(placesVersion)
+        }
+    }
+
+    private func placeRow(_ key: String, _ title: String, _ symbol: String, _ tint: Color) -> some View {
+        let place = SavedPlaces.load(key)
+        return HStack(spacing: 14) {
+            Image(systemName: symbol).font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.stickerInk)
+                .frame(width: 40, height: 40).background(RoundedRectangle(cornerRadius: 12).fill(tint))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(Theme.ui(15, weight: .semibold))
+                Text(place?.address ?? "Not set").font(Theme.ui(12.5)).foregroundStyle(Theme.inkSecondary).lineLimit(2)
+            }
+            Spacer(minLength: 8)
+            Button(place == nil ? "Set" : "Change") { placeEditing = SavedPlaceKey(id: key) }.buttonStyle(SoftButtonStyle())
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Theme.card))
+    }
+
+    private var preferencesStep: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            title("A few preferences", "So the weather and your reading look right from day one. You can change any of these in Settings.")
+            VStack(spacing: 0) {
                 prefRow("Weather city", "cloud.sun.fill", Theme.cyan) {
                     TextField(WeatherStore.defaultCity, text: $city).multilineTextAlignment(.trailing).frame(maxWidth: 170)
                 }
@@ -277,6 +344,7 @@ struct SetupFlow: View {
     private func finish() {
         userName = name.trimmingCharacters(in: .whitespaces).isEmpty ? userName : name.trimmingCharacters(in: .whitespaces)
         assistantName = aiNameOrDefault
+        Income.startBudgetOnPayday()
         UserDefaults.standard.set(false, forKey: Self.key)
         onDone()
     }

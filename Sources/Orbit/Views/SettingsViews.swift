@@ -28,6 +28,8 @@ struct GeneralSettings: View {
     @Environment(\.modelContext) private var context
     @AppStorage("userName") private var userName = Platform.fullUserName
     @AppStorage("monthlyBudget") private var monthlyBudget = 2000.0
+    @AppStorage(Income.salaryKey) private var salary = 0.0
+    @AppStorage(Income.paydayKey) private var payday = 0
     @AppStorage("currencyCode") private var currency = Locale.current.currency?.identifier ?? "USD"
     @State private var confirmClear = false
 
@@ -40,6 +42,12 @@ struct GeneralSettings: View {
     Form {
         TextField("Your name", text: $userName)
         TextField("Monthly budget", value: $monthlyBudget, format: .number)
+        TextField("Monthly salary (after tax)", value: $salary, format: .number)
+        Picker("Payday", selection: $payday) {
+            Text("Not set").tag(0)
+            ForEach(1...31, id: \.self) { Text("The \(Income.ordinal($0))").tag($0) }
+        }
+        .onChange(of: payday) { _, _ in Income.startBudgetOnPayday() }
         Picker("Currency", selection: $currency) {
             ForEach(["USD", "EUR", "GBP", "EGP", "AED", "SAR", "JPY", "CAD", "AUD", "INR"], id: \.self) { Text($0) }
         }

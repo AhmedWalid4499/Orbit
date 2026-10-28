@@ -97,7 +97,7 @@ extension Snapshot {
             renderAlone("signed-out", width: 1280, height: 800, wait: 1, SignedOutWelcome())
             renderAlone("pro-welcome", width: 760, height: 780, wait: 1.2, ProWelcome())
             renderAlone("ai-consent", width: 480, height: 520, wait: 0.5, AIConsentSheet())
-            for i in 0..<4 { renderAlone("setup-\(i)", width: 620, height: 640, wait: 0.6, SetupFlow(startAt: i)) }
+            for i in 0..<6 { renderAlone("setup-\(i)", width: 620, height: 640, wait: 0.6, SetupFlow(startAt: i)) }
             // The tour's MacBook screens: a smaller window, so text stays readable when the picture is shown small.
             if ProcessInfo.processInfo.environment["ORBIT_SNAPSHOT_TOUR"] != nil {
                 let tourSize = CGSize(width: 1280, height: 800)

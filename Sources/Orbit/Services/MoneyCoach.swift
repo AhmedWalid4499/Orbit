@@ -97,6 +97,7 @@ final class MoneyCoach: ObservableObject {
         let tasks = (try? context.fetch(FetchDescriptor<TaskItem>())) ?? []
         let budget = UserDefaults.standard.object(forKey: "monthlyBudget") as? Double ?? 2000
         var lines = ["Currency: \(Fmt.currencyCode). Monthly budget: \(Fmt.money(budget)). Today: \(Date.now.formatted(date: .complete, time: .omitted))."]
+        if let income = Income.promptLine { lines.append(income) }
         if let anchor = BudgetPeriod.anchor {
             lines.append("The user started a new budget month on \(anchor.formatted(date: .long, time: .shortened)); budget months run from that day each month.")
         }

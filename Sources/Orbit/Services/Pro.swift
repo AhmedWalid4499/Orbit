@@ -48,6 +48,29 @@ final class Pro: ObservableObject {
     /// Free accounts connect one email; Pro, as many as they like.
     func canAddEmail(existing: Int) -> Bool { isPro || existing == 0 }
 
+    /// Joshu Pro gets the Pro icon: on iPhone the app icon itself (iOS shows a short note when it changes), on the
+    /// Mac the Dock icon while Joshu runs (the app's own file keeps the usual icon, so its signature stays intact).
+    func applyIcon() {
+        guard !Snapshot.isActive else { return }
+        #if os(iOS)
+        let want: String? = isPro ? "AppIconPro" : nil
+        guard UIApplication.shared.supportsAlternateIcons, UIApplication.shared.alternateIconName != want else { return }
+        UIApplication.shared.setAlternateIconName(want) { _ in }
+        #else
+        NSApp.applicationIconImage = isPro ? Self.macProIcon
+            : Bundle.main.url(forResource: "AppIcon", withExtension: "icns").flatMap(NSImage.init(contentsOf:)) ?? AppIcon.make()
+        #endif
+    }
+
+    #if os(macOS)
+    /// The Pro logo with the margin Mac icons have around their tile.
+    private static let macProIcon: NSImage? = {
+        let renderer = ImageRenderer(content: ProLogo(size: 824).padding(100).frame(width: 1024, height: 1024))
+        renderer.scale = 1
+        return renderer.nsImage
+    }()
+    #endif
+
     private var welcomeKey: String { "pro.welcomed." + (CloudAuth.session?.userID ?? "device") }
 
     func welcomeDone() {
@@ -72,6 +95,7 @@ final class Pro: ObservableObject {
         await checkServer()
         if (storeActive || serverActive) && !Snapshot.isActive && !UserDefaults.standard.bool(forKey: welcomeKey) { showWelcome = true }
         UserDefaults.standard.set((storeActive || serverActive) && CloudAuth.session != nil, forKey: "pro.serverAI")
+        applyIcon()
         AIAssistant.shared.reloadKey()
     }
 

@@ -17,10 +17,12 @@ struct RootView: View {
     @ObservedObject private var focus = FocusTimer.shared
     /// In full screen the window has no title bar, so keep the tabs below the camera notch.
     @State private var fullScreenTopInset: CGFloat = 0
+    /// Full screen hides macOS's own window buttons, so the top bar shows its own.
+    @State private var isFullScreen = false
 
     var body: some View {
         VStack(spacing: 0) {
-            TopBar(userName: userName)
+            TopBar(userName: userName, fullScreen: isFullScreen)
                 .padding(.horizontal, 32)
                 .padding(.top, 22 + fullScreenTopInset)
                 .padding(.bottom, 18)
@@ -93,13 +95,15 @@ struct RootView: View {
         .onChange(of: hiddenTabs) { _, raw in if raw.split(separator: ",").contains(Substring(state.tab.rawValue)) { state.tab = .today } }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { n in
             fullScreenTopInset = (n.object as? NSWindow)?.screen?.safeAreaInsets.top ?? 0
+            isFullScreen = true
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { _ in fullScreenTopInset = 0 }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { _ in fullScreenTopInset = 0; isFullScreen = false }
         .task {
             // Orbit can reopen already in full screen (macOS restores it), with no "entered" notification.
             try? await Task.sleep(for: .seconds(1))
             if let w = NSApp.windows.first(where: { $0.canBecomeMain && $0.styleMask.contains(.fullScreen) }) {
                 fullScreenTopInset = w.screen?.safeAreaInsets.top ?? 0
+                isFullScreen = true
             }
         }
         .task { focus.restore(context: context) }
@@ -154,16 +158,18 @@ struct TopBar: View {
     @EnvironmentObject private var state: AppState
     @AppStorage("assistantName") private var assistantName = "Joshu"
     let userName: String
+    var fullScreen = false
 
     var body: some View {
         HStack {
+            if fullScreen { WindowButtons().padding(.trailing, 16) }
             HStack(spacing: 2) {
                 Text("joshu")
                     .font(.system(size: 34, weight: .black, design: .rounded))
                     .tracking(-1)
                 OrbDot(size: 11).offset(y: 9)
             }
-            .padding(.leading, 70) // traffic lights
+            .padding(.leading, fullScreen ? 0 : 70) // room for macOS's window buttons
             Spacer(minLength: 16)
             // The current tab always shows its name; narrower windows get tighter spacing instead.
             ViewThatFits(in: .horizontal) { NavDock(density: 0); NavDock(density: 1); NavDock(density: 2) }
@@ -287,5 +293,45 @@ struct ProfileMenu: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Profile")
+    }
+}
+
+/// Close, minimise and leave full screen, for full screen, where macOS hides its own buttons (Joshu has no title bar
+/// for them to slide down with). They look and work like the real ones.
+struct WindowButtons: View {
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            button(Color(hex: 0xFF5F57), "xmark") { NSApp.keyWindow?.performClose(nil) }
+                .help("Close")
+            button(Color(hex: 0xFEBC2E), "minus") {
+                // A full-screen window can't be minimised: leave full screen first, then minimise.
+                guard let w = NSApp.windows.first(where: { $0.canBecomeMain && $0.isVisible }) else { return }
+                w.toggleFullScreen(nil)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { w.miniaturize(nil) }
+            }
+            .help("Minimise")
+            button(Color(hex: 0x28C840), "arrow.down.right.and.arrow.up.left") {
+                NSApp.windows.first(where: { $0.canBecomeMain && $0.isVisible })?.toggleFullScreen(nil)
+            }
+            .help("Leave full screen")
+        }
+        .onHover { hovering = $0 }
+    }
+
+    private func button(_ color: Color, _ symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Circle().fill(color)
+                .overlay(Circle().strokeBorder(.black.opacity(0.12), lineWidth: 0.5))
+                .overlay {
+                    if hovering {
+                        Image(systemName: symbol).font(.system(size: 7, weight: .heavy)).foregroundStyle(.black.opacity(0.55))
+                    }
+                }
+                .frame(width: 13, height: 13)
+                .contentShape(Circle().inset(by: -4))
+        }
+        .buttonStyle(.plain)
     }
 }

@@ -90,7 +90,7 @@ common_target = {
 }
 app = {
     **common_target,
-    "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
+    "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon", "ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES": "AppIconPro",  # the Joshu Pro icon
     "ENABLE_PREVIEWS": "YES",
     "GENERATE_INFOPLIST_FILE": "YES",
     "INFOPLIST_FILE": "Support/OrbitPhone-Info.plist", "ENABLE_USER_SCRIPT_SANDBOXING": "NO",  # the shared Google sign-in step reads from your Library

@@ -4,6 +4,8 @@ import SwiftUI
 /// lime. Drawn from the icon's own shapes (1024-point design, see scripts/make-pro-logo.swift), so it's sharp at any size.
 struct ProLogo: View {
     var size: CGFloat = 44
+    /// A square, edge-to-edge tile with no shadow: the iPhone app icon (iOS rounds the corners itself).
+    var square = false
 
     private static let rainbow: [Color] = [Color(hex: 0xC6F432), Color(hex: 0x3DDC97), Color(hex: 0x22D3EE), Color(hex: 0x8B7CF6),
                                            Color(hex: 0xF472B6), Color(hex: 0xC6F432)]
@@ -18,8 +20,8 @@ struct ProLogo: View {
                 .frame(width: size * 1.3, height: size * 1.3)
                 .blur(radius: 70 * k)
                 .frame(width: size, height: size)
-                .clipShape(RoundedRectangle(cornerRadius: 230 * k, style: .continuous))
-            RoundedRectangle(cornerRadius: 230 * k, style: .continuous)
+                .clipShape(RoundedRectangle(cornerRadius: square ? 0 : 230 * k, style: .continuous))
+            RoundedRectangle(cornerRadius: square ? 0 : 230 * k, style: .continuous)
                 .fill(LinearGradient(colors: [.white.opacity(0.38), .white.opacity(0)], startPoint: .top, endPoint: .center))
             // The j's stem and hook.
             Path { p in
@@ -45,7 +47,7 @@ struct ProLogo: View {
         }
         .frame(width: size, height: size)
         .compositingGroup()
-        .shadow(color: .black.opacity(size > 60 ? 0.18 : 0.1), radius: size * 0.08, y: size * 0.04)
+        .shadow(color: .black.opacity(square ? 0 : size > 60 ? 0.18 : 0.1), radius: square ? 0 : size * 0.08, y: size * 0.04)
         .accessibilityLabel("Joshu Pro")
     }
 }

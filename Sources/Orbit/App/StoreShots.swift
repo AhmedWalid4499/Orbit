@@ -47,7 +47,8 @@ enum StoreShots {
     /// `ORBIT_PRO_LOGO=<file.png>`: the Joshu Pro logo at 1024 × 1024, for the website and the Brand folder.
     static func renderProLogoIfRequested() -> Bool {
         guard let file = ProcessInfo.processInfo.environment["ORBIT_PRO_LOGO"] else { return false }
-        let renderer = ImageRenderer(content: ProLogo(size: 1024).shadow(radius: 0).padding(0))
+        // "…-icon.png": the square app icon; anything else: the rounded logo.
+        let renderer = ImageRenderer(content: ProLogo(size: 1024, square: file.hasSuffix("-icon.png")))
         renderer.scale = 1
         if let cg = renderer.cgImage { try? NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: file)) }
         print("Pro logo written to \(file)")

@@ -84,12 +84,32 @@ struct StoreShotView: View {
     let shot: StoreShots.Shot
     let screen: Image
 
+    static let phoneTop: CGFloat = 300
+    static let phoneHeight: CGFloat = 590
+
+    private func chipView(_ chip: (String, String, Color, CGPoint)) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: chip.0).font(.system(size: 13, weight: .bold))
+                .frame(width: 28, height: 28).background(Circle().fill(Color.white.opacity(0.55)))
+            Text(chip.1).font(.system(size: 15, weight: .bold)).lineLimit(1).fixedSize()
+        }
+        .foregroundStyle(Color(hex: 0x111111))
+        .padding(.leading, 7).padding(.trailing, 14).padding(.vertical, 7)
+        .background(Capsule().fill(chip.2))
+        .overlay(Capsule().strokeBorder(Color.white.opacity(0.7), lineWidth: 1.2))
+        .shadow(color: .black.opacity(0.18), radius: 14, y: 8)
+    }
+
     var body: some View {
         ZStack {
+            // Soft colour glows behind the phone, kept inside the image so they don't widen the layout.
             Color(hex: 0xFBFBF8)
-            // Soft colour glows behind the phone.
-            Circle().fill(shot.colors.0.opacity(0.75)).frame(width: 520).blur(radius: 90).offset(x: -150, y: -260)
-            Circle().fill(shot.colors.1.opacity(0.55)).frame(width: 460).blur(radius: 100).offset(x: 170, y: 260)
+                .overlay {
+                    Circle().fill(shot.colors.0.opacity(0.75)).frame(width: 520, height: 520).blur(radius: 90).offset(x: -150, y: -260)
+                    Circle().fill(shot.colors.1.opacity(0.55)).frame(width: 460, height: 460).blur(radius: 100).offset(x: 170, y: 260)
+                }
+                .frame(width: 440, height: 956)
+                .clipped()
             VStack(spacing: 0) {
                 VStack(spacing: 12) {
                     Text(shot.eyebrow.uppercased())
@@ -104,27 +124,22 @@ struct StoreShotView: View {
                         .foregroundStyle(Color(hex: 0x55555C)).frame(maxWidth: 360).fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.top, 58)
-                Spacer(minLength: 22)
-                IPhoneFrame(image: screen)
-                    .frame(height: 640)
-                    .overlay {
-                        GeometryReader { g in
-                            ForEach(Array(shot.chips.enumerated()), id: \.offset) { _, chip in
-                                HStack(spacing: 8) {
-                                    Image(systemName: chip.0).font(.system(size: 13, weight: .bold))
-                                        .frame(width: 28, height: 28).background(Circle().fill(Color.white.opacity(0.55)))
-                                    Text(chip.1).font(.system(size: 15, weight: .bold)).lineLimit(1).fixedSize()
-                                }
-                                .foregroundStyle(Color(hex: 0x111111))
-                                .padding(.leading, 7).padding(.trailing, 14).padding(.vertical, 7)
-                                .background(Capsule().fill(chip.2))
-                                .overlay(Capsule().strokeBorder(Color.white.opacity(0.7), lineWidth: 1.2))
-                                .shadow(color: .black.opacity(0.18), radius: 14, y: 8)
-                                .position(x: g.size.width * min(0.86, max(0.14, chip.3.x)), y: g.size.height * chip.3.y)
-                            }
-                        }
-                    }
-                    .padding(.bottom, -70)   // the phone runs off the bottom edge, like a product shot
+                Spacer(minLength: 0)
+            }
+            // The whole phone, with room around it: 300–890 of the 956-point-tall image.
+            IPhoneFrame(image: screen)
+                .frame(height: Self.phoneHeight)
+                .position(x: 220, y: Self.phoneTop + Self.phoneHeight / 2)
+            // Highlights overlap the phone's sides but always stay well inside the image.
+            ForEach(Array(shot.chips.enumerated()), id: \.offset) { _, chip in
+                HStack(spacing: 0) {
+                    if chip.3.x >= 0.5 { Spacer(minLength: 0) }
+                    chipView(chip)
+                    if chip.3.x < 0.5 { Spacer(minLength: 0) }
+                }
+                .padding(.horizontal, 30)
+                .frame(width: 440)
+                .position(x: 220, y: Self.phoneTop + Self.phoneHeight * chip.3.y)
             }
         }
         .frame(width: 440, height: 956)

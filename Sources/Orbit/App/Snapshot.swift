@@ -348,3 +348,58 @@ extension Snapshot {
     }
 
 }
+
+/// Read-only check: `ORBIT_SYNC_REPORT=1 ORBIT_SNAPSHOT_DEMO=1 build/Orbit.app/Contents/MacOS/Orbit` prints what your
+/// account holds on the sync server (items by kind, live and deleted, and when things were deleted), using this Mac's
+/// sign-in. It changes nothing: no data is opened (demo mode) and nothing is written.
+@MainActor
+enum SyncReport {
+    static func runIfRequested() {
+        guard ProcessInfo.processInfo.environment["ORBIT_SYNC_REPORT"] != nil else { return }
+        Task {
+            var counts: [String: (live: Int, deleted: Int)] = [:]
+            var deletedDays: [String: [String: Int]] = [:]   // kind → day → deletions
+            var cursor = "", lastID: String?, rowsSeen = 0
+            do {
+                while true {
+                    var c = URLComponents(string: "\(SupabaseConfig.url)/rest/v1/orbit_records")!
+                    c.queryItems = [.init(name: "select", value: ProcessInfo.processInfo.environment["ORBIT_SYNC_REPORT_DATA"] != nil ? "id,kind,deleted,updated_at,data" : "id,kind,deleted,updated_at"), .init(name: "order", value: "updated_at.asc,id.asc"),
+                                    .init(name: "limit", value: "1000")] + CloudSync.after(cursor: cursor, id: lastID)
+                    c.percentEncodedQuery = c.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
+                    let rows = try await CloudSync.shared.rest(c.url!, method: "GET") as? [[String: Any]] ?? []
+                    for r in rows {
+                        let kind = r["kind"] as? String ?? "?"
+                        let del = J.bool(r["deleted"])
+                        if kind == "book", !del, let d = r["data"] as? [String: Any] {
+                            print("BOOK \(r["id"] ?? "") \(r["updated_at"] ?? "") keys=\(d.keys.sorted().joined(separator: ",")) source=\(d["source"] ?? "-") library=\(d["library"] ?? "-")")
+                        }
+                        if ["bucket", "subscription"].contains(kind) { print("ROW \(kind) \(r["id"] ?? "") \(del ? "deleted" : "live") \(r["updated_at"] ?? "")") }
+                        rowsSeen += 1
+                        var n = counts[kind] ?? (0, 0)
+                        if del { n.deleted += 1; deletedDays[kind, default: [:]][String((r["updated_at"] as? String ?? "").prefix(13)), default: 0] += 1 } else { n.live += 1 }
+                        counts[kind] = n
+                    }
+                    cursor = rows.last?["updated_at"] as? String ?? cursor
+                    lastID = rows.last?["id"] as? String ?? lastID
+                    if rows.isEmpty { break }   // not "fewer than asked for": a server may send smaller pages
+                }
+                print("ROWS \(rowsSeen)")
+                for (k, n) in counts.sorted(by: { $0.key < $1.key }) { print("KIND \(k): \(n.live) live, \(n.deleted) deleted") }
+                for (k, days) in deletedDays.sorted(by: { $0.key < $1.key }) where ["book", "bucket", "subscription"].contains(k) {
+                    print("DELETED \(k) by hour (UTC): \(days.sorted(by: { $0.key < $1.key }).map { "\($0.key)h=\($0.value)" }.joined(separator: ", "))")
+                }
+                var s = URLComponents(string: "\(SupabaseConfig.url)/rest/v1/orbit_records")!
+                s.queryItems = [.init(name: "select", value: "data,updated_at"), .init(name: "kind", value: "eq.setting")]
+                for r in try await CloudSync.shared.rest(s.url!, method: "GET") as? [[String: Any]] ?? [] {
+                    if let d = r["data"] as? [String: Any], d["key"] as? String == "assistantName" {
+                        print("SETTING assistantName = \(d["value"] ?? "nil") at \(d["at"] ?? "-") (row updated \(r["updated_at"] ?? ""))")
+                    }
+                }
+            } catch {
+                print("REPORT FAILED: \(error.localizedDescription)")
+            }
+            fflush(stdout)
+            NSApp.terminate(nil)
+        }
+    }
+}

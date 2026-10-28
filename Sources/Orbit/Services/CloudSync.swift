@@ -513,6 +513,7 @@ final class CloudSync: ObservableObject {
 
     private struct State: Codable {
         var cursor = ""                              // last updated_at pulled from the server
+        var cursorID: String?                        // …and that row's id: rows can share a timestamp
         var known: [String: Known] = [:]             // id → what was last synced
         var vaultMac: String?                        // fingerprint of the key vault when last synced
         var settingTimes: [String: Date]?            // setting key → when this device changed it (not yet synced)
@@ -693,6 +694,10 @@ final class CloudSync: ObservableObject {
         do {
             assignMissingIDs(context: context)
             AssistantStore.shared.shareChats(context: context)
+            // One time on every device: fetch everything again, so changes earlier pages skipped (see `after`) arrive
+            // now, removals included.
+            let catchUpKey = "sync.catchUp147"
+            if !UserDefaults.standard.bool(forKey: catchUpKey) && !isTestDevice { state.cursor = ""; state.cursorID = nil }
             noteSettingChanges()
             let pulled = try await pull(context: context)
             lastPulled = pulled
@@ -703,6 +708,7 @@ final class CloudSync: ObservableObject {
             saveState()
             SpendingAlerts.check(context: context)
             lastSync = .now
+            if !isTestDevice { UserDefaults.standard.set(true, forKey: catchUpKey) }   // the sync test shares this Mac's settings
             status = pulled + pushed == 0 ? "Up to date" : "Synced \(pulled) down, \(pushed) up"
             if UserDefaults.standard.string(forKey: ownerKey) == nil { UserDefaults.standard.set(session.userID, forKey: ownerKey) }
             return true
@@ -774,6 +780,14 @@ final class CloudSync: ObservableObject {
         ["key": key, "value": UserDefaults.standard.object(forKey: key) ?? NSNull()]
     }
 
+    /// The rows after the last one pulled. Items uploaded together share one timestamp, so "newer than the last
+    /// timestamp" alone would skip the rest of a group when a page ends inside it: the row's id breaks the tie.
+    nonisolated static func after(cursor: String, id: String?) -> [URLQueryItem] {
+        guard !cursor.isEmpty else { return [] }
+        guard let id else { return [URLQueryItem(name: "updated_at", value: "gte.\(cursor)")] }   // from before ids were kept
+        return [URLQueryItem(name: "or", value: "(updated_at.gt.\"\(cursor)\",and(updated_at.eq.\"\(cursor)\",id.gt.\"\(id)\"))")]
+    }
+
     private func pull(context: ModelContext, ignoreDeletes: Bool = false) async throws -> Int {
         var index: [String: [String: any PersistentModel]] = [:]
         for k in syncKinds { index[k.kind] = Dictionary(k.fetch(context).map { (k.uuid($0), $0) }, uniquingKeysWith: { a, _ in a }) }
@@ -783,7 +797,7 @@ final class CloudSync: ObservableObject {
             var comps = URLComponents(string: "\(SupabaseConfig.url)/rest/v1/orbit_records")!
             comps.queryItems = [.init(name: "select", value: "id,kind,data,deleted,updated_at"),
                                 .init(name: "order", value: "updated_at.asc,id.asc"), .init(name: "limit", value: "1000")]
-                + (state.cursor.isEmpty ? [] : [URLQueryItem(name: "updated_at", value: "gt.\(state.cursor)")])
+                + Self.after(cursor: state.cursor, id: state.cursorID)
             // Timestamps contain "+00:00": encode the plus so it isn't read as a space.
             comps.percentEncodedQuery = comps.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
             let rows = try await rest(comps.url!, method: "GET") as? [[String: Any]] ?? []
@@ -791,7 +805,7 @@ final class CloudSync: ObservableObject {
                 guard let id = row["id"] as? String, let kindName = row["kind"] as? String else { continue }
                 let deleted = J.bool(row["deleted"])
                 let data = row["data"] as? [String: Any] ?? [:]
-                if let ts = row["updated_at"] as? String { state.cursor = ts }
+                if let ts = row["updated_at"] as? String { state.cursor = ts; state.cursorID = id }
                 if deleted && ignoreDeletes { continue }
 
                 if kindName == "vault" || kindName == "vaultkey" { continue } // handled by syncVault
@@ -835,7 +849,7 @@ final class CloudSync: ObservableObject {
                 }
                 applied += 1
             }
-            if rows.count < 1000 { break }
+            if rows.isEmpty { break }   // not "fewer than asked for": a server may send smaller pages
         }
         return applied
     }

@@ -133,6 +133,8 @@ struct ClaudeClient {
 
     init?(apiKey: String? = Keychain.apiKey) {
         guard apiKey != nil || Pro.serverAI else { return nil }
+        // Nothing goes to the AI until the person has said yes once.
+        guard AIConsent.granted else { AIConsent.ask(); return nil }
         self.apiKey = apiKey
     }
 

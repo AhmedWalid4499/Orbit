@@ -10,16 +10,21 @@ The home-screen widgets reuse Widgets/OrbitWidgets.swift.
 The Apple Watch app (iOS/OrbitWatch, with complications in iOS/OrbitWatchWidgets) is embedded in the iPhone app and
 talks to it over WatchConnectivity; iOS/Shared holds the types both sides use.
 """
-import hashlib, pathlib, sys
+import hashlib, os, pathlib, subprocess, sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "iOS" / "Orbit.xcodeproj" / "project.pbxproj"
 VERSION = (ROOT / "VERSION").read_text().strip()
-TEAM = "Y2K55S3UA9"
+# The build number must go up with every App Store upload: the number of commits does, on its own.
+BUILD = os.environ.get("ORBIT_BUILD_NUMBER") or subprocess.run(["git", "-C", str(ROOT), "rev-list", "--count", "HEAD"],
+                                                               capture_output=True, text=True).stdout.strip() or "1"
+TEAM = os.environ.get("ORBIT_TEAM_ID", "Y2K55S3UA9")  # the paid team for the App Store build (scripts/upload-ios.sh)
 BUNDLE_ID = "com.ahmedwalid.orbit"
 WIDGETS = "--no-widgets" not in sys.argv
 HEALTH = "--no-health" not in sys.argv  # Apple Health (read-only); install-iphone.sh drops it if the account can't sign it
 WATCH = "--no-watch" not in sys.argv
+# The App Store build (scripts/upload-ios.sh): your paid team's signing, with Sign in with Apple, which free accounts can't use.
+APP_STORE = "--app-store" in sys.argv
 
 # Shared Mac files that can't run on iPhone (Mac-only windows, hotkeys, updater).
 MAC_ONLY_SERVICES = ["Capture.swift", "Updater.swift", "VoiceCapture.swift"]
@@ -80,7 +85,7 @@ project_release = {**project_common, "DEBUG_INFORMATION_FORMAT": "dwarf-with-dsy
                    "SWIFT_COMPILATION_MODE": "wholemodule", "VALIDATE_PRODUCT": "YES"}
 
 common_target = {
-    "CODE_SIGN_STYLE": "Automatic", "CURRENT_PROJECT_VERSION": "1", "DEVELOPMENT_TEAM": TEAM, "MARKETING_VERSION": VERSION,
+    "CODE_SIGN_STYLE": "Automatic", "CURRENT_PROJECT_VERSION": BUILD, "DEVELOPMENT_TEAM": TEAM, "MARKETING_VERSION": VERSION,
     "SUPPORTED_PLATFORMS": "iphoneos iphonesimulator", "SUPPORTS_MACCATALYST": "NO", "SWIFT_EMIT_LOC_STRINGS": "NO", "TARGETED_DEVICE_FAMILY": "1",
 }
 app = {
@@ -104,8 +109,11 @@ app = {
     "LD_RUNPATH_SEARCH_PATHS": "$(inherited) @executable_path/Frameworks",
     "PRODUCT_BUNDLE_IDENTIFIER": BUNDLE_ID,
     "PRODUCT_NAME": "Orbit",
+    "JOSHU_SIGN_IN_WITH_APPLE": "YES" if APP_STORE else "NO",
 }
-if WIDGETS and HEALTH:
+if APP_STORE:
+    app["CODE_SIGN_ENTITLEMENTS"] = "Support/OrbitPhone-AppStore.entitlements"
+elif WIDGETS and HEALTH:
     app["CODE_SIGN_ENTITLEMENTS"] = "Support/OrbitPhone.entitlements"
 elif WIDGETS:
     app["CODE_SIGN_ENTITLEMENTS"] = "Support/OrbitPhone-NoHealth.entitlements"
@@ -132,7 +140,7 @@ if WIDGETS:
     configs[oid("cfg.wid.release")] = ("Release", widgets)
 
 watch_common = {
-    "CODE_SIGN_STYLE": "Automatic", "CURRENT_PROJECT_VERSION": "1", "DEVELOPMENT_TEAM": TEAM, "MARKETING_VERSION": VERSION,
+    "CODE_SIGN_STYLE": "Automatic", "CURRENT_PROJECT_VERSION": BUILD, "DEVELOPMENT_TEAM": TEAM, "MARKETING_VERSION": VERSION,
     "SDKROOT": "watchos", "SUPPORTED_PLATFORMS": "watchos watchsimulator", "TARGETED_DEVICE_FAMILY": "4",
     "WATCHOS_DEPLOYMENT_TARGET": "10.0", "SWIFT_EMIT_LOC_STRINGS": "NO", "GENERATE_INFOPLIST_FILE": "YES",
     "INFOPLIST_KEY_CFBundleDisplayName": "Joshu", "SKIP_INSTALL": "YES",

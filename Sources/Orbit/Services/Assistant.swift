@@ -113,6 +113,7 @@ final class AssistantStore: ObservableObject {
         var text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty || !attachments.isEmpty, !busy else { return }
         if text.isEmpty { text = attachments.count == 1 ? "Here's a file. What's in it, and is there anything I should do about it?" : "Here are some files. What's in them, and is there anything I should do about them?" }
+        guard AIConsent.granted else { AIConsent.ask(force: true); error = "Allow Joshu to use the AI first."; return }
         guard let client = ClaudeClient() else { error = "This is part of Joshu Pro."; return }
         if system.isEmpty { system = Self.systemPrompt(context: context, apple: apple) }
 

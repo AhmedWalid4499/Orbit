@@ -71,9 +71,12 @@ struct ProWelcome: View {
                     }
                     .frame(maxWidth: 420)
 
+                    Text("Your assistant works by sending what each request needs (your message, and the parts of your day, money, notes or email it's about) to Anthropic's Claude AI. It isn't used to train their models.")
+                        .font(Theme.ui(12)).foregroundStyle(Theme.inkMuted).multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true).frame(maxWidth: 460)
                     VStack(spacing: 10) {
                         Button(action: start) {
-                            Text("Say hello to \(trimmedName)").frame(maxWidth: .infinity)
+                            Text("Allow and say hello to \(trimmedName)").frame(maxWidth: .infinity)
                         }
                         .buttonStyle(PrimaryButtonStyle()).frame(maxWidth: 420).keyboardShortcut(.defaultAction)
                         Button("Maybe later") { finish(openAssistant: false) }.buttonStyle(.orbitLink).font(Theme.ui(14))
@@ -107,7 +110,7 @@ struct ProWelcome: View {
         return n.isEmpty ? "Joshu" : n
     }
 
-    private func start() { finish(openAssistant: true) }
+    private func start() { AIConsent.shared.answer(true); finish(openAssistant: true) }
 
     private func finish(openAssistant: Bool) {
         assistantName = trimmedName

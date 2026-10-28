@@ -9,5 +9,9 @@
             <key>CFBundleURLSchemes</key><array><string>com.personal.orbit</string></array>
         </dict>
     </array>
+    <!-- YES only in the App Store build (scripts/upload-ios.sh), which carries the Sign in with Apple entitlement. -->
+    <key>JoshuSignInWithApple</key><string>$(JOSHU_SIGN_IN_WITH_APPLE)</string>
+    <!-- Only standard encryption (HTTPS, Apple's CryptoKit), so App Store Connect doesn't ask on every upload. -->
+    <key>ITSAppUsesNonExemptEncryption</key><false/>
 </dict>
 </plist>

@@ -13,6 +13,7 @@ struct RootView: View {
     @AppStorage(SignedOutWelcome.key) private var showSignedOutWelcome = false
     @ObservedObject private var cloud = CloudSync.shared
     @ObservedObject private var pro = Pro.shared
+    @ObservedObject private var consent = AIConsent.shared
     @ObservedObject private var focus = FocusTimer.shared
     /// In full screen the window has no title bar, so keep the tabs below the camera notch.
     @State private var fullScreenTopInset: CGFloat = 0
@@ -77,6 +78,9 @@ struct RootView: View {
         // Once, when Pro first switches on (after the tour and setup, and once the purchase sheet is closed).
         .sheet(isPresented: Binding(get: { pro.showWelcome && onboarded && tourSeen && !state.proOpen && !state.tourOpen },
                                     set: { if !$0 { pro.welcomeDone() } })) { ProWelcome() }
+        // Asked once, before anything goes to the AI.
+        .sheet(isPresented: Binding(get: { consent.asking && onboarded && tourSeen && !pro.showWelcome && !state.proOpen },
+                                    set: { if !$0 && consent.asking { consent.answer(false) } })) { AIConsentSheet() }
         .sheet(isPresented: $state.newTaskOpen) {
             NewTaskSheet { state.newTaskOpen = false; DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { CapturePanel.shared.show() } }
         }

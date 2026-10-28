@@ -92,6 +92,15 @@ enum CloudAuth {
         try await signInWithGoogleViaServer()
     }
 
+    /// Sign in with Apple: Apple's sign-in sheet hands Joshu a token for this app (and the nonce it was made with),
+    /// which the sync server checks with Apple.
+    static func signInWithApple(idToken: String, nonce: String) async throws {
+        guard SupabaseConfig.isConfigured else { throw CloudError("Sync isn't set up in this copy of Joshu.") }
+        let json = try await auth("token?grant_type=id_token", body: ["provider": "apple", "id_token": idToken, "nonce": nonce])
+        guard let s = parseSession(json) else { throw CloudError("Apple sign-in didn't finish.") }
+        session = s
+    }
+
     /// Google sign-in through the sync server's own Google page (shows the server's address).
     private static func signInWithGoogleViaServer() async throws {
         pending?.continuation.resume(throwing: CancellationError())
@@ -468,7 +477,8 @@ private let syncedSettings = ["monthlyBudget", "readingGoal", "currencyCode", "a
                               "notify.subscriptions", "notify.documents", "notify.evening", "notify.trips", "notify.morningHour",
                               "notify.habitHour", "notify.journalHour", "notify.eventLead",
                               "merchantRules", "categoryBudgets", "places.home", "places.work", "hiddenTabs", "inbox.windowHours", "inbox.everyHours", "notify.budgets", "notify.bigCharges", "spendAlerts.sent",
-                              "assistant.memory", "notify.weeklyMoney", "budget.periodStart", "profile.photo", "voice.natural", "voice.openai"]
+                              "assistant.memory", "notify.weeklyMoney", "budget.periodStart", "profile.photo", "voice.natural", "voice.openai",
+                              "ai.consent"]
 
 // MARK: - Sync engine
 
@@ -522,6 +532,16 @@ final class CloudSync: ObservableObject {
         try await CloudAuth.signInWithGoogle()
         self.email = CloudAuth.session?.email
         await firstSync(context: context)
+    }
+
+    /// `name` is what Apple shares the first time someone signs in (never again), used if Joshu doesn't know their name yet.
+    func signInWithApple(idToken: String, nonce: String, name: String?, context: ModelContext) async throws {
+        try await CloudAuth.signInWithApple(idToken: idToken, nonce: nonce)
+        self.email = CloudAuth.session?.email
+        await firstSync(context: context)
+        if let name, !name.isEmpty, (UserDefaults.standard.string(forKey: "userName") ?? "").isEmpty {
+            UserDefaults.standard.set(name, forKey: "userName")
+        }
     }
 
     func signUp(email: String, password: String, context: ModelContext) async throws -> CloudAuth.SignUpResult {

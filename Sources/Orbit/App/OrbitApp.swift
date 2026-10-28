@@ -145,6 +145,7 @@ struct OrbitApp: App {
                 .onAppear {
                     Snapshot.runIfRequested(container: container, apple: apple)
                     SyncTest.runIfRequested()
+                    StoreShots.renderIfRequested()
                     AITest.runIfRequested(apple: apple)
                     BankTest.runIfRequested()
                     AskTest.runIfRequested(apple: apple)

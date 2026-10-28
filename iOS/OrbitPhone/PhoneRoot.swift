@@ -16,6 +16,7 @@ struct PhoneRoot: View {
     @AppStorage("tourSeen") private var tourSeen = false
     @AppStorage(SignedOutWelcome.key) private var showSignedOutWelcome = false
     @ObservedObject private var pro = Pro.shared
+    @ObservedObject private var consent = AIConsent.shared
     @AppStorage(SetupFlow.key) private var setupNeeded = false
 
     @State private var tab: PhoneTab = .today
@@ -45,6 +46,9 @@ struct PhoneRoot: View {
         // Once, when Pro first switches on (after the tour, and once the purchase sheet is closed).
         .fullScreenCover(isPresented: Binding(get: { pro.showWelcome && tourSeen && !state.proOpen && !state.tourOpen },
                                               set: { if !$0 { pro.welcomeDone() } })) { ProWelcome() }
+        // Asked once, before anything goes to the AI.
+        .sheet(isPresented: Binding(get: { consent.asking && tourSeen && !pro.showWelcome && !state.proOpen && !state.assistantOpen },
+                                    set: { if !$0 && consent.asking { consent.answer(false) } })) { AIConsentSheet().presentationDetents([.large]) }
         .sheet(isPresented: $state.settingsOpen) { PhoneSettings() }
         .sheet(isPresented: $state.reviewOpen) { ReviewView() }
         .sheet(isPresented: $state.cardOpen) { PhoneCardSheet() }

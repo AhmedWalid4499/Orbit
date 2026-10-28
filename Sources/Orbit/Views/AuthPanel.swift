@@ -64,6 +64,9 @@ struct AuthPanel: View {
                 Rectangle().fill(Theme.line).frame(height: 1)
             }
 
+            if AppleSignIn.available {
+                AppleSignInButton(working: working) { token, nonce, name in apple(token, nonce, name) } onError: { show($0, error: true) }
+            }
             GoogleSignInButton(working: working, action: google)
 
             if let message {
@@ -91,6 +94,15 @@ struct AuthPanel: View {
             defer { working = false }
             do { try await cloud.signInWithGoogle(context: context) }
             catch is CancellationError {}
+            catch { show(error.localizedDescription, error: true) }
+        }
+    }
+
+    private func apple(_ token: String, _ nonce: String, _ name: String?) {
+        working = true; message = nil
+        Task {
+            defer { working = false }
+            do { try await cloud.signInWithApple(idToken: token, nonce: nonce, name: name, context: context) }
             catch { show(error.localizedDescription, error: true) }
         }
     }

@@ -25,7 +25,7 @@ struct ProSheet: View {
                 }
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 10) {
-                        AssistantAvatar(size: 44)
+                        ProLogo(size: 52)
                         Text("Joshu Pro").font(Theme.display(34))
                     }
                     Text(pro.isPro ? "You're on Pro. Thanks for supporting Joshu." : "Everything in Joshu, plus your AI assistant and the smart features that save you time. No API keys, nothing to set up.")
@@ -100,7 +100,7 @@ struct ProUpsell: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            AssistantAvatar(size: compact ? 30 : 40)
+            ProLogo(size: compact ? 32 : 42)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(Theme.ui(compact ? 14 : 15, weight: .semibold))
                 Text(detail).font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
@@ -119,7 +119,7 @@ struct ProSettingsRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            AssistantAvatar(size: 30)
+            ProLogo(size: 32)
             VStack(alignment: .leading, spacing: 2) {
                 Text(pro.isPro ? "Joshu Pro" : "Joshu Free").font(.headline)
                 Text(pro.isPro ? (pro.ownKey && !pro.storeActive && !pro.serverActive ? "Using your own Anthropic key" : "\(AssistantName.current) and all smart features are on")

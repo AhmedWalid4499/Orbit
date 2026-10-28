@@ -53,6 +53,9 @@
          box-shadow: 0 16px 40px -10px rgba(139,124,246,.6); animation: bob 4s ease-in-out infinite; }
   .orb::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 32% 26%, rgba(255,255,255,.7), rgba(255,255,255,0) 60%); }
   @keyframes bob { 50% { transform: translateY(-6px); } }
+  .pro-logo { display: block; margin: 0 auto 18px; width: 88px; height: 88px; filter: drop-shadow(0 16px 30px rgba(139,124,246,.45)); animation: bob 4s ease-in-out infinite; }
+  .pro-h { display: flex; align-items: center; gap: 10px; }
+  .pro-h img { border-radius: 9px; }
   h1 { font-family: var(--display); font-weight: 700; font-size: clamp(38px, 6vw, 64px); line-height: 1.04; letter-spacing: -.02em; margin: 0 auto 14px; max-width: 820px; }
   .lede { font-size: clamp(17px, 2vw, 20px); color: var(--ink2); max-width: 640px; margin: 0 auto; }
 
@@ -90,7 +93,7 @@
   .plan.pro .btn { background: #f4f4f5; color: #111114; }
   .plan.pro li::before { background-color: var(--lime); }
   .plan .badge { display: inline-block; font-size: 12px; font-weight: 700; background: var(--orb); color: #111; border-radius: 999px; padding: 3px 10px; margin-left: 8px; vertical-align: 3px; }
-  @media (prefers-reduced-motion: reduce) { .plan.pro, .plan.pro::after, .orb { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .plan.pro, .plan.pro::after, .orb, .pro-logo { animation: none; } }
   .fine { font-size: 13.5px; color: var(--ink3); text-align: center; margin: 22px auto 0; max-width: 640px; }
 
   /* What the AI can do */
@@ -136,7 +139,7 @@
 </nav>
 
 <header class="top wrap">
-  <div class="orb" aria-hidden="true"></div>
+  <img class="pro-logo" src="../assets/joshu-pro.png" width="88" height="88" alt="Joshu Pro">
   <h1>Joshu is free. Pro gives you your own AI.</h1>
   <p class="lede">Everything in Joshu works for free. Pro adds an assistant you name yourself, that knows your day and gets things done on your Mac and iPhone. No API keys, nothing to set up.</p>
   <div class="switch" role="group" aria-label="Billing">
@@ -167,7 +170,7 @@
       <a class="btn soft" href="/download/Joshu.dmg">Download Joshu</a>
     </div>
     <div class="plan pro">
-      <h2>Pro <span class="badge">AI</span></h2>
+      <h2 class="pro-h"><img src="../assets/joshu-pro.png" width="34" height="34" alt="">Joshu Pro</h2>
       <p class="for">Everything in Free, plus your own assistant</p>
       <p class="amount" id="price">$5.00<small>/month</small></p>
       <p class="alt" id="billed">$59.99 billed once a year</p>

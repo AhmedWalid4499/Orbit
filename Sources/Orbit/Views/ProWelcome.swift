@@ -92,14 +92,14 @@ struct ProWelcome: View {
         .onAppear { withAnimation(.easeOut(duration: 0.5)) { shown = true } }
     }
 
-    /// The assistant's orb, turning, with a glowing ring in its colours.
+    /// The Joshu Pro logo, with a glow in the orb's colours behind it.
     private var orb: some View {
         ZStack {
             Circle()
                 .fill(AngularGradient(colors: [Color(hex: 0xC6F432), Color(hex: 0x3DDC97), Color(hex: 0x22D3EE), Color(hex: 0x8B7CF6),
                                                Color(hex: 0xF472B6), Color(hex: 0xC6F432)], center: .center))
-                .frame(width: 150, height: 150).blur(radius: 30).opacity(0.7)
-            AssistantAvatar(size: 104, busy: true)
+                .frame(width: 170, height: 170).blur(radius: 34).opacity(0.7)
+            ProLogo(size: 112)
         }
         .scaleEffect(shown ? 1 : 0.6)
         .animation(.spring(response: 0.6, dampingFraction: 0.6), value: shown)

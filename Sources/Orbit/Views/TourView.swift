@@ -378,9 +378,13 @@ struct IPhoneFrame: View {
     var zoom: CGFloat = 1
     var focus: UnitPoint = .center
 
+    /// The whole phone's width ÷ height, worked out so the screen inside the bezels has exactly a screenshot's shape
+    /// (1206 × 2622): the app shows whole, never cropped at the sides.
+    static let aspect: CGFloat = 1 / ((1 - 0.13) * 2622.0 / 1206.0 + 0.13)
+
     var body: some View {
         GeometryReader { g in
-            let aspect = 1206.0 / 2622.0
+            let aspect = Self.aspect
             let h = min(g.size.height, g.size.width / aspect), w = h * aspect
             let edge = w * 0.035, border = w * 0.03
             let outer = w * 0.17
@@ -430,7 +434,7 @@ struct IPhoneFrame: View {
             .shadow(color: .black.opacity(0.3), radius: 28, y: 20)
             .position(x: g.size.width / 2, y: g.size.height / 2)
         }
-        .aspectRatio(1206.0 / 2622.0, contentMode: .fit)
+        .aspectRatio(Self.aspect, contentMode: .fit)
     }
 
     private func button(w: CGFloat, h: CGFloat) -> some View {

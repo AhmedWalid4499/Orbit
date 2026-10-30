@@ -272,7 +272,7 @@ struct AISettings: View {
             Section("Your assistant") {
                 TextField("Name", text: Binding(get: { UserDefaults.standard.string(forKey: "assistantName") ?? "Joshu" },
                                                 set: { UserDefaults.standard.set($0, forKey: "assistantName") }))
-                Text("What you call your AI around Joshu: the top-bar button, the journal and the morning brief. It's “Ask” unless you rename it.")
+                Text("What you call your AI around Joshu: the top-bar button, the journal and the morning brief. It's “Joshu” unless you rename it.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             MemorySection()
@@ -294,7 +294,7 @@ struct AISettings: View {
             }
 
             Section("Privacy") {
-                Text("When these are on, Joshu sends Anthropic what it needs: the text you capture, and for the brief today's events, tasks, habits, this month's spending total and yesterday's journal entry. Nothing is sent while no key is saved.")
+                Text("When these are on, Joshu sends Anthropic what it needs: the text you capture, and for the brief today's events, tasks, habits, this month's spending total, yesterday's journal entry and, if you connect Apple Health, a short summary of your steps, sleep and workouts. Nothing is sent without Joshu Pro or your own key.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -324,6 +324,7 @@ struct GmailSettings: View {
                 HStack {
                     Button(inbox.signingIn ? "Waiting for Google…" : "Add Gmail account…") { Task { await inbox.addAccount() } }
                         .buttonStyle(.borderedProminent).disabled(inbox.signingIn)
+                    if inbox.signingIn { Button("Cancel") { inbox.cancelSignIn() } }
                     Spacer()
                     Button(showSetup ? "Hide setup" : "Google client settings") { showSetup.toggle() }
                 }

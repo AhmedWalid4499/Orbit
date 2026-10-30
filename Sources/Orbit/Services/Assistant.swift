@@ -45,6 +45,8 @@ final class AssistantStore: ObservableObject {
     var speakNextReply = false
 
     private var system = ""
+    /// When `system`, and the date in it, was written. Never for a chat opened from disk.
+    private var systemWritten = Date.distantPast
     private var messages: [[String: Any]] = []
     private var received = ""
     private var streamDone = true
@@ -115,10 +117,13 @@ final class AssistantStore: ObservableObject {
         if text.isEmpty { text = attachments.count == 1 ? "Here's a file. What's in it, and is there anything I should do about it?" : "Here are some files. What's in them, and is there anything I should do about them?" }
         guard AIConsent.granted else { AIConsent.ask(force: true); error = "Allow Joshu to use the AI first."; return }
         guard let client = ClaudeClient() else { error = "This is part of Joshu Pro."; return }
-        if system.isEmpty { system = Self.systemPrompt(context: context, apple: apple) }
+        if system.isEmpty { system = Self.systemPrompt(context: context, apple: apple); systemWritten = .now }
 
         items.append(ChatItem(role: .user, text: text, files: attachments.isEmpty ? nil : attachments.map(\.name)))
-        messages.append(["role": "user", "content": attachments.isEmpty ? text as Any : (attachments.map(\.block) + [["type": "text", "text": text]]) as Any])
+        // A chat picked up later still has the date from when it began: say what it is now ("tomorrow" depends on it).
+        // In the message, not by rewriting the prompt, so the conversation so far stays exactly as it was.
+        let dated = Date.now.timeIntervalSince(systemWritten) > 1800 ? "[\(Self.currentTime), replacing any earlier one]\n\(text)" : text
+        messages.append(["role": "user", "content": attachments.isEmpty ? dated as Any : (attachments.map(\.block) + [["type": "text", "text": dated]]) as Any])
         save()
         busy = true
         error = nil
@@ -400,6 +405,7 @@ final class AssistantStore: ObservableObject {
         }
         lastSavedCount = saved.items.count
         system = saved.system
+        systemWritten = .distantPast
         container = saved.container
         messages = (try? JSONSerialization.jsonObject(with: saved.messages) as? [[String: Any]]) ?? []
         items = saved.items
@@ -447,8 +453,12 @@ final class AssistantStore: ObservableObject {
         - Keep it short: usually 1-3 sentences. Use "•" bullets only when there are several things to list, and never headings in chat.
         - Vary your wording; don't open every reply the same way. Never more than one question at a time.
 
-        Current date and time: \(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide).year().hour().minute())) (\(TimeZone.current.identifier)). Currency: \(Fmt.currencyCode).
+        \(currentTime). Currency: \(Fmt.currencyCode).
         """ + AssistantMemory.promptBlock
+    }
+
+    private static var currentTime: String {
+        "Current date and time: \(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide).year().hour().minute())) (\(TimeZone.current.identifier))"
     }
 }
 

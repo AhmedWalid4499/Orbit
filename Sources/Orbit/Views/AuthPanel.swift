@@ -12,6 +12,7 @@ struct AuthPanel: View {
     @State private var working = false
     @State private var message: String?
     @State private var isError = false
+    @State private var googleTask: Task<Void, Never>?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -68,6 +69,9 @@ struct AuthPanel: View {
                 AppleSignInButton(working: working) { token, nonce, name in apple(token, nonce, name) } onError: { show($0, error: true) }
             }
             GoogleSignInButton(working: working, action: google)
+            if let googleTask {
+                Button("Cancel") { googleTask.cancel() }.buttonStyle(.orbitLink).font(Theme.ui(12))
+            }
 
             if let message {
                 Label(message, systemImage: isError ? "exclamationmark.triangle.fill" : "envelope.fill")
@@ -90,8 +94,8 @@ struct AuthPanel: View {
 
     private func google() {
         working = true; message = nil
-        Task {
-            defer { working = false }
+        googleTask = Task {
+            defer { working = false; googleTask = nil }
             do { try await cloud.signInWithGoogle(context: context) }
             catch is CancellationError {}
             catch { show(error.localizedDescription, error: true) }

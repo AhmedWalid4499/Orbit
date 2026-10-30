@@ -217,6 +217,8 @@ struct AssistantPanel: View {
     private func send(_ text: String) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty || !attachments.isEmpty, !store.busy else { return }
+        // Asked first; what they wrote stays in the box for when they've said yes.
+        guard AIConsent.granted else { AIConsent.ask(force: true); return }
         if !dictation.listening && t == draft.trimmingCharacters(in: .whitespacesAndNewlines) { voiceTurn = false }
         draft = ""
         if Platform.isPhone { focused = false }

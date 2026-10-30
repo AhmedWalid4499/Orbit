@@ -40,9 +40,14 @@ enum BudgetPeriod {
 
     static var current: DateInterval { period(containing: .now) }
 
-    /// The period before or after `p`.
+    /// The period before or after `p`. One step at a time, from its edge: "a month later" can land inside the same
+    /// period when months differ in length.
     static func shifted(_ p: DateInterval, by months: Int) -> DateInterval {
-        period(containing: Calendar.current.date(byAdding: .month, value: months, to: p.start)!.addingTimeInterval(3600))
+        var out = p
+        for _ in 0..<abs(months) {
+            out = period(containing: months > 0 ? out.end.addingTimeInterval(1) : out.start.addingTimeInterval(-1))
+        }
+        return out
     }
 
     /// Starts a new budget month right now: anything spent before this moment, even earlier today, no longer counts.
@@ -112,10 +117,22 @@ enum Income {
         return thisMonth <= now ? thisMonth : date(monthsBack: 1)
     }
 
+    /// Where budget months are counted from for a payday: the last time that exact day came round. Counted from a
+    /// shorter month, a payday of the 31st would stay on the 30th or 28th for good.
+    static func paydayAnchor(_ day: Int, now: Date = .now) -> Date {
+        let cal = Calendar.current
+        var date = lastPayday(day, now: now)
+        while cal.component(.day, from: date) != day {
+            let earlier = cal.date(byAdding: .month, value: -1, to: date)!
+            date = lastPayday(day, now: cal.date(byAdding: .day, value: -1, to: earlier.startOfMonth)!)
+        }
+        return date
+    }
+
     /// Budget months start on payday.
     static func startBudgetOnPayday() {
         guard payday > 0 else { return }
-        BudgetPeriod.anchor = lastPayday(payday)
+        BudgetPeriod.anchor = paydayAnchor(payday)
     }
 
     /// "25th"

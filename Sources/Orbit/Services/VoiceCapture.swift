@@ -56,7 +56,7 @@ final class VoiceCapture: ObservableObject {
     // MARK: Recording
 
     private func start() async {
-        guard await permissions() else { return }
+        guard await permissions(), isHolding else { return }   // the key may have come up during the permission prompt
         let recognizer = SFSpeechRecognizer() ?? SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
         guard let recognizer, recognizer.isAvailable else { show(.failed("Speech recognition isn't available right now.")); return }
 

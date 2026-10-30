@@ -40,7 +40,13 @@ struct PhoneRoot: View {
         .tint(Theme.ink)
         // Voice mode ("Hey <name>"): the orb in the middle of the screen, over everything.
         .overlay { VoiceOrbHost() }
-        .sheet(isPresented: $state.assistantOpen) { AssistantPanel().presentationDragIndicator(.visible) }
+        .sheet(isPresented: $state.assistantOpen) {
+            AssistantPanel().presentationDragIndicator(.visible)
+                // Over the assistant, which is itself a sheet here.
+                .sheet(isPresented: Binding(get: { consent.asking }, set: { if !$0 && consent.asking { consent.answer(false) } })) {
+                    AIConsentSheet().presentationDetents([.large])
+                }
+        }
         .sheet(isPresented: $state.searchOpen) { SearchView() }
         .fullScreenCover(isPresented: $state.tourOpen) { TourView { state.tourOpen = false } }
         // Once, when Pro first switches on (after the tour, and once the purchase sheet is closed).

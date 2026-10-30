@@ -86,10 +86,7 @@ enum GoogleAuth {
             .init(name: "prompt", value: "consent"),
             .init(name: "include_granted_scopes", value: "true"),
         ] + (hint.map { [URLQueryItem(name: "login_hint", value: $0)] } ?? [])
-        let browser = Task { _ = await Platform.webAuth(comps.url!, callbackScheme: nil) }
-        defer { browser.cancel(); Platform.endWebAuth() }
-
-        let code = try await server.waitForCode()
+        let code = try await answer(from: comps.url!, server: server)
         let tokens = try await tokenRequest([
             "grant_type": "authorization_code", "code": code, "redirect_uri": redirect,
             "client_id": clientID, "client_secret": clientSecret, "code_verifier": verifier,
@@ -98,6 +95,20 @@ enum GoogleAuth {
             throw GmailError("Google didn't return a refresh token. Remove Joshu from your Google account's third-party access and try again.")
         }
         return (refresh, access, tokens["expires_in"] as? Int ?? 3600)
+    }
+
+    /// Opens Google's page and waits for the code it sends back. On iPhone, closing the page cancels; on the Mac it's in
+    /// the browser, where Joshu can't see that, so it waits until the app's Cancel button or the time limit.
+    @MainActor
+    private static func answer(from url: URL, server: LoopbackServer) async throws -> String {
+        let browser = Task {
+            _ = await Platform.webAuth(url, callbackScheme: nil)
+            #if os(iOS)
+            server.cancel()
+            #endif
+        }
+        defer { browser.cancel(); Platform.endWebAuth() }
+        return try await server.waitForCode()
     }
 
     /// Google's sign-in page for signing in to Joshu itself: just your name and email, no Gmail access. Google
@@ -116,9 +127,7 @@ enum GoogleAuth {
             .init(name: "code_challenge", value: Data(SHA256.hash(data: Data(verifier.utf8))).base64URL),
             .init(name: "code_challenge_method", value: "S256"), .init(name: "prompt", value: "select_account"),
         ]
-        let browser = Task { _ = await Platform.webAuth(comps.url!, callbackScheme: nil) }
-        defer { browser.cancel(); Platform.endWebAuth() }
-        let code = try await server.waitForCode()
+        let code = try await answer(from: comps.url!, server: server)
         let tokens = try await tokenRequest([
             "grant_type": "authorization_code", "code": code, "redirect_uri": redirect,
             "client_id": clientID, "client_secret": clientSecret, "code_verifier": verifier,
@@ -268,6 +277,8 @@ private final class LoopbackServer: @unchecked Sendable {
         }
     }
 
+    func cancel() { finish(.failure(CancellationError())) }
+
     private func finish(_ result: Result<String, Error>) {
         guard let cont = codeContinuation else { return }
         codeContinuation = nil
@@ -308,6 +319,8 @@ final class InboxStore: ObservableObject {
     @Published private(set) var loading = false
     @Published private(set) var error: String?
     @Published var signingIn = false
+    private var signIn: Task<String, Error>?
+    func cancelSignIn() { signIn?.cancel() }
 
     /// Signing out clears this device: connected accounts and the summary of their mail go.
     func forgetLocal() {
@@ -346,9 +359,11 @@ final class InboxStore: ObservableObject {
         }
         signingIn = true
         error = nil
-        defer { signingIn = false }
+        defer { signingIn = false; signIn = nil }
         do {
-            _ = try await GoogleAuth.signIn(hint: hint)
+            let task = Task { try await GoogleAuth.signIn(hint: hint) }
+            signIn = task
+            _ = try await task.value
             reloadAccounts()
             await refresh()
         } catch is CancellationError {

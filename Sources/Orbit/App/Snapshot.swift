@@ -251,6 +251,23 @@ enum SyncTest {
                 check("Edit reaches Mac A", tasksA.contains { $0.title == "Edited on Mac B" })
                 check("Deletion reaches Mac A", !(try a.fetch(FetchDescriptor<Book>())).contains { $0.title == deletedTitle })
 
+                // Deleted on one device while edited on the other: the edit wins and comes back everywhere.
+                let editedA = try a.fetch(FetchDescriptor<TaskItem>()).first { $0.title != "Edited on Mac B" }!
+                let contested = editedA.uuid
+                editedA.title = "Edited on A, deleted on B"
+                try a.save()
+                cloud.deviceTag = "-testB"
+                b.delete(try b.fetch(FetchDescriptor<TaskItem>()).first { $0.uuid == contested }!)
+                try b.save()
+                await cloud.sync(context: b)
+                cloud.deviceTag = "-testA"
+                await cloud.sync(context: a)
+                check("An edit survives a deletion elsewhere", try a.fetch(FetchDescriptor<TaskItem>()).contains { $0.title == "Edited on A, deleted on B" })
+                cloud.deviceTag = "-testB"
+                await cloud.sync(context: b)
+                check("…and comes back on the other device", try b.fetch(FetchDescriptor<TaskItem>()).contains { $0.title == "Edited on A, deleted on B" })
+                cloud.deviceTag = "-testA"
+
                 // Key sync. An older Orbit left a passphrase vault; the Mac that still has the passphrase converts it,
                 // then a second device gets the keys with nothing to type, and the server never holds a key in the clear.
                 let testSecret = "test-secret-value-123"
@@ -404,6 +421,25 @@ enum SyncTest {
             if let realPassphrase { Keychain.write(realPassphrase, account: "sync-passphrase") } else { Keychain.delete("sync-passphrase") }
             if let realSession { Keychain.write(realSession, account: "supabase-session") }
             cloud.syncSecrets = realKeySync
+
+            // Budget months: payday on the 31st, and stepping through months of different lengths.
+            let realAnchor = UserDefaults.standard.object(forKey: BudgetPeriod.key)
+            func day(_ y: Int, _ m: Int, _ d: Int) -> Date { Calendar.current.date(from: DateComponents(year: y, month: m, day: d))! }
+            func dayOf(_ d: Date) -> Int { Calendar.current.component(.day, from: d) }
+            let anchor = Income.paydayAnchor(31, now: day(2027, 7, 1).addingTimeInterval(3600))   // set on 1 July
+            check("Payday 31 set in June counts from a real 31st", dayOf(anchor) == 31)
+            let febAnchor = Income.paydayAnchor(30, now: day(2027, 3, 1))
+            check("Payday 30 set after February counts from a real 30th", dayOf(febAnchor) == 30)
+            BudgetPeriod.anchor = anchor
+            let june = BudgetPeriod.period(containing: day(2027, 6, 15))
+            let august = BudgetPeriod.period(containing: day(2027, 8, 15))
+            check("Budget months run from the 31st or the month's last day", dayOf(june.start) == 31 && dayOf(august.start) == 31)
+            var step = BudgetPeriod.period(containing: day(2027, 1, 15)), starts: [Int] = []
+            for _ in 0..<14 { step = BudgetPeriod.shifted(step, by: 1); starts.append(Calendar.current.component(.month, from: step.start)) }
+            check("The forward arrow never sticks (\(starts))", Set(starts).count == 12 && zip(starts, starts.dropFirst()).allSatisfy { $0 != $1 })
+            let there = BudgetPeriod.shifted(june, by: 3)
+            check("Back undoes forward", BudgetPeriod.shifted(there, by: -3).start == june.start)
+            UserDefaults.standard.set(realAnchor, forKey: BudgetPeriod.key)
             print(results.joined(separator: "\n"))
             fflush(stdout)
             NSApp.terminate(nil)

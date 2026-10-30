@@ -676,6 +676,9 @@ final class CloudSync: ObservableObject {
             DaySummaryStore.shared.forget()
             InboxStore.shared.forgetLocal()
             ProfileStore.shared.forgetLocal()
+            YouTubeStore.shared.disconnect()
+            LinkedInAccount.shared.signOut()
+            GitHubStore.shared.disconnect()
             for key in syncedSettings + ["moneyCoachCache", "githubUser"] { UserDefaults.standard.removeObject(forKey: key) }
             // Keys and sign-ins to other services (they're in the account's encrypted key sync). Joshu's own Google setup stays.
             for k in Keychain.syncable().keys where k != "google-client-secret" { Keychain.delete(k) }
@@ -862,7 +865,11 @@ final class CloudSync: ObservableObject {
                 if !deleted, let known = state.known[id], known.hash == fingerprint(data) { continue }
                 let local = index[kindName]?[id]
                 if deleted {
-                    if let local { context.delete(local); index[kindName]?[id] = nil; applied += 1 }
+                    if let local {
+                        // Edited here since the last sync: the edit wins, and the push that follows brings it back.
+                        if let known = state.known[id], known.hash != fingerprint(k.encode(local)) { state.known[id] = nil; continue }
+                        context.delete(local); index[kindName]?[id] = nil; applied += 1
+                    }
                     else if state.known[id] == nil { continue } // already gone here
                     state.known[id] = nil
                     continue

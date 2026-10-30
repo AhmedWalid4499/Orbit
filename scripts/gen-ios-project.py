@@ -102,7 +102,7 @@ app = {
     "INFOPLIST_KEY_NSSpeechRecognitionUsageDescription": "Joshu turns what you say into text on your iPhone, so your assistant can understand you.",
     "INFOPLIST_KEY_NSCameraUsageDescription": "Take a photo of a receipt or document to send to your assistant.",
     "INFOPLIST_KEY_NSLocationWhenInUseUsageDescription": "Joshu uses your location when you ask for food or places nearby, to find what's close to you.",
-    "INFOPLIST_KEY_NSHealthShareUsageDescription": "Joshu reads your steps, sleep, workouts and heart rate to show them next to your habits and day, and to tick off workout habits. It never writes to Health.",
+    "INFOPLIST_KEY_NSHealthShareUsageDescription": "Joshu reads your steps, sleep, workouts and heart rate to show them next to your habits and day, and to tick off workout habits. If you turn on your assistant, a short summary goes into your morning brief through Anthropic's Claude AI. It never writes to Health.",
     "INFOPLIST_KEY_UIApplicationSceneManifest_Generation": "YES",
     "INFOPLIST_KEY_UILaunchScreen_Generation": "YES",
     "INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone": "UIInterfaceOrientationPortrait",

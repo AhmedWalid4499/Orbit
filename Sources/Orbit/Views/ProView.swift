@@ -4,7 +4,12 @@ import SwiftUI
 struct ProSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var pro = Pro.shared
+    @ObservedObject private var cloud = CloudSync.shared
     @State private var plan = Pro.yearlyID
+
+    /// Pro lives on your account (that's how the assistant reaches you on every device), so there's nothing to buy
+    /// until you have one. Your own Anthropic key needs none.
+    private var needsAccount: Bool { !cloud.isSignedIn && !pro.ownKey && !Snapshot.isActive }
 
     private var features: [(String, String, Color)] { [
         ("Your own AI assistant, named by you: ask anything, plan, write, code, by voice or text", "sparkles", Theme.lime),
@@ -28,7 +33,7 @@ struct ProSheet: View {
                         ProLogo(size: 52)
                         Text("Joshu Pro").font(Theme.display(34))
                     }
-                    Text(pro.isPro ? "You're on Pro. Thanks for supporting Joshu." : "Everything in Joshu, plus your AI assistant and the smart features that save you time. No API keys, nothing to set up.")
+                    Text(pro.isPro && !needsAccount ? "You're on Pro. Thanks for supporting Joshu." : "Everything in Joshu, plus your AI assistant and the smart features that save you time. No API keys, nothing to set up.")
                         .font(Theme.ui(15)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
                 }
                 VStack(alignment: .leading, spacing: 12) {
@@ -40,7 +45,15 @@ struct ProSheet: View {
                         }
                     }
                 }
-                if !pro.isPro {
+                if needsAccount {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("First, your free Joshu account").font(Theme.ui(16, weight: .semibold))
+                        Text(pro.storeActive ? "Your subscription is active. Sign in or create an account to switch on your assistant."
+                             : "Pro is tied to your account, so your assistant works on all your devices.")
+                            .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
+                        AuthPanel()
+                    }
+                } else if !pro.isPro {
                     VStack(spacing: 10) {
                         planButton(Pro.yearlyID, title: "Yearly", detail: "\(pro.price(Pro.yearlyID)) a year · save 37%")
                         planButton(Pro.monthlyID, title: "Monthly", detail: "\(pro.price(Pro.monthlyID)) a month")
@@ -106,7 +119,7 @@ struct ProUpsell: View {
                 Text(detail).font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
-            Button("Get Pro") { AppState.current?.proOpen = true }.buttonStyle(PrimaryButtonStyle()).fixedSize()
+            Button("Get Pro") { AppState.current?.openPro() }.buttonStyle(PrimaryButtonStyle()).fixedSize()
         }
         .padding(compact ? 12 : 16)
         .background(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous).strokeBorder(Theme.line, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])))
@@ -129,7 +142,7 @@ struct ProSettingsRow: View {
             if pro.storeActive {
                 Link("Manage", destination: URL(string: "https://apps.apple.com/account/subscriptions")!)
             } else if !pro.isPro {
-                Button("See Pro") { AppState.current?.proOpen = true }.buttonStyle(.borderedProminent)
+                Button("See Pro") { AppState.current?.openPro() }.buttonStyle(.borderedProminent)
             }
         }
         .task { await pro.refresh() }

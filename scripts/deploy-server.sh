@@ -13,4 +13,6 @@ supabase functions deploy claude --project-ref "$REF"
 supabase functions deploy subscription --project-ref "$REF" --no-verify-jwt
 # The admin page (docs/admin) calls this from the browser; it checks the caller is in public.admins itself.
 supabase functions deploy admin --project-ref "$REF" --no-verify-jwt
+# Ends Sign in with Apple when an account is deleted; it checks the caller's sign-in itself.
+supabase functions deploy apple-revoke --project-ref "$REF" --no-verify-jwt
 echo "Deployed. App Store Server Notifications URL: https://$REF.supabase.co/functions/v1/subscription"

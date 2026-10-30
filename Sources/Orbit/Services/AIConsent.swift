@@ -37,6 +37,7 @@ struct AIConsentSheet: View {
         ("text.bubble.fill", "What you ask or say to your assistant, and files you give it"),
         ("calendar", "The parts of your day it needs: events, tasks, habits, money, notes or reading"),
         ("envelope.fill", "Emails being summarised, if you connect Gmail"),
+        ("heart.fill", "A short Health summary (steps, sleep, workouts) in your morning brief, if you connect Apple Health"),
     ]
 
     var body: some View {

@@ -455,7 +455,11 @@ struct AccountSettings: View {
                     Button("Delete Account…", role: .destructive) { confirmDelete = true }
                         .confirmationDialog("Delete your Joshu account?", isPresented: $confirmDelete, titleVisibility: .visible) {
                             Button("Delete Account", role: .destructive) {
-                                Task { do { try await cloud.deleteAccount() } catch { deleteError = error.localizedDescription } }
+                                Task {
+                                    do { try await cloud.deleteAccount() }
+                                    catch is CancellationError {}
+                                    catch { deleteError = error.localizedDescription }
+                                }
                             }
                         } message: {
                             Text("This deletes your account and everything synced to it, on all your devices. What's on this device stays until you reset it. A Pro subscription is cancelled in your Apple ID settings, not here.")

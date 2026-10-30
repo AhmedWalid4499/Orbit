@@ -131,6 +131,17 @@ final class AppState: ObservableObject {
         if tab == .assistant && !Platform.isPhone { assistantOpen = false } else { assistantOpen.toggle() }
     }
 
+    /// Shows the paywall. It opens from anywhere, including inside other sheets, where a second sheet couldn't
+    /// appear: whatever is open closes first.
+    func openPro() {
+        var closing = Platform.closeSheets()
+        if searchOpen || settingsOpen || reviewOpen || cardOpen || planOpen || captureOpen || newTaskOpen || (Platform.isPhone && assistantOpen) { closing = true }
+        searchOpen = false; settingsOpen = false; reviewOpen = false; cardOpen = false; planOpen = false; captureOpen = false; newTaskOpen = false
+        if Platform.isPhone { assistantOpen = false }
+        guard closing else { proOpen = true; return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { self.proOpen = true }
+    }
+
     func openAssistant(with message: String? = nil) {
         assistantSeed = message
         // On the Mac's AI tab the chat is already on screen.

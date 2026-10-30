@@ -23,6 +23,50 @@ enum AppleSignIn {
     static func sha256(_ s: String) -> String {
         SHA256.hash(data: Data(s.utf8)).map { String(format: "%02x", $0) }.joined()
     }
+
+    #if os(iOS)
+    private static var request: CodeRequest?
+
+    /// Asks Apple for a fresh one-time code, which Joshu's server trades in to end Sign in with Apple (see
+    /// supabase/functions/apple-revoke). Throws CancellationError if they back out of Apple's sheet.
+    @MainActor static func authorizationCode() async throws -> String? {
+        try await withCheckedThrowingContinuation { continuation in
+            let r = CodeRequest(continuation)
+            request = r
+            r.start()
+        }
+    }
+
+    private final class CodeRequest: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+        private let continuation: CheckedContinuation<String?, Error>
+        init(_ continuation: CheckedContinuation<String?, Error>) { self.continuation = continuation }
+
+        func start() {
+            let controller = ASAuthorizationController(authorizationRequests: [ASAuthorizationAppleIDProvider().createRequest()])
+            controller.delegate = self
+            controller.presentationContextProvider = self
+            controller.performRequests()
+        }
+
+        func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+            UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.first ?? ASPresentationAnchor()
+        }
+
+        func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+            let code = (authorization.credential as? ASAuthorizationAppleIDCredential)?.authorizationCode
+            continuation.resume(returning: code.flatMap { String(data: $0, encoding: .utf8) })
+            AppleSignIn.request = nil
+        }
+
+        func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+            if (error as? ASAuthorizationError)?.code == .canceled { continuation.resume(throwing: CancellationError()) }
+            else { continuation.resume(returning: nil) }
+            AppleSignIn.request = nil
+        }
+    }
+    #else
+    @MainActor static func authorizationCode() async throws -> String? { nil }
+    #endif
 }
 
 struct AppleSignInButton: View {

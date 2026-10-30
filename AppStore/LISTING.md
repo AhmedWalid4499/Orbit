@@ -87,7 +87,7 @@ Everything below goes into App Store Connect › your app. Lengths are within Ap
 >
 > BANK TEXTS AND APPLE PAY (optional, Money › Auto-log card payments): the user adds our Shortcuts and creates Shortcuts automations themselves. Joshu never reads messages on its own.
 >
-> APPLE HEALTH (optional): read-only. Steps, sleep and workouts are shown next to habits and tick off workout habits. Joshu never writes to Health.
+> APPLE HEALTH (optional): read-only. Steps, sleep and workouts are shown next to habits and tick off workout habits. A short summary goes into the morning brief through Anthropic's Claude AI, only after the user allows the AI on a screen that lists it. Joshu never writes to Health.
 >
 > ACCOUNT DELETION: Settings › Account › Delete Account.
 

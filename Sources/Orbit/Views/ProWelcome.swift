@@ -73,7 +73,7 @@ struct ProWelcome: View {
                     }
                     .frame(maxWidth: 420)
 
-                    Text("Your assistant works by sending what each request needs (your message, and the parts of your day, money, notes or email it's about) to Anthropic's Claude AI. It isn't used to train their models.")
+                    Text("Your assistant works by sending what each request needs (your message, and the parts of your day, money, health, notes or email it's about) to Anthropic's Claude AI. It isn't used to train their models.")
                         .font(Theme.ui(12)).foregroundStyle(Theme.inkMuted).multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true).frame(maxWidth: 460)
                     VStack(spacing: 10) {

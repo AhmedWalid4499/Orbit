@@ -54,6 +54,20 @@ enum Platform {
     private static var session: ASWebAuthenticationSession?
     private static let anchor = AuthAnchor()
 
+    /// Closes any sheet on the iPhone, or the Settings window on the Mac. Says whether something was open.
+    static func closeSheets() -> Bool {
+        #if os(iOS)
+        let root = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.first?.rootViewController
+        guard root?.presentedViewController != nil else { return false }
+        root?.dismiss(animated: true)
+        return true
+        #else
+        guard let window = NSApp.keyWindow, window.identifier?.rawValue.contains("Settings") == true else { return false }
+        window.close()
+        return true
+        #endif
+    }
+
     /// Opens a sign-in page in the system's sign-in window and returns the redirect to `callbackScheme`.
     /// The redirect comes straight back to this app, so it works even if another app (an old copy, or the Windows
     /// version's Electron build) has claimed Orbit's link scheme. Without a scheme (loopback sign-ins), the Mac opens

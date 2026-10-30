@@ -99,7 +99,8 @@ final class Pro: ObservableObject {
         }
         storeActive = active
         await checkServer()
-        if (storeActive || serverActive) && !Snapshot.isActive && !UserDefaults.standard.bool(forKey: welcomeKey) { showWelcome = true }
+        // Not before there's an account: without one the assistant can't reach Joshu's server yet.
+        if (storeActive || serverActive) && CloudAuth.session != nil && !Snapshot.isActive && !UserDefaults.standard.bool(forKey: welcomeKey) { showWelcome = true }
         UserDefaults.standard.set((storeActive || serverActive) && CloudAuth.session != nil, forKey: "pro.serverAI")
         applyIcon()
         AIAssistant.shared.reloadKey()
@@ -107,8 +108,14 @@ final class Pro: ObservableObject {
 
     /// The Joshu server's record for this account (purchases from other devices, or a grant).
     private func checkServer() async {
-        guard let session = CloudAuth.session, !Snapshot.isActive,
-              var c = URLComponents(string: "\(SupabaseConfig.url)/rest/v1/entitlements") else { return }
+        guard !Snapshot.isActive, Keychain.isAvailable else { return }
+        guard let session = CloudAuth.session else {
+            // Signed out: a grant or purchase on the server belongs to the account, not this device.
+            serverActive = false
+            UserDefaults.standard.set(false, forKey: "pro.server")
+            return
+        }
+        guard var c = URLComponents(string: "\(SupabaseConfig.url)/rest/v1/entitlements") else { return }
         c.queryItems = [.init(name: "select", value: "pro_until"), .init(name: "user_id", value: "eq.\(session.userID)")]
         guard let url = c.url, let token = try? await CloudAuth.accessToken() else { return }
         var req = URLRequest(url: url)
@@ -140,8 +147,9 @@ final class Pro: ObservableObject {
 
     func buy(_ id: String) async {
         message = nil
+        if products.isEmpty { products = ((try? await Product.products(for: Self.productIDs)) ?? []).sorted { $0.price < $1.price } }
         guard let product = products.first(where: { $0.id == id }) else {
-            message = "Subscriptions open once Joshu is on the App Store."
+            message = "The App Store isn't answering right now. Check your connection and try again."
             return
         }
         busy = true
@@ -171,7 +179,7 @@ final class Pro: ObservableObject {
         message = isPro ? "Your Pro subscription is back." : "No Pro subscription found for this Apple ID."
     }
 
-    /// Price shown on a plan button: the App Store's (in your currency), or the list price before launch.
+    /// Price shown on a plan button: the App Store's (in your currency), or the list price until that loads.
     func price(_ id: String) -> String {
         if let p = products.first(where: { $0.id == id }) { return p.displayPrice }
         return id == Self.yearlyID ? "$59.99" : "$7.99"

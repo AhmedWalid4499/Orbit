@@ -341,7 +341,7 @@ final class InboxStore: ObservableObject {
         // Joshu Free connects one email account; more is part of Pro.
         if hint == nil, !Pro.shared.canAddEmail(existing: accounts.count) {
             error = "Joshu Free connects one email account. Get Joshu Pro to add more."
-            AppState.current?.proOpen = true
+            AppState.current?.openPro()
             return
         }
         signingIn = true

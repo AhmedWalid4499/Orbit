@@ -279,7 +279,7 @@ struct SetupFlow: View {
                         Text("Your assistant comes with Joshu Pro").font(Theme.ui(14, weight: .semibold))
                         Text("Everything else in Joshu is free. Upgrade whenever you like and \(aiNameOrDefault) will be ready.")
                             .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
-                        Button("See Joshu Pro") { finish(); DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { AppState.current?.proOpen = true } }
+                        Button("See Joshu Pro") { finish(); DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { AppState.current?.openPro() } }
                             .buttonStyle(.orbitLink).font(Theme.ui(13, weight: .semibold)).padding(.top, 2)
                     }
                 }

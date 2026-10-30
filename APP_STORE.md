@@ -38,7 +38,10 @@ What's left needs your accounts and your OK. In order:
    - Terms (EULA): https://ahmedwalid4499.github.io/Orbit/terms/
    - Support: the site's home page.
 6. **Assets.** Screenshots (I can render them), a description, keywords and an age rating (4+).
-7. **Review notes.** Give a demo Joshu account with Pro (grant it with the same SQL as yours), so the reviewer can try the AI assistant.
+   Before submitting: create a key with Sign in with Apple enabled (Apple Developer › Keys), then set
+   `APPLE_TEAM_ID`, `APPLE_KEY_ID` and `APPLE_PRIVATE_KEY` (the .p8 file's contents) as Supabase secrets.
+   Deleting an account uses them to end Sign in with Apple, as Apple requires.
+7. **Review notes.** Say that Joshu Pro needs a free account, because the assistant runs on the account across devices. Give a demo Joshu account with Pro (grant it with the same SQL as yours), so the reviewer can try the AI assistant.
 
 ## 4. Google sign-in (Gmail) for the public
 Gmail reading and sending are "restricted" Google scopes. Until Google verifies Joshu, only up to 100 test users you

@@ -163,6 +163,16 @@ enum CloudAuth {
         session = nil
     }
 
+    /// Whether this account signs in with Apple, from the sign-in token's own details.
+    static var usesApple: Bool {
+        guard let part = session?.accessToken.split(separator: ".").dropFirst().first else { return false }
+        var text = part.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        text += String(repeating: "=", count: (4 - text.count % 4) % 4)
+        guard let data = Data(base64Encoded: text), let claims = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let meta = claims["app_metadata"] as? [String: Any] else { return false }
+        return (meta["providers"] as? [String] ?? []).contains("apple") || meta["provider"] as? String == "apple"
+    }
+
     static func resetPassword(email: String) async throws {
         _ = try await auth("recover?redirect_to=\(accountPage)", body: ["email": email])
     }
@@ -573,6 +583,12 @@ final class CloudSync: ObservableObject {
     func deleteAccount() async throws {
         guard let url = URL(string: "\(SupabaseConfig.url)/rest/v1/rpc/delete_my_account") else { return }
         guard !Snapshot.isDemo else { return }
+        // Apple asks for Sign in with Apple to be ended too. Apple's sheet asks them to confirm; backing out there
+        // cancels the deletion. Any other failure here doesn't stop it: the account still goes.
+        if CloudAuth.usesApple, AppleSignIn.available, let code = try await AppleSignIn.authorizationCode(),
+           let revoke = URL(string: "\(SupabaseConfig.url)/functions/v1/apple-revoke") {
+            _ = try? await rest(revoke, method: "POST", body: ["code": code])
+        }
         _ = try await rest(url, method: "POST", body: [String: Any]())
         // What's here is kept, and no account owns it now: the next account on this device takes it over instead of
         // clearing it as someone else's.
@@ -677,6 +693,7 @@ final class CloudSync: ObservableObject {
         lastSync = nil
         accountKeyCache = nil
         vaultState = .off
+        if !isTestDevice { Task { await Pro.shared.refresh() } }   // Pro on the account doesn't stay behind
     }
 
     // MARK: Sync
@@ -700,6 +717,7 @@ final class CloudSync: ObservableObject {
                 email = nil
                 status = "Signed out. Sign in again to keep syncing."
                 UserDefaults.standard.set(true, forKey: SignedOutWelcome.key)
+                Task { await Pro.shared.refresh() }
             }
             return false
         }

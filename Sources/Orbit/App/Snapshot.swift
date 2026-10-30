@@ -282,6 +282,70 @@ enum SyncTest {
                 check("New device gets the keys with nothing to type (\(cloud.vaultState))",
                       cloud.vaultState == .on && Keychain.read("orbit-test-secret") == testSecret)
 
+                // Removing a key stays removed, here and on the other device, while a key added elsewhere still arrives.
+                cloud.deviceTag = "-testA"
+                await cloud.sync(context: a)
+                Keychain.write("gone-value", account: "orbit-test-gone")
+                await cloud.sync(context: a)
+                cloud.deviceTag = "-testB"
+                await cloud.sync(context: b)
+                cloud.deviceTag = "-testA"
+                Keychain.delete("orbit-test-gone")
+                await cloud.sync(context: a)
+                await cloud.sync(context: a)
+                check("A removed key doesn't come back", Keychain.read("orbit-test-gone") == nil)
+                cloud.deviceTag = "-testB"
+                Keychain.write("gone-value", account: "orbit-test-gone")   // the two devices share one Keychain here
+                await cloud.sync(context: b)
+                check("A key removed elsewhere is removed here too", Keychain.read("orbit-test-gone") == nil)
+
+                // Clearing a setting reaches the other device, and that device still takes later changes.
+                let realGoodreads = UserDefaults.standard.object(forKey: "goodreadsUser")
+                UserDefaults.standard.set("test-reader", forKey: "goodreadsUser")
+                cloud.deviceTag = "-testA"
+                await cloud.sync(context: a)
+                cloud.deviceTag = "-testB"
+                await cloud.sync(context: b)
+                UserDefaults.standard.removeObject(forKey: "goodreadsUser")
+                await cloud.sync(context: b)
+                var clearedRows: [[String: Any]] = []
+                var clearedReq = URLRequest(url: URL(string: "\(SupabaseConfig.url)/rest/v1/orbit_records?select=data,kind")!)
+                clearedReq.setValue("Bearer tok", forHTTPHeaderField: "Authorization")
+                clearedRows = (try JSONSerialization.jsonObject(with: try await URLSession.shared.data(for: clearedReq).0) as? [[String: Any]]) ?? []
+                let clearedRow = clearedRows.compactMap { $0["data"] as? [String: Any] }.first { $0["key"] as? String == "goodreadsUser" }
+                check("A cleared setting reaches the account", clearedRow != nil && clearedRow?["value"] is NSNull)
+                cloud.deviceTag = "-testA"
+                UserDefaults.standard.set("test-reader", forKey: "goodreadsUser")   // still set on A: one settings store here
+                await cloud.sync(context: a)
+                check("…and is cleared on the other device", UserDefaults.standard.object(forKey: "goodreadsUser") == nil)
+                UserDefaults.standard.set(realGoodreads, forKey: "goodreadsUser")
+
+                // A server that's down or busy never ends the sign-in; only a refusal does.
+                func refreshAnswers(_ status: Int) async throws {
+                    var r = URLRequest(url: URL(string: "\(SupabaseConfig.url)/test/refresh")!)
+                    r.httpMethod = "POST"
+                    r.httpBody = try JSONSerialization.data(withJSONObject: ["status": status])
+                    _ = try await URLSession.shared.data(for: r)
+                }
+                let goodSession = CloudAuth.session
+                var expired = goodSession
+                expired?.expiresAt = .distantPast
+                CloudAuth.session = expired
+                try await refreshAnswers(503)
+                _ = try? await CloudAuth.accessToken()
+                check("A server outage keeps you signed in", CloudAuth.session != nil)
+                try await refreshAnswers(429)
+                _ = try? await CloudAuth.accessToken()
+                check("A busy server keeps you signed in", CloudAuth.session != nil)
+                try await refreshAnswers(200)
+                _ = try? await CloudAuth.accessToken()
+                check("A Wi-Fi login page keeps you signed in", CloudAuth.session != nil)
+                try await refreshAnswers(400)
+                _ = try? await CloudAuth.accessToken()
+                check("A refused sign-in ends it", CloudAuth.session == nil)
+                try await refreshAnswers(0)
+                CloudAuth.session = goodSession
+
                 // Signing out removes this device's copy, but only after a last sync, and deletes nothing from the account.
                 func serverRows(_ token: String) async throws -> [[String: Any]] {
                     var r = URLRequest(url: URL(string: "\(SupabaseConfig.url)/rest/v1/orbit_records?select=data,kind,deleted")!)
@@ -312,6 +376,17 @@ enum SyncTest {
                       otherTasks == 0 && count(TaskItem.self, a) == 0)
                 let deletedAfterSwitch = try await deletions("tok")
                 check("The first account loses nothing (\(deletedAfterSwitch - deletedBefore) new deletions)", deletedAfterSwitch == deletedBefore)
+
+                // Deleting an account keeps what's on this device, and the next account takes it over instead of clearing it.
+                let keptTask = TaskItem(title: "Kept after deleting the account")
+                a.insert(keptTask)
+                try a.save()
+                await cloud.sync(context: a)
+                try await cloud.deleteAccount()
+                check("Deleting the account keeps this device's copy", count(TaskItem.self, a) == 1)
+                try await cloud.signIn(email: "other@example.com", password: "secret2", context: a)
+                let carried = try await serverRows("tok2").filter { $0["kind"] as? String == "task" && !J.bool($0["deleted"]) }.count
+                check("The next account keeps it (\(count(TaskItem.self, a)) here, \(carried) uploaded)", count(TaskItem.self, a) == 1 && carried == 1)
             } catch {
                 results.append("FAIL  \(error.localizedDescription)")
             }
@@ -325,6 +400,7 @@ enum SyncTest {
             for tag in ["-testA", "-testB", "-testC"] { UserDefaults.standard.removeObject(forKey: "sync.owner" + tag) }
             cloud.deviceTag = ""
             Keychain.delete("orbit-test-secret")
+            Keychain.delete("orbit-test-gone")
             if let realPassphrase { Keychain.write(realPassphrase, account: "sync-passphrase") } else { Keychain.delete("sync-passphrase") }
             if let realSession { Keychain.write(realSession, account: "supabase-session") }
             cloud.syncSecrets = realKeySync

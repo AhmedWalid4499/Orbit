@@ -448,7 +448,9 @@ struct AccountSettings: View {
                             Button("Sign Out and Remove from This Device", role: .destructive) { signOut(keep: false) }
                             Button("Sign Out and Keep a Copy Here") { signOut(keep: true) }
                         } message: {
-                            Text("Everything is saved to your account first, then removed from this device, with your chats and connected accounts like Gmail. Sign in again and it all comes back. Keep a copy only on a device that's just yours.")
+                            Text(cloud.syncSecrets
+                                 ? "Everything is saved to your account first, then removed from this device, with your chats and connected accounts like Gmail. Sign in again and it all comes back. Keep a copy only on a device that's just yours."
+                                 : "Everything is saved to your account first, then removed from this device. Key sync is off, so your API keys and connected accounts like Gmail aren't saved: you'd need to add them again. Keep a copy only on a device that's just yours.")
                         }
                     Button("Delete Account…", role: .destructive) { confirmDelete = true }
                         .confirmationDialog("Delete your Joshu account?", isPresented: $confirmDelete, titleVisibility: .visible) {

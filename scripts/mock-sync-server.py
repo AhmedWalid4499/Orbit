@@ -8,6 +8,7 @@ TOKENS = {"tok": USER, "tok2": USER2}
 rows = {}
 lock = threading.Lock()
 calls = []
+refresh_answer = [0]   # set by /test/refresh: how the next token refreshes are answered (0: normally)
 def now(): return datetime.datetime.now(datetime.timezone.utc).isoformat()
 class H(http.server.BaseHTTPRequestHandler):
     def _send(self, code, obj=None):
@@ -16,7 +17,16 @@ class H(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         u = urllib.parse.urlparse(self.path); n = int(self.headers.get("Content-Length", 0)); data = json.loads(self.rfile.read(n) or b"null")
         calls.append(("POST", u.path, u.query, self.headers.get("Prefer")))
+        if u.path == "/test/refresh":
+            refresh_answer[0] = data["status"]; return self._send(200)
+        if u.path.startswith("/rest/v1/rpc/delete_my_account"):
+            who = TOKENS.get((self.headers.get("Authorization") or "")[7:]); assert who, "missing user token"
+            with lock:
+                for k in [k for k in rows if k[0] == who]: del rows[k]
+            return self._send(204)
         if u.path.startswith("/auth/v1/token"):
+            if "refresh_token" in u.query and refresh_answer[0]:
+                return self._send(refresh_answer[0], {} if refresh_answer[0] == 200 else {"msg": "refused"})
             other = isinstance(data, dict) and data.get("email") == "other@example.com"
             return self._send(200, {"access_token": "tok2" if other else "tok", "refresh_token": "ref", "expires_in": 3600,
                                     "user": {"id": USER2 if other else USER, "email": "other@example.com" if other else "test@example.com"}})

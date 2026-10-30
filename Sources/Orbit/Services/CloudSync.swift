@@ -22,7 +22,9 @@ enum SupabaseConfig {
 
 struct CloudError: LocalizedError {
     let message: String
-    init(_ m: String) { message = m }
+    /// The server's HTTP status, when it answered with an error.
+    var status: Int?
+    init(_ m: String, status: Int? = nil) { message = m; self.status = status }
     var errorDescription: String? { message }
 }
 
@@ -172,13 +174,14 @@ enum CloudAuth {
         let json: [String: Any]
         do {
             json = try await auth("token?grant_type=refresh_token", body: ["refresh_token": s.refreshToken])
-        } catch let e as CloudError {
+        } catch let e as CloudError where e.status.map({ (400..<500).contains($0) && $0 != 408 && $0 != 429 }) ?? false {
             // The server turned the sign-in down (signed out elsewhere, or it ran out): sign in again.
-            // Network trouble is a URLError, so it doesn't end up here and the sign-in is kept for next time.
+            // Network trouble, a busy or broken server, keep the sign-in for next time.
             session = nil
             throw CloudError("You were signed out of Joshu on this device (\(e.message)). Sign in again to keep syncing.")
         }
-        guard let fresh = parseSession(json) else { session = nil; throw CloudError("Your Joshu sign-in expired. Sign in again in Settings › Account.") }
+        // An answer that isn't a sign-in (a Wi-Fi login page, say) says nothing about this one: try again next time.
+        guard let fresh = parseSession(json) else { throw CloudError("Couldn't reach your Joshu account. Trying again soon.") }
         s = fresh
         session = s
         return s.accessToken
@@ -196,7 +199,7 @@ enum CloudAuth {
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(status) else {
             let msg = json["msg"] as? String ?? json["error_description"] as? String ?? json["message"] as? String ?? "Error \(status)"
-            throw CloudError(msg)
+            throw CloudError(msg, status: status)
         }
         return json
     }
@@ -516,6 +519,7 @@ final class CloudSync: ObservableObject {
         var cursorID: String?                        // …and that row's id: rows can share a timestamp
         var known: [String: Known] = [:]             // id → what was last synced
         var vaultMac: String?                        // fingerprint of the key vault when last synced
+        var vaultKnown: [String]?                    // names in the key vault when last synced, to tell removed from new
         var settingTimes: [String: Date]?            // setting key → when this device changed it (not yet synced)
         struct Known: Codable { var kind: String; var hash: String }
     }
@@ -568,7 +572,12 @@ final class CloudSync: ObservableObject {
     /// Deletes the Joshu account and everything synced for it (data on this device stays), then signs out.
     func deleteAccount() async throws {
         guard let url = URL(string: "\(SupabaseConfig.url)/rest/v1/rpc/delete_my_account") else { return }
+        guard !Snapshot.isDemo else { return }
         _ = try await rest(url, method: "POST", body: [String: Any]())
+        // What's here is kept, and no account owns it now: the next account on this device takes it over instead of
+        // clearing it as someone else's.
+        for f in syncRecords { try? FileManager.default.removeItem(at: f) }
+        UserDefaults.standard.removeObject(forKey: ownerKey)
         signOut()
     }
 
@@ -590,9 +599,11 @@ final class CloudSync: ObservableObject {
     /// then is this device's copy removed (data, chats, the AI's notes and connected accounts). It all comes back
     /// when you sign in again. If the last sync fails, nothing is removed and you stay signed in.
     func signOut(context: ModelContext, keepOnDevice: Bool) async throws {
+        while syncing { try? await Task.sleep(for: .milliseconds(200)) }
+        // Also when keeping a copy: it's replaced if another account signs in here, so the account needs the latest.
+        let saved = await sync(context: context)
         if !keepOnDevice {
-            while syncing { try? await Task.sleep(for: .milliseconds(200)) }
-            guard await sync(context: context) else {
+            guard saved else {
                 throw CloudError("Your latest changes couldn't be saved to your account, so nothing was removed and you're still signed in. Check your connection and try again.")
             }
             if case .error = vaultState {
@@ -632,7 +643,7 @@ final class CloudSync: ObservableObject {
 
     /// Right after signing in: if this device holds another account's data, it's cleared before anything syncs.
     private func adoptDevice(context: ModelContext) {
-        guard let uid = CloudAuth.session?.userID else { return }
+        guard let uid = CloudAuth.session?.userID, !Snapshot.isDemo else { return }
         if let owner = deviceOwner, owner.lowercased() != uid.lowercased() { clearDevice(context: context) }
         UserDefaults.standard.set(uid, forKey: ownerKey)
     }
@@ -671,6 +682,8 @@ final class CloudSync: ObservableObject {
     // MARK: Sync
 
     func syncIfSignedIn(context: ModelContext) async {
+        // Opened while the iPhone was locked, the sign-in couldn't be read: pick it up now.
+        if email == nil, let session = CloudAuth.session { email = session.email; loadState() }
         guard isSignedIn, !Snapshot.isActive else { return }
         await sync(context: context)
     }
@@ -678,7 +691,8 @@ final class CloudSync: ObservableObject {
     /// Returns whether everything was synced.
     @discardableResult
     func sync(context: ModelContext) async -> Bool {
-        guard !syncing else { return false }
+        // Sample data must never meet the real account: it would look like everything had been deleted.
+        guard !syncing, !Snapshot.isDemo, Keychain.isAvailable else { return false }
         guard let session = CloudAuth.session else {
             // Signed in here, but the sign-in has ended (see accessToken): say so and offer to sign in again, rather
             // than looking signed in while nothing syncs. Everything on this device stays.
@@ -770,7 +784,7 @@ final class CloudSync: ObservableObject {
     /// device later wins over it (and an earlier one doesn't).
     private func noteSettingChanges() {
         var times = state.settingTimes ?? [:]
-        for key in syncedSettings where times[key] == nil && UserDefaults.standard.object(forKey: key) != nil {
+        for key in syncedSettings where times[key] == nil && (UserDefaults.standard.object(forKey: key) != nil || state.known[settingID(key)] != nil) {
             if state.known[settingID(key)]?.hash != fingerprint(settingValue(key)) { times[key] = .now }
         }
         state.settingTimes = times
@@ -877,7 +891,8 @@ final class CloudSync: ObservableObject {
             present.insert(id)
             let d = settingValue(key)
             let h = fingerprint(d)
-            if state.known[id]?.hash != h, UserDefaults.standard.object(forKey: key) != nil {
+            // A setting cleared here goes up as an empty value; one that was never synced has nothing to clear.
+            if state.known[id]?.hash != h, UserDefaults.standard.object(forKey: key) != nil || state.known[id] != nil {
                 // With when it changed here, so another device that also changed it can tell which is newer.
                 var data = d
                 data["at"] = J.date(state.settingTimes?[key] ?? .now)
@@ -1007,7 +1022,12 @@ final class CloudSync: ObservableObject {
     }
 
     private func applyPayload(_ p: [String: Any]) {
-        Keychain.merge(p["secrets"] as? [String: String] ?? [:])
+        let secrets = p["secrets"] as? [String: String] ?? [:]
+        Keychain.merge(secrets)
+        // Removed on another device. Joshu's own Google setup stays, and the sync test only touches its own test keys.
+        for k in Keychain.syncable().keys where secrets[k] == nil && k != "google-client-secret" && (!isTestDevice || k.hasPrefix("orbit-test")) {
+            Keychain.delete(k)
+        }
         let config = p["config"] as? [String: Any] ?? [:]
         for k in ["googleClientID", "githubUser"] { if let v = config[k] as? String, !v.isEmpty { UserDefaults.standard.set(v, forKey: k) } }
         if let a = config["gmailAccounts"] as? [String] { UserDefaults.standard.set(a, forKey: "gmailAccounts") }
@@ -1016,15 +1036,29 @@ final class CloudSync: ObservableObject {
         AIAssistant.shared.reloadKey()
     }
 
-    /// Union of both sides; where both have a value, `preferLocal` decides.
+    /// The names in a vault: its keys, and its Gmail accounts.
+    private func vaultNames(_ p: [String: Any]) -> Set<String> {
+        let accounts = (p["config"] as? [String: Any])?["gmailAccounts"] as? [String] ?? []
+        return Set((p["secrets"] as? [String: String] ?? [:]).keys).union(accounts.map { "account:" + $0 })
+    }
+
+    /// Both sides together; where both have a value, `preferLocal` decides. Something only one side has is new if it
+    /// wasn't there at the last sync, and removed by the other side if it was. A device that has lost all its keys
+    /// hasn't removed them, so it takes everything back.
     private func mergePayloads(remote: [String: Any], local: [String: Any], preferLocal: Bool) -> [String: Any] {
-        var secrets = remote["secrets"] as? [String: String] ?? [:]
-        for (k, v) in local["secrets"] as? [String: String] ?? [:] where preferLocal || secrets[k] == nil { secrets[k] = v }
+        let localSecrets = local["secrets"] as? [String: String] ?? [:], remoteSecrets = remote["secrets"] as? [String: String] ?? [:]
+        let known = localSecrets.isEmpty ? [] : Set(state.vaultKnown ?? [])
+        var secrets: [String: String] = [:]
+        for k in Set(localSecrets.keys).union(remoteSecrets.keys) {
+            if let l = localSecrets[k], let r = remoteSecrets[k] { secrets[k] = preferLocal ? l : r }
+            else if !known.contains(k) { secrets[k] = localSecrets[k] ?? remoteSecrets[k] }
+        }
         var config = remote["config"] as? [String: Any] ?? [:]
         let localConfig = local["config"] as? [String: Any] ?? [:]
         for (k, v) in localConfig where k != "gmailAccounts" && (preferLocal || config[k] == nil) { config[k] = v }
-        let accounts = Set((config["gmailAccounts"] as? [String] ?? []) + (localConfig["gmailAccounts"] as? [String] ?? []))
-        if !accounts.isEmpty { config["gmailAccounts"] = accounts.sorted() }
+        let ours = Set(localConfig["gmailAccounts"] as? [String] ?? []), theirs = Set(config["gmailAccounts"] as? [String] ?? [])
+        let accounts = ours.intersection(theirs).union(ours.symmetricDifference(theirs).filter { !known.contains("account:" + $0) })
+        config["gmailAccounts"] = accounts.isEmpty ? nil : accounts.sorted()
         return ["secrets": secrets, "config": config]
     }
 
@@ -1032,6 +1066,7 @@ final class CloudSync: ObservableObject {
 
     private func syncVault(userID: String) async throws {
         guard syncSecrets else { vaultState = .off; return }
+        guard Keychain.isAvailable else { return }
         var comps = URLComponents(string: "\(SupabaseConfig.url)/rest/v1/orbit_records")!
         comps.queryItems = [.init(name: "id", value: "eq.\(vaultID)"), .init(name: "select", value: "data,deleted")]
         let rows = try await rest(comps.url!, method: "GET") as? [[String: Any]] ?? []
@@ -1069,6 +1104,7 @@ final class CloudSync: ObservableObject {
                 let data = plain(local)
                 try await uploadVault(data, key: k, userID: userID)
                 state.vaultMac = VaultCrypto.mac(data, key: k)
+                state.vaultKnown = vaultNames(local).sorted()
             }
             vaultState = .on
             return
@@ -1076,7 +1112,12 @@ final class CloudSync: ObservableObject {
 
         guard let k = try await accountKey(userID: userID, create: true) else { return }
         let localMac = VaultCrypto.mac(plain(local), key: k)
-        if !converting, localMac == remote?["mac"] as? String { state.vaultMac = localMac; vaultState = .on; return }
+        if !converting, localMac == remote?["mac"] as? String {
+            state.vaultMac = localMac
+            state.vaultKnown = vaultNames(local).sorted()
+            vaultState = .on
+            return
+        }
         let localChanged = converting || (state.vaultMac != nil && state.vaultMac != localMac)
         let merged = mergePayloads(remote: remotePayload, local: local, preferLocal: localChanged)
         applyPayload(merged)
@@ -1084,6 +1125,7 @@ final class CloudSync: ObservableObject {
         if converting || mergedPlain != remotePlain { try await uploadVault(mergedPlain, key: k, userID: userID) }
         if converting { Keychain.delete("sync-passphrase") }
         state.vaultMac = VaultCrypto.mac(mergedPlain, key: k)
+        state.vaultKnown = vaultNames(merged).sorted()
         vaultState = .on
     }
 

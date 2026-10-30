@@ -18,24 +18,28 @@ enum Keychain {
          kSecAttrAccount as String: account]
     }
 
-    private static func rawRead(_ account: String) -> Data? {
+    private static func rawRead(_ account: String) -> (data: Data?, status: OSStatus) {
         var q = query(account)
         q[kSecReturnData as String] = true
         q[kSecMatchLimit as String] = kSecMatchLimitOne
         var out: AnyObject?
-        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess else { return nil }
-        return out as? Data
+        let status = SecItemCopyMatching(q as CFDictionary, &out)
+        return (out as? Data, status)
     }
 
-    private static func vault() -> [String: String] {
+    /// nil when the Keychain can't be read right now (an iPhone that's locked, when the Watch or a Shortcut wakes
+    /// Joshu): that isn't "no secrets", so nothing is cached and nothing may be written over them.
+    private static func vault() -> [String: String]? {
         if let cache { return cache }
-        var dict = rawRead(vaultAccount).flatMap { try? JSONDecoder().decode([String: String].self, from: $0) } ?? [:]
+        let stored = rawRead(vaultAccount)
+        guard stored.status == errSecSuccess || stored.status == errSecItemNotFound else { return nil }
+        var dict = stored.data.flatMap { try? JSONDecoder().decode([String: String].self, from: $0) } ?? [:]
         // One-time move of items saved by older builds (each used to be its own keychain item).
         if !UserDefaults.standard.bool(forKey: "keychainVaultMigrated") {
             let legacy = ["anthropic-api-key", "github-token", "google-client-secret"]
                 + (UserDefaults.standard.stringArray(forKey: "gmailAccounts") ?? []).map { "gmail:\($0)" }
             for account in legacy {
-                if dict[account] == nil, let data = rawRead(account), let value = String(data: data, encoding: .utf8), !value.isEmpty {
+                if dict[account] == nil, let data = rawRead(account).data, let value = String(data: data, encoding: .utf8), !value.isEmpty {
                     dict[account] = value
                 }
                 SecItemDelete(query(account) as CFDictionary)
@@ -48,22 +52,37 @@ enum Keychain {
     }
 
     private static func persist(_ dict: [String: String]) {
+        let data = (try? JSONEncoder().encode(dict)) ?? Data()
+        #if os(iOS)
+        // Readable after the first unlock, so the Watch and Shortcuts can use Joshu while the phone is locked.
+        // Updated in place: deleting first would lose everything if adding it again failed.
+        let fields: [String: Any] = [kSecValueData as String: data, kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock]
+        guard SecItemUpdate(query(vaultAccount) as CFDictionary, fields as CFDictionary) == errSecItemNotFound else { return }
+        var q = query(vaultAccount).merging(fields) { _, new in new }
+        #else
         SecItemDelete(query(vaultAccount) as CFDictionary)
         var q = query(vaultAccount)
-        q[kSecValueData as String] = (try? JSONEncoder().encode(dict)) ?? Data()
+        q[kSecValueData as String] = data
+        #endif
         q[kSecAttrLabel as String] = "Joshu secrets"
         SecItemAdd(q as CFDictionary, nil)
     }
 
+    /// Whether secrets can be read at the moment (see `vault`).
+    static var isAvailable: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return vault() != nil
+    }
+
     static func read(_ account: String) -> String? {
         lock.lock(); defer { lock.unlock() }
-        return vault()[account]
+        return vault()?[account]
     }
 
     @discardableResult
     static func write(_ value: String, account: String) -> Bool {
         lock.lock(); defer { lock.unlock() }
-        var dict = vault()
+        guard var dict = vault() else { return false }
         dict[account] = value
         cache = dict
         persist(dict)
@@ -72,7 +91,7 @@ enum Keychain {
 
     static func delete(_ account: String) {
         lock.lock(); defer { lock.unlock() }
-        var dict = vault()
+        guard var dict = vault() else { return }
         dict[account] = nil
         cache = dict
         persist(dict)
@@ -84,12 +103,12 @@ enum Keychain {
     /// Everything that can follow you to other devices (end-to-end encrypted by CloudSync).
     static func syncable() -> [String: String] {
         lock.lock(); defer { lock.unlock() }
-        return vault().filter { !deviceOnly.contains($0.key) }
+        return (vault() ?? [:]).filter { !deviceOnly.contains($0.key) }
     }
 
     static func merge(_ items: [String: String]) {
         lock.lock(); defer { lock.unlock() }
-        var dict = vault()
+        guard var dict = vault() else { return }
         for (k, v) in items where !deviceOnly.contains(k) && !v.isEmpty { dict[k] = v }
         cache = dict
         persist(dict)

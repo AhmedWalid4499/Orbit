@@ -665,6 +665,7 @@ final class CloudSync: ObservableObject {
     }
 
     private static let folder = URL.applicationSupportDirectory.appending(path: "Orbit", directoryHint: .isDirectory)
+    private static let errorFile = folder.appending(path: "sync-error.txt")
 
     /// Removes this device's copy of the account. It also forgets what was synced (the sync-*.json records), so the
     /// next sign-in downloads everything fresh and can never mistake the empty device for deletions.
@@ -726,18 +727,23 @@ final class CloudSync: ObservableObject {
         }
         syncing = true
         defer { syncing = false }
+        var step = "preparing"
         do {
             assignMissingIDs(context: context)
+            mergeChatCopies(context: context)
             AssistantStore.shared.shareChats(context: context)
             // One time on every device: fetch everything again, so changes earlier pages skipped (see `after`) arrive
             // now, removals included.
             let catchUpKey = "sync.catchUp147"
             if !UserDefaults.standard.bool(forKey: catchUpKey) && !isTestDevice { state.cursor = ""; state.cursorID = nil }
             noteSettingChanges()
+            step = "download"
             let pulled = try await pull(context: context)
             lastPulled = pulled
             if pulled > 0 { AssistantStore.shared.adoptSharedChats(context: context) }
+            step = "upload"
             let pushed = try await push(context: context, userID: session.userID)
+            step = "keys"
             do { try await syncVault(userID: session.userID) } catch { vaultState = .error(error.localizedDescription) }
             try? context.save()
             saveState()
@@ -746,11 +752,30 @@ final class CloudSync: ObservableObject {
             if !isTestDevice { UserDefaults.standard.set(true, forKey: catchUpKey) }   // the sync test shares this Mac's settings
             status = pulled + pushed == 0 ? "Up to date" : "Synced \(pulled) down, \(pushed) up"
             if UserDefaults.standard.string(forKey: ownerKey) == nil { UserDefaults.standard.set(session.userID, forKey: ownerKey) }
+            try? FileManager.default.removeItem(at: Self.errorFile)
             return true
         } catch {
             status = error.localizedDescription
+            // Kept so a device whose sync keeps failing can say why.
+            try? "\(Date.now.ISO8601Format()) \(step): \(error)".write(to: Self.errorFile, atomically: true, encoding: .utf8)
+            // Keys and connections don't depend on the rest: they still arrive when data can't get through.
+            do { try await syncVault(userID: session.userID) } catch { vaultState = .error(error.localizedDescription) }
             return false
         }
+    }
+
+    /// Chats were once filed here under upper-case ids while the server hands ids back in lower case, so a chat came
+    /// back as a second copy, and sending the two together made the server refuse the whole upload. The newest copy
+    /// stays, under the server's spelling.
+    private func mergeChatCopies(context: ModelContext) {
+        let threads = (try? context.fetch(FetchDescriptor<ChatThread>())) ?? []
+        for (id, copies) in Dictionary(grouping: threads, by: { $0.uuid.lowercased() }) where copies.count > 1 || copies[0].uuid != id {
+            let newestFirst = copies.sorted { $0.updatedAt > $1.updatedAt }
+            for extra in newestFirst.dropFirst() { context.delete(extra) }
+            newestFirst[0].uuid = id
+        }
+        for id in state.known.keys where id != id.lowercased() { state.known[id] = nil }
+        try? context.save()
     }
 
     /// Items made before sync existed get their permanent id now.
@@ -901,8 +926,8 @@ final class CloudSync: ObservableObject {
         for k in syncKinds {
             for m in k.fetch(context) {
                 let id = k.uuid(m)
-                guard !id.isEmpty else { continue }
-                present.insert(id)
+                // One row per id: the server refuses a whole upload that has an id twice.
+                guard !id.isEmpty, present.insert(id).inserted else { continue }
                 let d = k.encode(m)
                 let h = fingerprint(d)
                 if state.known[id]?.hash != h {

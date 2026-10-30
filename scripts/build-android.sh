@@ -59,6 +59,10 @@ npx vite build
 npx cap sync android
 cd native
 echo "sdk.dir=$ANDROID_HOME" > local.properties
+# The Desktop's iCloud sync leaves "classes 2.jar"-style copies in Gradle's output, which fail the build as duplicate
+# classes. All of it is generated, so it starts clean.
+rm -rf "$ROOT"/android/node_modules/@capacitor/*/android/build "$ROOT"/android/node_modules/@capacitor/android/capacitor/build \
+  "$ROOT"/android/native/app/build "$ROOT"/android/native/build
 ./gradlew --quiet assembleRelease -PorbitVersionName="$VERSION" -PorbitVersionCode="$CODE" \
   -PorbitKeystore="$KEYSTORE" -PorbitKeystorePassword="$PASS"
 mkdir -p "$ROOT/build"

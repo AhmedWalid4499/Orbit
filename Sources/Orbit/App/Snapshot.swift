@@ -251,6 +251,20 @@ enum SyncTest {
                 check("Edit reaches Mac A", tasksA.contains { $0.title == "Edited on Mac B" })
                 check("Deletion reaches Mac A", !(try a.fetch(FetchDescriptor<Book>())).contains { $0.title == deletedTitle })
 
+                // The same chat under upper- and lower-case ids: one row reaches the server (it refuses two), the newest.
+                let chatID = UUID().uuidString
+                let oldCopy = ChatThread(uuid: chatID.lowercased()), newCopy = ChatThread(uuid: chatID)
+                oldCopy.title = "Older copy"; oldCopy.updatedAt = .now.addingTimeInterval(-60)
+                newCopy.title = "Newer copy"
+                a.insert(oldCopy); a.insert(newCopy)
+                try a.save()
+                let chatSynced = await cloud.sync(context: a)
+                let chatsHere = try a.fetch(FetchDescriptor<ChatThread>()).filter { $0.uuid.lowercased() == chatID.lowercased() }
+                check("Two copies of a chat don't stop the upload (\(cloud.status ?? "-"))", chatSynced)
+                check("One copy of the chat stays, the newest", chatsHere.count == 1 && chatsHere.first?.title == "Newer copy" && chatsHere.first?.uuid == chatID.lowercased())
+                await cloud.sync(context: a)
+                check("…and it stays one after another sync", try a.fetch(FetchDescriptor<ChatThread>()).filter { $0.uuid.lowercased() == chatID.lowercased() }.count == 1)
+
                 // Deleted on one device while edited on the other: the edit wins and comes back everywhere.
                 let editedA = try a.fetch(FetchDescriptor<TaskItem>()).first { $0.title != "Edited on Mac B" }!
                 let contested = editedA.uuid

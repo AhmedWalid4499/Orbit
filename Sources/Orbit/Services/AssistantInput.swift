@@ -389,7 +389,10 @@ final class Speaker: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
                     // Streamed: it starts talking a moment after the sentence is sent, and the next sentence downloads
                     // while this one plays, so there are no gaps.
                     if await VoiceStream.shared.say(sentence, key: key, still: { self.liveToken == token }) { usedNatural = true }
-                    else { useNatural = false; await sayApple(sentence) }
+                    // Streaming can fail where a finished clip works (the iPhone's audio just came from listening).
+                    else if let clip = try? await NaturalVoice.audio(sentence, key: key) {
+                        if liveToken == token { await NaturalVoice.shared.playClip(clip) }
+                    } else { useNatural = false; await sayApple(sentence) }
                 } else {
                     await sayApple(sentence)
                 }

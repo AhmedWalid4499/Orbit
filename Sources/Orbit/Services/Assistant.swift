@@ -102,8 +102,8 @@ final class AssistantStore: ObservableObject {
         try? FileManager.default.removeItem(at: Self.folder.appending(path: "\(id.uuidString).json"))
         // Gone from your other devices too.
         if let context = OrbitStore.container?.mainContext {
-            let key = id.uuidString
-            for t in (try? context.fetch(FetchDescriptor<ChatThread>(predicate: #Predicate { $0.uuid == key }))) ?? [] { context.delete(t) }
+            let key = id.uuidString.lowercased()
+            for t in (try? context.fetch(FetchDescriptor<ChatThread>())) ?? [] where t.uuid.lowercased() == key { context.delete(t) }
             try? context.save()
         }
         chats.removeAll { $0.id == id }
@@ -280,20 +280,24 @@ final class AssistantStore: ObservableObject {
 
     // MARK: Chats on your other devices
 
+    /// Chat id (lower case, like the server's) → when it was last copied to the synced store. File names are upper case.
     private var shared: [String: Date] {
-        get { (UserDefaults.standard.dictionary(forKey: "chats.shared") as? [String: Double] ?? [:]).mapValues { Date(timeIntervalSince1970: $0) } }
+        get {
+            let saved = UserDefaults.standard.dictionary(forKey: "chats.shared") as? [String: Double] ?? [:]
+            return Dictionary(saved.map { ($0.key.lowercased(), Date(timeIntervalSince1970: $0.value)) }, uniquingKeysWith: max)
+        }
         set { UserDefaults.standard.set(newValue.mapValues(\.timeIntervalSince1970), forKey: "chats.shared") }
     }
 
     /// Copies chats changed on this device into the synced store (before a sync). File contents stay on this device.
     func shareChats(context: ModelContext) {
         guard !Snapshot.isActive else { return }
-        let threads = Dictionary(((try? context.fetch(FetchDescriptor<ChatThread>())) ?? []).map { ($0.uuid, $0) }, uniquingKeysWith: { a, _ in a })
+        let threads = Dictionary(((try? context.fetch(FetchDescriptor<ChatThread>())) ?? []).map { ($0.uuid.lowercased(), $0) }, uniquingKeysWith: { a, _ in a })
         var done = shared
         for c in chats where !busy || c.id != currentID {
-            let key = c.id.uuidString
+            let key = c.id.uuidString.lowercased()
             if let sent = done[key], sent >= c.updated { continue }
-            guard let data = try? Data(contentsOf: Self.folder.appending(path: "\(key).json")),
+            guard let data = try? Data(contentsOf: Self.folder.appending(path: "\(c.id.uuidString).json")),
                   var saved = try? JSONDecoder().decode(Saved.self, from: data) else { continue }
             saved.messages = Self.withoutFiles(saved.messages)
             guard let json = try? JSONEncoder().encode(saved), let payload = String(data: json, encoding: .utf8) else { continue }
@@ -321,19 +325,19 @@ final class AssistantStore: ObservableObject {
             if busy && id == currentID { continue }
             guard let data = t.payload.data(using: .utf8), (try? JSONDecoder().decode(Saved.self, from: data)) != nil else { continue }
             try? FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
-            try? data.write(to: Self.folder.appending(path: "\(t.uuid).json"))
+            try? data.write(to: Self.folder.appending(path: "\(id.uuidString).json"))
             chats.removeAll { $0.id == id }
             chats.append(ChatInfo(id: id, title: t.title, updated: t.updatedAt))
-            done[t.uuid] = t.updatedAt
+            done[t.uuid.lowercased()] = t.updatedAt
             changed = true
             if id == currentID { load() }
         }
         // Shared before but gone from the store now: it was deleted on another device.
-        let present = Set(threads.map(\.uuid))
+        let present = Set(threads.map { $0.uuid.lowercased() })
         for (key, _) in done where !present.contains(key) {
             done[key] = nil
             guard let id = UUID(uuidString: key), id != currentID || !busy else { continue }
-            try? FileManager.default.removeItem(at: Self.folder.appending(path: "\(key).json"))
+            try? FileManager.default.removeItem(at: Self.folder.appending(path: "\(id.uuidString).json"))
             chats.removeAll { $0.id == id }
             changed = true
         }
@@ -367,6 +371,18 @@ final class AssistantStore: ObservableObject {
 
     /// Reads the list of chats and reopens the latest; a chat from before past chats existed becomes the first one.
     private func loadIndex() {
+        #if os(iOS)
+        // Chats from other devices were once saved under lower-case names, which the iPhone (where case matters)
+        // then couldn't open.
+        let files = (try? FileManager.default.contentsOfDirectory(at: Self.folder, includingPropertiesForKeys: nil)) ?? []
+        for f in files where UUID(uuidString: f.deletingPathExtension().lastPathComponent) != nil {
+            let name = f.lastPathComponent.replacingOccurrences(of: ".json", with: "").uppercased() + ".json"
+            guard name != f.lastPathComponent else { continue }
+            let right = Self.folder.appending(path: name)
+            if FileManager.default.fileExists(atPath: right.path) { try? FileManager.default.removeItem(at: f) }
+            else { try? FileManager.default.moveItem(at: f, to: right) }
+        }
+        #endif
         if Snapshot.isDemo {
             chats = [ChatInfo(id: currentID, title: "I'm hungry, anything good near me?", updated: .now),
                      ChatInfo(id: UUID(), title: "Plan my week around my calendar", updated: .now.addingTimeInterval(-86_400)),

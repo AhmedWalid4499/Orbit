@@ -34,11 +34,14 @@ class H(http.server.BaseHTTPRequestHandler):
         if u.path == "/rest/v1/orbit_records":
             who = TOKENS.get((self.headers.get("Authorization") or "")[7:]); assert who, "missing user token"
             assert "on_conflict=user_id,id" in u.query and "merge-duplicates" in (self.headers.get("Prefer") or "")
+            batch = data if isinstance(data, list) else [data]
+            ids = [r["id"].lower() for r in batch]   # ids are uuids on the real server: upper and lower case are one id
+            if len(ids) != len(set(ids)): return self._send(500, {"message": "ON CONFLICT DO UPDATE command cannot affect row a second time"})
             with lock:
                 batch_ts = now()
-                for r in (data if isinstance(data, list) else [data]):
+                for r in batch:
                     assert r["user_id"] == who, "row for another account"
-                    r = dict(r); r["updated_at"] = batch_ts
+                    r = dict(r); r["updated_at"] = batch_ts; r["id"] = r["id"].lower()
                     rows[(r["user_id"], r["id"])] = r
             return self._send(201)
         self._send(404, {"message": "not found"})

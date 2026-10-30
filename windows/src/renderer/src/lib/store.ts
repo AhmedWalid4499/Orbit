@@ -24,6 +24,10 @@ export type SettingKey = (typeof SYNCED_SETTINGS)[number]
 
 interface Cache {
   cursor: string
+  /** The last row pulled: rows can share a timestamp, so the cursor needs both (see `pull`). */
+  cursorID?: string
+  /** Has fetched everything once since rows sharing a timestamp stopped being skipped. */
+  caughtUp?: boolean
   records: Record<string, Rec>
   pending: Record<string, Rec>
   /** Local mode only: the account a kept copy came from. Its edits go back only into that account. */
@@ -38,6 +42,8 @@ class Store {
   private records = new Map<string, Rec>()
   private pending = new Map<string, Rec>()
   private cursor = ''
+  private cursorID: string | undefined
+  private caughtUp = false
   private userID = ''
   private version = 0
   private subs = new Set<() => void>()
@@ -99,6 +105,7 @@ class Store {
     this.pending = new Map(Object.entries(c?.pending ?? {}))
     this.localOwner = c?.owner
     this.cursor = ''
+    this.cursorID = undefined
     this.userID = ''
     this.local = true
     this.status = 'On this device only'
@@ -161,6 +168,8 @@ class Store {
     this.records.clear()
     this.pending.clear()
     this.cursor = ''
+    this.cursorID = undefined
+    this.caughtUp = false
     this.userID = ''
     this.emit()
   }
@@ -171,7 +180,10 @@ class Store {
     try {
       const c: Cache = JSON.parse(localStorage.getItem(`orbit.cache.${this.userID}`) ?? 'null')
       if (!c) return
-      this.cursor = c.cursor
+      // One time on every device: fetch everything again, so rows earlier pages skipped arrive now, deletions included.
+      this.caughtUp = !!c.caughtUp
+      this.cursor = c.caughtUp ? c.cursor : ''
+      this.cursorID = c.caughtUp ? c.cursorID : undefined
       this.records = new Map(Object.entries(c.records))
       this.pending = new Map(Object.entries(c.pending))
     } catch { /* start fresh */ }
@@ -182,7 +194,7 @@ class Store {
     this.saveTimer = setTimeout(() => {
       if (this.local) { this.writeLocal(); return }
       if (!this.userID) return
-      const c: Cache = { cursor: this.cursor, records: Object.fromEntries(this.records), pending: Object.fromEntries(this.pending) }
+      const c: Cache = { cursor: this.cursor, cursorID: this.cursorID, caughtUp: this.caughtUp, records: Object.fromEntries(this.records), pending: Object.fromEntries(this.pending) }
       localStorage.setItem(`orbit.cache.${this.userID}`, JSON.stringify(c))
     }, 300)
   }
@@ -284,17 +296,21 @@ class Store {
     let applied = 0
     for (;;) {
       const q = new URLSearchParams({ select: 'id,kind,data,deleted,updated_at', order: 'updated_at.asc,id.asc', limit: '1000' })
-      if (this.cursor) q.set('updated_at', `gt.${this.cursor}`)
+      // Rows uploaded together share a timestamp, so "newer than the last one" alone would skip the rest of a group
+      // when a page ends inside it: the row's id breaks the tie (same as the Mac's CloudSync.after).
+      if (this.cursor && this.cursorID) q.set('or', `(updated_at.gt."${this.cursor}",and(updated_at.eq."${this.cursor}",id.gt."${this.cursorID}"))`)
+      else if (this.cursor) q.set('updated_at', `gte.${this.cursor}`) // from before ids were kept
       const rows: Rec[] = (await rest(`orbit_records?${q.toString()}`)) ?? []
       for (const row of rows) {
-        if (row.updated_at) this.cursor = row.updated_at
+        if (row.updated_at) { this.cursor = row.updated_at; this.cursorID = row.id }
         if (row.kind === 'vault') continue // encrypted keys: not used here yet
         if (this.pending.has(row.id)) continue // edited here and not sent yet: ours wins
         this.records.set(row.id, { id: row.id, kind: row.kind, data: row.data ?? {}, deleted: !!row.deleted, updated_at: row.updated_at })
         applied++
       }
-      if (rows.length < 1000) break
+      if (!rows.length) break // not "fewer than asked for": a server may send smaller pages
     }
+    this.caughtUp = true
     return applied
   }
 

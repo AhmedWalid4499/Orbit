@@ -73,7 +73,8 @@ export async function resetPassword(email: string): Promise<void> { await auth('
 export function signOut(): void {
   const s = getSession()
   if (s) {
-    fetch(`${config.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: config.key, Authorization: `Bearer ${s.accessToken}` } }).catch(() => {})
+    // scope=local: only this device. The default ends the account's sessions everywhere, signing your other devices out.
+    fetch(`${config.url}/auth/v1/logout?scope=local`, { method: 'POST', headers: { apikey: config.key, Authorization: `Bearer ${s.accessToken}` } }).catch(() => {})
   }
   setSession(null)
 }

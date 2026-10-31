@@ -18,7 +18,8 @@ if [[ -z "$TOKEN" ]]; then
   echo "  security add-generic-password -s orbit-github-release -a AhmedWalid4499 -w"
   exit 1
 fi
-api() { curl -fsS -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" "$@"; }
+# Retries, so one dropped connection can't leave a release half uploaded.
+api() { curl -fsS --retry 4 --retry-all-errors --retry-delay 5 -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" "$@"; }
 
 if curl -fsS -o /dev/null "https://api.github.com/repos/$REPO/releases/tags/$TAG" 2>/dev/null; then
   echo "$TAG is already published. Pick a higher version."; exit 1

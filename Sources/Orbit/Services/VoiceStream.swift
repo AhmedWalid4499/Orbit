@@ -14,6 +14,8 @@ final class VoiceStream {
     private var queued = 0
     private var started = false
     private var drained: CheckedContinuation<Void, Never>?
+    /// Why the last `say` failed.
+    private(set) var problem: String?
 
     private init() {
         engine.attach(player)
@@ -23,6 +25,7 @@ final class VoiceStream {
     /// Streams `text` and queues its audio as it arrives; returns once it's all downloaded (it keeps playing).
     /// False if OpenAI couldn't be reached, so the caller can use the Apple voice instead.
     func say(_ text: String, key: String, still: () -> Bool) async -> Bool {
+        problem = nil
         guard startEngine() else { return false }
         var req = URLRequest(url: URL(string: "https://api.openai.com/v1/audio/speech")!)
         req.httpMethod = "POST"
@@ -34,12 +37,20 @@ final class VoiceStream {
             "instructions": "Speak like a warm, relaxed friend having a real conversation: natural pace, light expression, small pauses, never like an announcer.",
         ])
         // Downloaded off the main thread, in ~0.1 s pieces (small enough to start quickly, big enough to play smoothly).
-        enum Piece { case audio(Data), failed }
+        enum Piece { case audio(Data), failed(String) }
         let request = req
         let pieces = AsyncStream<Piece> { cont in
             let job = Task.detached {
-                guard let (bytes, response) = try? await URLSession.shared.bytes(for: request),
-                      (response as? HTTPURLResponse)?.statusCode == 200 else { cont.yield(.failed); cont.finish(); return }
+                let bytes: URLSession.AsyncBytes, status: Int
+                do {
+                    let (body, response) = try await URLSession.shared.bytes(for: request)
+                    (bytes, status) = (body, (response as? HTTPURLResponse)?.statusCode ?? 0)
+                } catch { cont.yield(.failed(error.localizedDescription)); cont.finish(); return }
+                guard status == 200 else {
+                    var refusal = Data()
+                    do { for try await byte in bytes { refusal.append(byte) } } catch {}
+                    cont.yield(.failed(NaturalVoice.refusal(status, refusal))); cont.finish(); return
+                }
                 var pending = Data()
                 pending.reserveCapacity(9600)
                 do {
@@ -58,7 +69,7 @@ final class VoiceStream {
         for await piece in pieces {
             guard still() else { return true }
             switch piece {
-            case .failed: return gotAudio
+            case .failed(let why): problem = why; return gotAudio
             case .audio(let d): schedule(d); gotAudio = true
             }
         }
@@ -86,7 +97,7 @@ final class VoiceStream {
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
         try? AVAudioSession.sharedInstance().setActive(true)
         #endif
-        do { try engine.start() } catch { return false }
+        do { try engine.start() } catch { problem = "The audio couldn't start: \(error.localizedDescription)"; return false }
         player.play()
         started = true
         return true

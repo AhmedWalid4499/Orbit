@@ -576,6 +576,7 @@ struct VoiceSection: View {
                 if speaker.speaking { speaker.stop() }
                 else { speaker.speak("Hey! I had a look at your day. You've got two things this afternoon, so maybe grab lunch early? Let me know if you want me to move anything.") }
             }
+            if hasOpenAI && natural, let problem = speaker.voiceProblem { Text(problem).font(.caption).foregroundStyle(Theme.orange) }
         } header: {
             Text("Voice")
         } footer: {

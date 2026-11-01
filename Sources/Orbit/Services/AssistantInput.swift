@@ -210,6 +210,8 @@ final class Speaker: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
     static let shared = Speaker()
 
     @Published private(set) var speaking = false
+    /// Why the natural voice last gave way to the Apple one, for Settings › AI › Voice.
+    @Published private(set) var voiceProblem: String?
     private let synth = AVSpeechSynthesizer()
     private var onDone: (() -> Void)?
 
@@ -219,6 +221,19 @@ final class Speaker: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
     }
 
     private var pending = 0
+
+    private static let voiceErrorFile = URL.applicationSupportDirectory.appending(path: "Orbit/voice-error.txt")
+
+    /// Also kept in a file, so a device that falls back to the Apple voice can say why.
+    func noteVoice(_ problem: String?) {
+        guard problem != voiceProblem else { return }
+        voiceProblem = problem
+        if let problem {
+            try? "\(Date.now.ISO8601Format()) \(problem)".write(to: Self.voiceErrorFile, atomically: true, encoding: .utf8)
+        } else {
+            try? FileManager.default.removeItem(at: Self.voiceErrorFile)
+        }
+    }
 
     /// Set for speech you didn't ask for (the welcome): on iPhone it stays silent when the ring/silent switch is on silent.
     private(set) var quiet = false
@@ -388,11 +403,19 @@ final class Speaker: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
                 if useNatural && !key.isEmpty {
                     // Streamed: it starts talking a moment after the sentence is sent, and the next sentence downloads
                     // while this one plays, so there are no gaps.
-                    if await VoiceStream.shared.say(sentence, key: key, still: { self.liveToken == token }) { usedNatural = true }
+                    if await VoiceStream.shared.say(sentence, key: key, still: { self.liveToken == token }) { usedNatural = true; noteVoice(nil) }
                     // Streaming can fail where a finished clip works (the iPhone's audio just came from listening).
-                    else if let clip = try? await NaturalVoice.audio(sentence, key: key) {
-                        if liveToken == token { await NaturalVoice.shared.playClip(clip) }
-                    } else { useNatural = false; await sayApple(sentence) }
+                    else {
+                        do {
+                            let clip = try await NaturalVoice.audio(sentence, key: key)
+                            noteVoice(nil)
+                            if liveToken == token { await NaturalVoice.shared.playClip(clip) }
+                        } catch {
+                            useNatural = false
+                            noteVoice(error.localizedDescription)
+                            await sayApple(sentence)
+                        }
+                    }
                 } else {
                     await sayApple(sentence)
                 }
@@ -541,14 +564,17 @@ final class NaturalVoice: NSObject, AVAudioPlayerDelegate {
         try? AVAudioSession.sharedInstance().setActive(true)
         #endif
         for (i, job) in jobs.enumerated() {
-            guard let data = try? await job.value else {
+            let data: Data
+            do { data = try await job.value } catch {
                 jobs.forEach { $0.cancel() }
+                Speaker.shared.noteVoice(error.localizedDescription)
                 return i > 0 // part of it was read; don't start over with the other voice
             }
             guard still() else { jobs.forEach { $0.cancel() }; return true }
             await play(data)
             guard still() else { jobs.forEach { $0.cancel() }; return true }
         }
+        Speaker.shared.noteVoice(nil)
         return true
     }
 
@@ -591,11 +617,14 @@ final class NaturalVoice: NSObject, AVAudioPlayerDelegate {
         ])
         let (data, response) = try await URLSession.shared.data(for: req)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        guard status == 200, !data.isEmpty else {
-            let msg = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any]).flatMap { ($0["error"] as? [String: Any])?["message"] as? String }
-            throw CloudError("OpenAI voice error \(status)\(msg.map { ": \($0)" } ?? "")")
-        }
+        guard status == 200, !data.isEmpty else { throw CloudError(refusal(status, data)) }
         return data
+    }
+
+    /// OpenAI's reason for refusing a request.
+    nonisolated static func refusal(_ status: Int, _ body: Data) -> String {
+        let msg = ((try? JSONSerialization.jsonObject(with: body)) as? [String: Any]).flatMap { ($0["error"] as? [String: Any])?["message"] as? String }
+        return "OpenAI voice error \(status)\(msg.map { ": \($0)" } ?? "")"
     }
 
     /// For Settings: checks the key by making a short clip.

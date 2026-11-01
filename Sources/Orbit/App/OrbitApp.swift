@@ -7,6 +7,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Sign-in callbacks (com.personal.orbit://auth-callback?code=…) go straight to the account code, without opening a new window.
     func applicationWillFinishLaunching(_ notification: Notification) {
+        // The last known icon straight away: checking Pro takes a few seconds, and the Dock mustn't show the usual icon meanwhile.
+        NSApp.applicationIconImage = Pro.macIcon(pro: UserDefaults.standard.bool(forKey: "pro.dockIcon"))
         NSAppleEventManager.shared().setEventHandler(self, andSelector: #selector(handleURL(_:reply:)),
                                                      forEventClass: AEEventClass(kInternetEventClass), andEventID: AEEventID(kAEGetURL))
         reclaimLinkScheme()
@@ -49,8 +51,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
-        // The bundled icon (the j); the drawn one only when running outside the app bundle.
-        NSApp.applicationIconImage = Bundle.main.url(forResource: "AppIcon", withExtension: "icns").flatMap(NSImage.init(contentsOf:)) ?? AppIcon.make()
         // ⌥Space: a quick tap opens quick capture; holding it records your voice and Ask files what you said.
         hotKey = HotKey(onPress: { VoiceCapture.shared.keyDown() }, onRelease: { VoiceCapture.shared.keyUp() })
         _ = Reminders.shared // become the notification delegate before any notification is tapped

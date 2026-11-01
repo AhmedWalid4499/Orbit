@@ -57,8 +57,7 @@ final class Pro: ObservableObject {
         guard UIApplication.shared.supportsAlternateIcons, UIApplication.shared.alternateIconName != want else { return }
         UIApplication.shared.setAlternateIconName(want) { _ in }
         #else
-        NSApp.applicationIconImage = isPro ? Self.macProIcon
-            : Bundle.main.url(forResource: "AppIcon", withExtension: "icns").flatMap(NSImage.init(contentsOf:)) ?? AppIcon.make()
+        NSApp.applicationIconImage = Self.macIcon(pro: isPro)
         // And while Joshu is closed: the Dock asks the plug-in in Contents/PlugIns, which reads this.
         if UserDefaults.standard.bool(forKey: "pro.dockIcon") != isPro {
             UserDefaults.standard.set(isPro, forKey: "pro.dockIcon")
@@ -69,12 +68,19 @@ final class Pro: ObservableObject {
     }
 
     #if os(macOS)
-    /// The Pro logo with the margin Mac icons have around their tile.
+    /// The Pro logo with the margin Mac icons have around their tile: the picture the Dock plug-in shows, so the icon
+    /// stays the same when Joshu opens.
     private static let macProIcon: NSImage? = {
+        if let file = Bundle.main.builtInPlugInsURL?.appending(path: "JoshuDock.docktileplugin/Contents/Resources/AppIconPro.png"),
+           let image = NSImage(contentsOf: file) { return image }
         let renderer = ImageRenderer(content: ProLogo(size: 824).padding(100).frame(width: 1024, height: 1024))
         renderer.scale = 1
         return renderer.nsImage
     }()
+
+    static func macIcon(pro: Bool) -> NSImage? {
+        pro ? macProIcon : Bundle.main.url(forResource: "AppIcon", withExtension: "icns").flatMap(NSImage.init(contentsOf:)) ?? AppIcon.make()
+    }
     #endif
 
     private var welcomeKey: String { "pro.welcomed." + (CloudAuth.session?.userID ?? "device") }

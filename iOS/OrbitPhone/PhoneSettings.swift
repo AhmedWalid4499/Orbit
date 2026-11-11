@@ -37,7 +37,7 @@ struct PhoneSettings: View {
                 Section {
                     LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")
                 } footer: {
-                    Text("Joshu on iPhone shares everything with Joshu on your Mac through your Joshu account. Sign in with the same account on both.")
+                    Text("Your Joshu account backs up everything and keeps it the same on every device you sign in to.")
                 }
             }
             .navigationTitle("Settings")
@@ -86,7 +86,7 @@ struct PhoneWelcome: View {
                 OrbitMark(size: 72).padding(.top, 40)
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Joshu on your iPhone").font(Theme.display(34))
-                    Text("Sign in with the account you use on your Mac and everything comes across: tasks, calendar, habits, money, notes, books, trips and your assistant.")
+                    Text("Create a free account to back up your tasks, calendar, habits, money, notes and books and keep them in sync, or use Joshu without one.")
                         .font(Theme.ui(15)).foregroundStyle(Theme.inkSecondary)
                 }
                 if !cloud.isSignedIn {
@@ -94,10 +94,10 @@ struct PhoneWelcome: View {
                 } else {
                     VStack(alignment: .leading, spacing: 10) {
                         Label("Signed in as \(cloud.email ?? "")", systemImage: "checkmark.circle.fill").foregroundStyle(Theme.good)
-                        if cloud.syncing { Label("Bringing everything over from your Mac…", systemImage: "arrow.triangle.2.circlepath").font(Theme.ui(13)) }
+                        if cloud.syncing { Label("Syncing your things…", systemImage: "arrow.triangle.2.circlepath").font(Theme.ui(13)) }
                         else if let s = cloud.status { Text(s).font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary) }
                         if cloud.vaultState == .waiting {
-                            Text("Open Joshu on your Mac once so your API key and Google and GitHub sign-ins come across.").font(Theme.ui(13))
+                            Text("If you also use Joshu on a Mac, open it there once so your sign-ins come across.").font(Theme.ui(13))
                         }
                         Button("Start", action: onDone).buttonStyle(PrimaryButtonStyle())
                     }

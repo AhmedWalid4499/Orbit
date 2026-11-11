@@ -31,8 +31,10 @@ What's left needs your accounts and your OK. In order:
    - `joshu.pro.yearly`: $59.99 / 1 year
 3. **App Store Server Notifications (Version 2).** Set the URL to
    `https://qngpfkqupvxeuxzwdeex.supabase.co/functions/v1/subscription`.
-4. **App Privacy.** Data linked to you: contact info (email, for the account), user content (synced data),
-   identifiers (account ID), purchases. No tracking.
+4. **App Privacy.** Answer exactly as `iOS/OrbitPhone/PrivacyInfo.xcprivacy` says. Data linked to you, for app
+   functionality, no tracking: email address, name, user ID (account), other user content (synced data), emails or text
+   messages (email summaries, bank texts read by the AI), other financial info (spending), health and fitness (daily
+   summary), photos (receipts and card photo), purchase history. Coarse location: not linked, app functionality.
 5. **URLs.**
    - Privacy: https://ahmedwalid4499.github.io/Orbit/privacy/
    - Terms (EULA): https://ahmedwalid4499.github.io/Orbit/terms/
@@ -49,6 +51,16 @@ add can connect Gmail.
 - Public launch needs Google's OAuth verification plus a yearly CASA security assessment, a paid third-party audit.
 - Until then, either keep Gmail as an invite-only beta or launch without Gmail on the App Store.
 - YouTube (read-only) only needs the lighter "sensitive scope" verification.
+
+## 4b. Apple Wallet pass for the card
+Run `scripts/setup-wallet-pass.sh` once in Terminal: it makes a certificate request, you create a Pass Type ID
+(`pass.com.ahmedwalid.orbit.card`) and its certificate on developer.apple.com, and it stores the certificate as Supabase
+secrets and deploys `supabase/functions/wallet-pass`. "Add to Apple Wallet" appears on the card only once that's done.
+
+## The App Store build leaves out
+`AppStoreBuild.isOn` (set by `gen-ios-project.py --app-store`): your own Anthropic key no longer unlocks Pro features
+(it still powers the AI), the OpenAI voice key, Goodreads website updates (read-only import stays) and the LinkedIn
+developer-app setup. Everyday installs keep all of them.
 
 ## 5. Things App Review may push back on
 - **Goodreads updates** work by driving Goodreads' website with your sign-in (Goodreads has no API). Keep it, but

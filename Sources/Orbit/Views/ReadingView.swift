@@ -280,8 +280,12 @@ struct ReadingView: View {
             if highlights.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Bring in your Kindle highlights and notes:").font(Theme.ui(14, weight: .semibold))
+                    #if os(macOS)
                     Text("• **Kindle e-reader:** plug it in with USB, open it in Finder, and import **documents › My Clippings.txt**.")
-                    Text("• **Kindle app on iPhone, iPad or Android:** open a book › Notebook › Share › **Export notebook**, send the file to your Mac, and import it.")
+                    Text("• **Kindle app on a phone or tablet:** open a book › Notebook › Share › **Export notebook**, send the file to your Mac, and import it.")
+                    #else
+                    Text("• **Kindle app:** open a book › Notebook › Share › **Export notebook**, save it to Files, and import it here.")
+                    #endif
                     Text("Joshu matches highlights to the books in your library and skips ones it already has.").foregroundStyle(Theme.inkMuted)
                 }
                 .font(Theme.ui(13)).padding(18).frame(maxWidth: .infinity, alignment: .leading)

@@ -40,7 +40,7 @@ struct ProWelcome: View {
                     orb.padding(.top, Platform.isPhone ? 30 : 10)
                     VStack(spacing: 10) {
                         Text("Welcome to Joshu Pro").font(Theme.display(Platform.isPhone ? 34 : 40)).multilineTextAlignment(.center)
-                        Text("Your assistant is ready. Everything below is now on, on your Mac and iPhone.")
+                        Text("Your assistant is ready. Everything below is now on, on every device you sign in to.")
                             .font(Theme.ui(16)).foregroundStyle(Theme.inkSecondary).multilineTextAlignment(.center)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -68,7 +68,6 @@ struct ProWelcome: View {
                             .textFieldStyle(.plain).font(Theme.ui(17, weight: .medium))
                             .padding(.horizontal, 16).padding(.vertical, 12)
                             .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
-                            .onSubmit(start)
                         Text("You can change it any time in Settings.").font(Theme.ui(12)).foregroundStyle(Theme.inkMuted)
                     }
                     .frame(maxWidth: 420)

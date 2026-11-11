@@ -496,7 +496,7 @@ struct KeySyncSection: View {
                 case .on:
                     Label("Synced with your Joshu account", systemImage: "lock.shield.fill").foregroundStyle(Theme.good)
                 case .waiting:
-                    Label("Open Joshu on your Mac once to bring your keys here.", systemImage: "hourglass").font(.caption)
+                    Label("Open Joshu on your other device once to bring your sign-ins here.", systemImage: "hourglass").font(.caption)
                 case .error(let e):
                     Label(e, systemImage: "exclamationmark.triangle.fill").foregroundStyle(Theme.orange).font(.caption)
                 case .off:
@@ -513,12 +513,12 @@ struct KeySyncSection: View {
 struct VoiceSection: View {
     @AppStorage("assistantSpeaks") private var speaks = false
     @AppStorage("assistantVoice") private var voiceID = ""
-    @AppStorage("welcome.speak") private var welcome = true
+    @AppStorage("welcome.speak") private var welcome = false
     @ObservedObject private var wake = WakeListener.shared
     @ObservedObject private var speaker = Speaker.shared
     @AppStorage("voice.natural") private var natural = true
     @AppStorage("voice.openai") private var openAIVoice = "coral"
-    @State private var hasOpenAI = NaturalVoice.hasKey
+    @State private var hasOpenAI = NaturalVoice.hasKey && !AppStoreBuild.isOn
     @State private var openAIKey = ""
     @State private var checking = false
     @State private var voiceStatus: String?
@@ -538,7 +538,9 @@ struct VoiceSection: View {
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 if let e = wake.error { Text(e).font(.caption).foregroundStyle(Theme.orange) }
             }
-            if hasOpenAI {
+            if AppStoreBuild.isOn {
+                // The App Store build reads replies with the Apple voice only (no keys to bring).
+            } else if hasOpenAI {
                 Toggle("Natural voice (OpenAI)", isOn: $natural)
                 if natural {
                     Picker("Natural voice", selection: $openAIVoice) {

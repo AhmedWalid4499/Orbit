@@ -18,7 +18,8 @@ struct OtherConnections: View {
             row("Goodreads", .goodreads, reading.goodreadsUser.isEmpty ? nil : "Shelves sync from your profile") {
                 reading.goodreadsUser = ""
             }
-            GoodreadsSyncRow()
+            // Updating Goodreads works by driving its website; the App Store build leaves that out (read-only import stays).
+            if !AppStoreBuild.isOn { GoodreadsSyncRow() }
             if !Platform.isPhone {
                 row("Apple Books", .appleBooks, reading.appleBooksLinked ? "Library on this Mac syncs daily" : nil) { reading.disconnect("apple", context: context) }
                 row("Kindle", .kindle, reading.kindleLinked ? "Kindle app library syncs daily" : nil) { reading.disconnect("kindle", context: context) }
@@ -28,6 +29,7 @@ struct OtherConnections: View {
         } footer: {
             Text("Disconnecting Apple Books or Kindle stops the sync and removes the books that came only from it. Goodreads books stay.")
         }
+        if !AppStoreBuild.isOn {
         Section {
             row("Claude (Anthropic API key)", .claude, ai.hasKey ? "Powers the assistant, brief and smart features" : nil) { ai.removeKey() }
             row("OpenAI voice", .openai, openAIConnected ? "Natural voice for spoken replies" : nil) {
@@ -38,6 +40,7 @@ struct OtherConnections: View {
             Text("AI")
         } footer: {
             Text("Removing a key deletes it from this device's Keychain. Add it again in Settings › AI.")
+        }
         }
     }
 

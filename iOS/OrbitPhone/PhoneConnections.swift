@@ -18,14 +18,14 @@ struct PhoneConnections: View {
         List {
             if cloud.vaultState == .waiting {
                 Section {
-                    Label("Waiting for your Mac to share your sign-ins. Open Joshu on the Mac once (signed in) and they'll appear here.",
+                    Label("Waiting for your other device to share your sign-ins. Open Joshu there once (signed in) and they'll appear here.",
                           systemImage: "hourglass").font(Theme.ui(14))
                 }
             }
 
             Section {
                 if inbox.accounts.isEmpty {
-                    row("envelope.fill", Theme.pink, "Gmail", detail: "Connect Gmail and your assistant summarises your inbox on Today. Accounts you added on your Mac come here on their own.")
+                    row("envelope.fill", Theme.pink, "Gmail", detail: "Connect Gmail and your assistant summarises your inbox on Today. Accounts you added on another device come here on their own.")
                     if GoogleAuth.isConfigured {
                         Button { Task { await inbox.addAccount() } } label: {
                             Label(inbox.signingIn ? "Waiting for Google…" : "Add Gmail account", systemImage: "plus")
@@ -97,7 +97,7 @@ struct PhoneConnections: View {
                     Spacer()
                     Button(goodreadsUser.isEmpty ? "Connect" : "Options") { readingSources = true }.buttonStyle(SoftButtonStyle())
                 }
-                Text("Apple Books and Kindle are imported by Joshu on your Mac, and the books then appear here on their own.").font(Theme.ui(12)).foregroundStyle(Theme.inkMuted)
+                Text("Apple Books and Kindle can be imported by Joshu for Mac; the books then appear here on their own.").font(Theme.ui(12)).foregroundStyle(Theme.inkMuted)
             }
             OtherConnections()
         }

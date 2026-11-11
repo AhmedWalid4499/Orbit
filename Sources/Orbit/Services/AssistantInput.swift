@@ -537,7 +537,7 @@ final class NaturalVoice: NSObject, AVAudioPlayerDelegate {
 
     static var hasKey: Bool { !(Keychain.read("openai-key") ?? "").isEmpty }
     /// On when there's a key, unless switched off in Settings.
-    static var isOn: Bool { hasKey && UserDefaults.standard.object(forKey: "voice.natural") as? Bool ?? true }
+    static var isOn: Bool { hasKey && !AppStoreBuild.isOn && UserDefaults.standard.object(forKey: "voice.natural") as? Bool ?? true }
     static var voice: String { UserDefaults.standard.string(forKey: "voice.openai") ?? "coral" }
 
     private var player: AVAudioPlayer?

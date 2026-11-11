@@ -15,4 +15,6 @@ supabase functions deploy subscription --project-ref "$REF" --no-verify-jwt
 supabase functions deploy admin --project-ref "$REF" --no-verify-jwt
 # Ends Sign in with Apple when an account is deleted; it checks the caller's sign-in itself.
 supabase functions deploy apple-revoke --project-ref "$REF" --no-verify-jwt
+# Makes Apple Wallet passes of your card; it checks the caller's sign-in itself (scripts/setup-wallet-pass.sh sets its secrets).
+supabase functions deploy wallet-pass --project-ref "$REF"
 echo "Deployed. App Store Server Notifications URL: https://$REF.supabase.co/functions/v1/subscription"

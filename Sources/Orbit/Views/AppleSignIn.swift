@@ -4,14 +4,21 @@ import CryptoKit
 
 /// "Sign in with Apple", shown next to Google sign-in in the App Store build of the iPhone app (Apple requires it there).
 /// Builds without the entitlement (installs from a free developer account, the Mac app) leave it out.
-enum AppleSignIn {
-    static var available: Bool {
+/// The iPhone build that goes to the App Store (scripts/upload-ios.sh, `gen-ios-project.py --app-store`). It leaves out
+/// the bring-your-own-key options and website automation that App Review doesn't allow; everyday installs keep them.
+enum AppStoreBuild {
+    static let isOn: Bool = {
         #if os(iOS)
         (Bundle.main.object(forInfoDictionaryKey: "JoshuSignInWithApple") as? String) == "YES"
         #else
         false
         #endif
-    }
+    }()
+}
+
+enum AppleSignIn {
+    static var available: Bool { AppStoreBuild.isOn }
+
 
     /// A one-time random string; Apple gets its SHA-256 and puts it in the token, the server checks it against this.
     static func newNonce() -> String {

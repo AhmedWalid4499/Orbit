@@ -594,6 +594,7 @@ struct ProfileCardSheet: View {
                     .buttonStyle(SoftButtonStyle()).help("Your card as a small web page you can open, email or put online")
             }
             #endif
+            AddToWalletButton(card: card, photo: profile.photo)
             if let copied { Text(copied).font(Theme.ui(11, weight: .medium)).foregroundStyle(Theme.good) }
         }
     }

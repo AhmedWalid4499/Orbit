@@ -55,7 +55,7 @@ struct ProSheet: View {
                     }
                 } else if !pro.isPro {
                     VStack(spacing: 10) {
-                        planButton(Pro.yearlyID, title: "Yearly", detail: "\(pro.price(Pro.yearlyID)) a year · save 37%")
+                        planButton(Pro.yearlyID, title: "Yearly", detail: "\(pro.price(Pro.yearlyID)) a year\(pro.yearlySaving.map { " · \($0)" } ?? "")")
                         planButton(Pro.monthlyID, title: "Monthly", detail: "\(pro.price(Pro.monthlyID)) a month")
                     }
                     Button { Task { await pro.buy(plan) } } label: {
@@ -129,6 +129,7 @@ struct ProUpsell: View {
 /// Settings: your plan, with a way to upgrade or manage it.
 struct ProSettingsRow: View {
     @ObservedObject private var pro = Pro.shared
+    @State private var managing = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -140,7 +141,11 @@ struct ProSettingsRow: View {
             }
             Spacer()
             if pro.storeActive {
+                #if os(iOS)
+                Button("Manage") { managing = true }.manageSubscriptionsSheet(isPresented: $managing)
+                #else
                 Link("Manage", destination: URL(string: "https://apps.apple.com/account/subscriptions")!)
+                #endif
             } else if !pro.isPro {
                 Button("See Pro") { AppState.current?.openPro() }.buttonStyle(.borderedProminent)
             }

@@ -669,7 +669,7 @@ struct LinkedInConnectionRow: View {
                     Spacer()
                     Button("Sign out") { account.signOut() }.font(.caption)
                 }
-            } else {
+            } else if !AppStoreBuild.isOn {
                 DisclosureGroup("Optional: Sign in with LinkedIn (needs a LinkedIn developer app)") {
                     if account.isSetUp {
                         Button(account.busy ? "Signing in…" : "Sign in with LinkedIn") { Task { await account.signIn() } }

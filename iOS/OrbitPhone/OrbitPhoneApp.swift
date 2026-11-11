@@ -26,10 +26,18 @@ struct OrbitPhoneApp: App {
             let url = URL.applicationSupportDirectory.appending(path: "Orbit", directoryHint: .isDirectory)  // the data folder keeps its old name
             try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
             let schema = OrbitSchema.schema
-            do {
-                container = try ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, url: url.appending(path: "Orbit.store")))
-            } catch {
-                fatalError("Could not open data store: \(error)")
+            let store = url.appending(path: "Orbit.store")
+            if let c = try? ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, url: store)) {
+                container = c
+            } else {
+                // A store this version can't open (e.g. after a change SwiftData can't migrate): keep it aside and start
+                // fresh rather than crashing on every launch; signed-in data comes back from sync.
+                let aside = url.appending(path: "Orbit-\(Int(Date.now.timeIntervalSince1970)).store")
+                for suffix in ["", "-shm", "-wal"] {
+                    try? FileManager.default.moveItem(at: URL(fileURLWithPath: store.path + suffix), to: URL(fileURLWithPath: aside.path + suffix))
+                }
+                container = (try? ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, url: store)))
+                    ?? (try! ModelContainer(for: schema, configurations: ModelConfiguration(isStoredInMemoryOnly: true)))
             }
         }
         OrbitStore.container = container

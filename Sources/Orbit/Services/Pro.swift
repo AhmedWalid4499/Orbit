@@ -40,7 +40,8 @@ final class Pro: ObservableObject {
 
     /// Your own Anthropic key: the AI works on it directly (no subscription needed for you).
     var ownKey: Bool { Keychain.apiKey != nil }
-    var isPro: Bool { storeActive || serverActive || ownKey || Snapshot.isDemo }
+    /// In the App Store build a key you bring powers the AI but doesn't unlock paid features (Apple requires in-app purchase).
+    var isPro: Bool { storeActive || serverActive || (ownKey && !AppStoreBuild.isOn) || Snapshot.isDemo }
 
     /// The AI through Joshu's server (Pro without your own key). Read by the AI client, so it's kept in UserDefaults.
     nonisolated static var serverAI: Bool { UserDefaults.standard.bool(forKey: "pro.serverAI") }
@@ -186,6 +187,14 @@ final class Pro: ObservableObject {
     }
 
     /// Price shown on a plan button: the App Store's (in your currency), or the list price until that loads.
+    /// How much the yearly plan saves over twelve months of the monthly one, from the store's own prices ("save 37%").
+    var yearlySaving: String? {
+        guard let y = products.first(where: { $0.id == Self.yearlyID }), let m = products.first(where: { $0.id == Self.monthlyID }),
+              m.price > 0 else { return nil }
+        let pct = Int(((1 - (y.price as NSDecimalNumber).doubleValue / ((m.price as NSDecimalNumber).doubleValue * 12)) * 100).rounded())
+        return pct >= 5 ? "save \(pct)%" : nil
+    }
+
     func price(_ id: String) -> String {
         if let p = products.first(where: { $0.id == id }) { return p.displayPrice }
         return id == Self.yearlyID ? "$59.99" : "$7.99"

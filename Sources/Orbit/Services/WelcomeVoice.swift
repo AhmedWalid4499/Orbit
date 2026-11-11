@@ -5,7 +5,7 @@ import SwiftData
 /// At most once an hour, so switching back and forth stays quiet; off in Settings › AI › Voice.
 @MainActor
 enum WelcomeVoice {
-    static var isOn: Bool { UserDefaults.standard.object(forKey: "welcome.speak") as? Bool ?? true }
+    static var isOn: Bool { UserDefaults.standard.object(forKey: "welcome.speak") as? Bool ?? false }
     private static var lastSpoken: Double {
         get { UserDefaults.standard.double(forKey: "welcome.lastSpoken") }
         set { UserDefaults.standard.set(newValue, forKey: "welcome.lastSpoken") }

@@ -529,7 +529,14 @@ struct ProfileCardSheet: View {
         publishTask?.cancel()
         guard cloud.isSignedIn else { return }
         if turnedOff {
-            publishTask = Task { try? await cloud.unpublishCard(); publishStatus = "Your card is no longer on the web." }
+            publishTask = Task {
+                do {
+                    try await cloud.unpublishCard()
+                    publishStatus = "Your card is no longer on the web."
+                } catch {
+                    publishStatus = "Couldn't take your card off the web: \(error.localizedDescription)"
+                }
+            }
             return
         }
         guard card.publishPublic else { return }

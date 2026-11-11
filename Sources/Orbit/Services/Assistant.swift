@@ -123,6 +123,7 @@ final class AssistantStore: ObservableObject {
         // A chat picked up later still has the date from when it began: say what it is now ("tomorrow" depends on it).
         // In the message, not by rewriting the prompt, so the conversation so far stays exactly as it was.
         let dated = Date.now.timeIntervalSince(systemWritten) > 1800 ? "[\(Self.currentTime), replacing any earlier one]\n\(text)" : text
+        let asked = messages.count
         messages.append(["role": "user", "content": attachments.isEmpty ? dated as Any : (attachments.map(\.block) + [["type": "text", "text": dated]]) as Any])
         save()
         busy = true
@@ -158,7 +159,10 @@ final class AssistantStore: ObservableObject {
                     let transient = (error as? URLError) != nil || { if case ClaudeClient.Failure.network = error { return true }; return false }()
                         || { if case ClaudeClient.Failure.overloaded = error { return true }; return false }()
                     if transient && attempt < 2 && !Task.isCancelled {
+                        // Start the reply over: what was shown or read aloud of the failed attempt is repeated by the next.
                         received = ""
+                        revealed = ""
+                        if talk { Speaker.shared.liveBegin() }
                         try? await Task.sleep(for: .seconds(attempt == 0 ? 1.5 : 4))
                         continue
                     }
@@ -166,6 +170,13 @@ final class AssistantStore: ObservableObject {
                     reveal.cancel()
                     revealed = ""
                     self.error = transient ? "The connection dropped. Check your internet and ask again." : error.localizedDescription
+                    // Don't keep a question that failed (a file the API refuses would fail every later request too);
+                    // its bubble stays so you can see what you asked.
+                    if messages.count == asked + 1 {
+                        messages.removeLast()
+                    } else if !attachments.isEmpty, messages.indices.contains(asked) {
+                        messages[asked]["content"] = "[Files sent, no longer attached: \(attachments.map(\.name).joined(separator: ", "))]\n\(dated)"
+                    }
                     return
                 }
             }
@@ -175,7 +186,19 @@ final class AssistantStore: ObservableObject {
             if talk { Speaker.shared.liveFeed(turn.text, final: true) }
             await reveal.value
             revealed = ""
-            messages.append(["role": "assistant", "content": turn.replayBlocks])
+            var replay = turn.replayBlocks
+            if turn.stopReason != "tool_use" && turn.stopReason != "pause_turn" {
+                // A reply cut off mid-call (max_tokens) leaves calls without results, which the API refuses from then on.
+                let answered = Set(replay.compactMap { $0["tool_use_id"] as? String })
+                replay.removeAll { b in
+                    let type = b["type"] as? String
+                    return type == "tool_use" || (type == "server_tool_use" && !answered.contains(b["id"] as? String ?? ""))
+                }
+                if !replay.contains(where: { $0["type"] as? String == "text" && !($0["text"] as? String ?? "").isEmpty }) {
+                    replay.append(["type": "text", "text": "(My reply was cut off.)"])
+                }
+            }
+            messages.append(["role": "assistant", "content": replay])
             for b in turn.blocks where b["type"] as? String == "server_tool_use" {
                 let input = b["input"] as? [String: Any] ?? [:]
                 if b["name"] as? String == "web_search", let q = input["query"] as? String {
@@ -231,7 +254,7 @@ final class AssistantStore: ObservableObject {
     }
 
     func undo(_ item: ChatItem, context: ModelContext) {
-        guard let i = items.firstIndex(of: item), let undo = item.undo, !item.undone else { return }
+        guard !busy, let i = items.firstIndex(of: item), let undo = item.undo, !item.undone else { return }
         switch undo {
         case .models(let ids):
             for id in ids { if let m = context.model(for: id) as (any PersistentModel)? { context.delete(m) } }
@@ -695,6 +718,7 @@ enum AssistantTools {
             let minutes = max(5, Int(num("duration_minutes")))
             let e = EventItem(title: str("title"), start: start, end: start.adding(minutes: minutes), area: area("area"))
             context.insert(e)
+            try? context.save()   // saved first, so the ID below is the lasting one Undo can find
             return Outcome(result: "Added event.", action: ChatItem(role: .action,
                 text: "Event “\(e.title)” · \(Fmt.relativeDay(start)) \(Fmt.time(start))", symbol: "calendar", undo: .models([e.persistentModelID])))
 
@@ -703,6 +727,7 @@ enum AssistantTools {
             let h = Habit(name: str("name"), symbol: habitSymbols.contains(str("symbol")) ? str("symbol") : "checkmark",
                           area: Area(rawValue: str("area")) ?? .health, targetPerWeek: max(1, min(7, Int(num("target_per_week")))))
             context.insert(h)
+            try? context.save()
             return Outcome(result: "Created habit.", action: ChatItem(role: .action,
                 text: "Habit “\(h.name)” · \(h.targetPerWeek)× a week", symbol: "flame.fill", undo: .models([h.persistentModelID])))
 
@@ -742,6 +767,7 @@ enum AssistantTools {
             guard !str("title").isEmpty else { return Outcome(result: "title is required", isError: true) }
             let d = DocItem(title: str("title"), kind: DocKind(rawValue: str("kind")) ?? .other, expires: day.date(from: str("expires")))
             context.insert(d)
+            try? context.save()
             return Outcome(result: "Saved.", action: ChatItem(role: .action,
                 text: "Document “\(d.title)”\(d.expires.map { " · expires \($0.formatted(date: .abbreviated, time: .omitted))" } ?? "")",
                 symbol: "doc.text.fill", undo: .models([d.persistentModelID])))
@@ -753,6 +779,7 @@ enum AssistantTools {
             s.nextDate = day.date(from: str("next_date"))
             if s.status == "trial" { s.trialEnds = s.nextDate }
             context.insert(s)
+            try? context.save()
             return Outcome(result: "Saved.", action: ChatItem(role: .action, text: "Subscription “\(s.name)” \(Fmt.money(s.amount)) \(s.cycle.title.lowercased())",
                                                              symbol: "repeat", undo: .models([s.persistentModelID])))
 
@@ -761,6 +788,7 @@ enum AssistantTools {
             let b = BucketItem(title: str("title"), kind: BucketKind(rawValue: str("kind")) ?? .other, notes: str("notes"),
                                targetDate: day.date(from: str("target_date")), excitement: max(1, min(3, Int(num("excitement")))))
             context.insert(b)
+            try? context.save()
             return Outcome(result: "Added to bucket list.", action: ChatItem(role: .action, text: "Bucket list: “\(b.title)”",
                                                                             symbol: "mountain.2.fill", undo: .models([b.persistentModelID])))
 
@@ -768,6 +796,7 @@ enum AssistantTools {
             guard !str("body").isEmpty else { return Outcome(result: "body is required: write the note's content", isError: true) }
             let n = Note(title: str("title").isEmpty ? "Note" : str("title"), body: str("body"))
             context.insert(n)
+            try? context.save()
             return Outcome(result: "Saved note.", action: ChatItem(role: .action, text: "Note “\(n.title)”", symbol: "doc.text",
                                                                   undo: .models([n.persistentModelID])))
 
@@ -829,6 +858,7 @@ enum AssistantTools {
                                 category: income ? "Income" : (MoneyCategory.all.contains(str("category")) ? str("category") : "General"),
                                 date: day.date(from: str("date")).map { $0.adding(minutes: 720) } ?? .now)
             context.insert(t)
+            try? context.save()
             return Outcome(result: "Logged.", action: ChatItem(role: .action, text: "\(income ? "Income" : "Expense") “\(t.title)” \(Fmt.money(t.amount, signed: true))",
                                                               symbol: "creditcard", undo: .models([t.persistentModelID])))
 
@@ -929,6 +959,7 @@ enum AssistantTools {
             b.remindDays = num("remind_days") > 0 ? Int(num("remind_days")) : 3
             b.match = str("match")
             context.insert(b)
+            try? context.save()
             let c = BillTracker.current(b, transactions: (try? context.fetch(FetchDescriptor<Transaction>())) ?? [])
             return Outcome(result: "Bill added. This month: \(BillTracker.describe(c.status)).",
                            action: ChatItem(role: .action, text: "Bill “\(b.name)” · day \(b.dueDay)\(b.amount > 0 ? " · \(Fmt.money(b.amount))" : "")",
@@ -955,6 +986,7 @@ enum AssistantTools {
             }
             guard g.target > 0 else { return Outcome(result: "target must be positive", isError: true) }
             context.insert(g)
+            try? context.save()
             let p = GoalTracker.progress(g, .load(context))
             return Outcome(result: "Goal created. Progress so far: \(GoalTracker.describe(g, p)).",
                            action: ChatItem(role: .action, text: "Goal “\(g.title)” · \(GoalTracker.describe(g, p))", symbol: "flag.checkered",

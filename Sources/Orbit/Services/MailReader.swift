@@ -117,7 +117,7 @@ enum MailReader {
 
     /// A reply in your voice, drafted by Claude from the email and what you want to say (can be empty).
     static func draftReply(to m: MailMessage, intent: String) async throws -> String {
-        guard let client = ClaudeClient() else { throw ClaudeClient.Failure.noKey }
+        guard let client = ClaudeClient() else { throw ClaudeClient.unavailable }
         let me = Platform.userName.split(separator: " ").first.map(String.init) ?? ""
         struct Out: Decodable { let reply: String }
         let out = try await client.structured(Out.self, system: """
@@ -210,10 +210,22 @@ extension String {
     var htmlDecoded: String {
         guard contains("&") else { return self }
         var s = self
-        for (k, v) in ["&nbsp;": " ", "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": "\"", "&#39;": "'", "&apos;": "'", "&rsquo;": "’", "&lsquo;": "‘",
+        for (k, v) in ["&nbsp;": " ", "&lt;": "<", "&gt;": ">", "&quot;": "\"", "&apos;": "'", "&rsquo;": "’", "&lsquo;": "‘",
                        "&ldquo;": "“", "&rdquo;": "”", "&mdash;": "—", "&ndash;": "–", "&hellip;": "…", "&zwnj;": ""] {
             s = s.replacingOccurrences(of: k, with: v)
         }
-        return s.replacingOccurrences(of: #"&#(\d+);"#, with: "", options: .regularExpression)
+        // Numbered ones (&#8217; and &#x27;) become the character they stand for.
+        if let numbered = try? NSRegularExpression(pattern: #"&#([xX][0-9a-fA-F]{1,6}|[0-9]{1,7});"#) {
+            for m in numbered.matches(in: s, range: NSRange(s.startIndex..., in: s)).reversed() {
+                guard let whole = Range(m.range, in: s), let r = Range(m.range(at: 1), in: s) else { continue }
+                let code = s[r]
+                let value = code.first == "x" || code.first == "X" ? UInt32(code.dropFirst(), radix: 16) : UInt32(code)
+                var char = ""
+                if let value, value != 0x200C, let scalar = Unicode.Scalar(value) { char = String(Character(scalar)) }
+                s.replaceSubrange(whole, with: char)
+            }
+        }
+        // Last, so "&amp;lt;" stays "&lt;".
+        return s.replacingOccurrences(of: "&amp;", with: "&")
     }
 }

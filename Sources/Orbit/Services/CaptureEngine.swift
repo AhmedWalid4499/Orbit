@@ -75,7 +75,8 @@ enum CaptureEngine {
         guard lower.contains("remind") || lower.contains("when i get") || lower.contains("when i leave") || lower.contains("when i'm near")
                 || lower.contains("when i am near") || lower.contains("ذكرني") else { return nil }
         var input: [String: Any]?
-        if let client = ClaudeClient() {
+        // Only with smart capture on: otherwise what you type stays on the device.
+        if AIAssistant.shared.smartCaptureActive, let client = ClaudeClient() {
             let system = """
             The user typed a quick note into their task app. Decide whether it asks for a reminder and pull out its parts.
             Now: \(Date.now.formatted(.iso8601)) (\(TimeZone.current.identifier)).

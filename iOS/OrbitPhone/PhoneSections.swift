@@ -146,14 +146,17 @@ struct PhoneNotes: View {
             .background(note.isJournal ? Theme.blush : Theme.canvas)
             .navigationBarTitleDisplayMode(.inline)
         }
-        .onAppear {
-            if state.openTodayJournal {
-                state.openTodayJournal = false
-                showJournal = true
-                newNote()
-            }
-        }
+        .onAppear { openTodayJournalIfAsked() }
+        // Asked while Notes is already showing (it doesn't appear again then).
+        .onChange(of: state.openTodayJournal) { _, asked in if asked { openTodayJournalIfAsked() } }
         .phoneChrome("Journal & Notes")
+    }
+
+    private func openTodayJournalIfAsked() {
+        guard state.openTodayJournal else { return }
+        state.openTodayJournal = false
+        showJournal = true
+        newNote()
     }
 
     private func newNote() {

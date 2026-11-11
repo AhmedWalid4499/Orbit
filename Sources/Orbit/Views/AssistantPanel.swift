@@ -344,7 +344,7 @@ private struct ChatTranscript: View {
             }
         case .action:
             if let place = item.place, !item.undone {
-                PlaceChatCard(place: place, note: item.text) { store.undo(item, context: context) }
+                PlaceChatCard(place: place, note: item.text, undoDisabled: store.busy) { store.undo(item, context: context) }
                     .padding(.leading, 30)
             } else {
                 let tint = ActionTint.color(for: item.symbol)
@@ -356,7 +356,9 @@ private struct ChatTranscript: View {
                         .foregroundStyle(item.undone ? Theme.inkMuted : Theme.ink)
                     Spacer(minLength: 4)
                     if item.undo != nil && !item.undone {
+                        // Not while a reply is being written: it would land in the middle of that turn.
                         Button("Undo") { store.undo(item, context: context) }
+                            .disabled(store.busy)
                             .buttonStyle(.plain).font(Theme.ui(11, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
                             .padding(.horizontal, 10).padding(.vertical, 5).background(Capsule().fill(Theme.canvas))
                     }
@@ -628,6 +630,7 @@ enum ActionTint {
 struct PlaceChatCard: View {
     let place: ChatPlace
     let note: String
+    var undoDisabled = false
     let undo: () -> Void
 
     private var category: PlaceCategory { PlaceCategory(rawValue: place.category) ?? .other }
@@ -648,7 +651,7 @@ struct PlaceChatCard: View {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.good)
                     Text(note).font(Theme.ui(11, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
                     Spacer()
-                    Button("Undo", action: undo).buttonStyle(.plain).font(Theme.ui(11, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
+                    Button("Undo", action: undo).disabled(undoDisabled).buttonStyle(.plain).font(Theme.ui(11, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
                 }
                 HStack(spacing: 10) {
                     Image(systemName: category.symbol).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.stickerInk)

@@ -94,6 +94,9 @@ enum BankMessages {
         let converted = await Currency.convert(p.amount, from: currency, to: Fmt.currencyCode)
         let value = converted ?? p.amount
         let signed = p.kind == .expense ? -value : value
+        // Look again: while this message was being read, a Wallet tap or the same text may have been logged.
+        let existing = (try? context.fetch(FetchDescriptor<Transaction>())) ?? existing
+        if existing.contains(where: { $0.sourceID == sourceID }) { return "Already logged." }
         // A Wallet tap and the bank's SMS (or the email receipt) for the same purchase: keep one.
         let twin = existing.first {
             $0.source != source && $0.date.isSameDay(as: .now) && $0.isExpense == (signed < 0) && abs(abs($0.amount) - value) <= max(1, value * 0.01)

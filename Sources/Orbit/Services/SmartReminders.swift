@@ -89,7 +89,9 @@ enum SmartReminders {
         return (timed, places)
     }
 
-    private static func key(_ t: TaskItem) -> String { t.uuid.isEmpty ? String(t.title.hashValue) : t.uuid }
+    /// Items get their id when made; one still without (made before that) uses when it was made, which stays the
+    /// same between launches (a title hash doesn't), so its reminder is replaced rather than added again.
+    private static func key(_ t: TaskItem) -> String { t.uuid.isEmpty ? "t\(Int(t.createdAt.timeIntervalSince1970))" : t.uuid }
 
     private static func content(_ t: TaskItem, body: String) -> UNMutableNotificationContent {
         let c = UNMutableNotificationContent()
@@ -101,11 +103,15 @@ enum SmartReminders {
         return c
     }
 
+    #if os(iOS)
+    /// Kept for the app's lifetime: a manager released right after asking can take the permission prompt with it.
+    private static let locationManager = CLLocationManager()
+    #endif
+
     /// Place reminders need permission to use location while Orbit is in use; ask when the first one is set.
     static func ensureLocationAccess() {
         #if os(iOS)
-        let m = CLLocationManager()
-        if m.authorizationStatus == .notDetermined { m.requestWhenInUseAuthorization() }
+        if locationManager.authorizationStatus == .notDetermined { locationManager.requestWhenInUseAuthorization() }
         #endif
     }
 }

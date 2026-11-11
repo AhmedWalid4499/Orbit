@@ -84,8 +84,9 @@ enum WidgetBridge {
 
         let enc = JSONEncoder()
         enc.dateEncodingStrategy = .iso8601
-        // Compare without the timestamp so widgets only reload when something actually changed.
-        var comparable = snap; comparable.generatedAt = .distantPast
+        // Compare without the time of day so widgets only reload when something actually changed, but at least once a
+        // day: widgets treat a snapshot from an earlier day as stale.
+        var comparable = snap; comparable.generatedAt = today
         guard let key = try? enc.encode(comparable), key != lastWritten, let data = try? enc.encode(snap) else { return }
         lastWritten = key
         guard let folder else { return } // iPhone builds without the app group (free accounts) have no widgets

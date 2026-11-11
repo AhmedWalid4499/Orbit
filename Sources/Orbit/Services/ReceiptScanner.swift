@@ -1,5 +1,5 @@
 import Foundation
-import Vision
+@preconcurrency import Vision
 import CoreGraphics
 
 /// Reads a photo of a paper receipt: the shop, the total actually paid, the currency and the date.

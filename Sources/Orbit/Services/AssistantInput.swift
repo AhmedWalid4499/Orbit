@@ -49,8 +49,11 @@ struct ChatAttachment: Identifiable, Equatable {
         let type = UTType(filenameExtension: ext)
 
         if type?.conforms(to: .pdf) == true {
+            // Base64 grows it by a third, and the whole request has to stay under the API's 32 MB.
+            let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+            guard size <= 20_000_000 else { throw CloudError("“\(name)” is over 20 MB, too big to send. Try a smaller PDF.") }
             let data = try Data(contentsOf: url)
-            guard data.count < 30_000_000 else { throw CloudError("“\(name)” is over 30 MB. Try a smaller PDF.") }
+            guard data.count <= 20_000_000 else { throw CloudError("“\(name)” is over 20 MB, too big to send. Try a smaller PDF.") }
             return ChatAttachment(name: name, kind: .pdf, payload: data.base64EncodedString(), mediaType: "application/pdf")
         }
         if type?.conforms(to: .image) == true {
@@ -102,6 +105,8 @@ final class Dictation: ObservableObject {
     func start(onFinish: @escaping (String) -> Void) async {
         guard !listening else { return }
         error = nil
+        // Otherwise the microphone hears Joshu still reading the last reply.
+        Speaker.shared.stop()
         guard await permissions() else { return }
         let recognizer = SFSpeechRecognizer() ?? SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
         guard let recognizer, recognizer.isAvailable else { error = "Speech recognition isn't available right now."; return }
@@ -120,8 +125,15 @@ final class Dictation: ObservableObject {
         #endif
         let input = engine.inputNode
         input.removeTap(onBus: 0)
+        // No microphone (or one that's busy elsewhere) reports an empty format, and a tap with it crashes.
+        let format = input.outputFormat(forBus: 0)
+        guard format.sampleRate > 0, format.channelCount > 0 else {
+            error = "No microphone is available right now."
+            abandon()
+            return
+        }
         let meter = Meter(on: true)
-        input.installTap(onBus: 0, bufferSize: 2048, format: input.outputFormat(forBus: 0)) { [weak self] buffer, _ in
+        input.installTap(onBus: 0, bufferSize: 2048, format: format) { [weak self] buffer, _ in
             req.append(buffer)
             guard let v = meter.level(buffer) else { return }
             Task { @MainActor in self?.setLevel(v) }
@@ -131,6 +143,8 @@ final class Dictation: ObservableObject {
             try engine.start()
         } catch {
             self.error = "Couldn't use the microphone: \(error.localizedDescription)"
+            input.removeTap(onBus: 0)
+            abandon()
             return
         }
         recognition = recognizer.recognitionTask(with: req) { [weak self] result, _ in
@@ -152,6 +166,15 @@ final class Dictation: ObservableObject {
                 if (!self.text.isEmpty && quiet > 1.6) || (self.text.isEmpty && quiet > 12) { self.stop(); return }
             }
         }
+    }
+
+    /// Undoes a start that couldn't begin listening.
+    private func abandon() {
+        request = nil
+        onFinish = nil
+        #if os(iOS)
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        #endif
     }
 
     private var levelAt = Date.distantPast
@@ -247,7 +270,7 @@ final class Speaker: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
             let token = UUID()
             natural = token
             Task {
-                let ok = await NaturalVoice.shared.speak(Self.plain(text)) { [weak self] in self?.natural == token }
+                let ok = await NaturalVoice.shared.speak(Self.plain(text)) { self.natural == token }
                 guard self.natural == token else { return }
                 self.natural = nil
                 if ok { self.finished() } else { self.speakWithApple(text) }
@@ -263,9 +286,19 @@ final class Speaker: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
 
     private func finished() {
         speaking = false
+        VoiceStream.shared.stop()
+        Self.releaseAudioSession()
         let done = onDone
         onDone = nil
         done?()
+    }
+
+    /// Lets go of the phone's audio once nothing is being read or heard, so music or a podcast that was ducked comes back.
+    static func releaseAudioSession() {
+        #if os(iOS)
+        guard !Dictation.shared.listening, !WakeListener.shared.listening else { return }
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        #endif
     }
 
     /// Text without links, markdown or bullets, for reading aloud.
@@ -309,6 +342,7 @@ final class Speaker: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
     }
 
     func stop() {
+        let wasSpeaking = speaking
         onDone = nil
         pending = 0
         natural = nil
@@ -320,6 +354,7 @@ final class Speaker: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
         NaturalVoice.shared.stop()
         if synth.isSpeaking { synth.stopSpeaking(at: .immediate) }
         speaking = false
+        if wasSpeaking { Self.releaseAudioSession() }
     }
 
     /// Runs `then` once nothing is being read aloud (right away if it's quiet).
@@ -494,10 +529,7 @@ final class Speaker: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
             if let w = self.appleWaiter { self.appleWaiter = nil; w.resume(); return }
             self.pending -= 1
             guard self.pending <= 0 else { return }
-            self.speaking = false
-            let done = self.onDone
-            self.onDone = nil
-            done?()
+            self.finished()
         }
     }
 }

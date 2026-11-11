@@ -72,6 +72,7 @@ final class TaskItem {
 
     init(title: String, area: Area = .personal, due: Date? = nil, priority: Int = 0,
          notes: String = "", recurrence: Recurrence = .none) {
+        self.uuid = UUID().uuidString.lowercased()
         self.title = title
         self.notes = notes
         self.areaRaw = area.rawValue
@@ -125,6 +126,7 @@ final class EventItem {
     var notes: String
 
     init(title: String, start: Date, end: Date, area: Area = .personal, location: String = "", notes: String = "") {
+        self.uuid = UUID().uuidString.lowercased()
         self.title = title
         self.start = start
         self.end = end
@@ -154,6 +156,7 @@ final class Habit {
     var doneDays: [String]
 
     init(name: String, symbol: String = "checkmark", area: Area = .health, targetPerWeek: Int = 7) {
+        self.uuid = UUID().uuidString.lowercased()
         self.name = name
         self.symbol = symbol
         self.areaRaw = area.rawValue
@@ -216,6 +219,7 @@ final class Transaction {
     var account: String = ""
 
     init(title: String, amount: Double, category: String = "General", date: Date = .now, isRecurring: Bool = false) {
+        self.uuid = UUID().uuidString.lowercased()
         self.title = title
         self.amount = amount
         // A category you taught Orbit for this merchant wins over any guess (see MerchantRules).
@@ -254,6 +258,7 @@ final class Note {
     var chatData: Data? = nil
 
     init(title: String, body: String = "", isJournal: Bool = false, date: Date = .now) {
+        self.uuid = UUID().uuidString.lowercased()
         self.title = title
         self.body = body
         self.createdAt = date
@@ -314,6 +319,7 @@ final class Book {
     var externalID: String = ""
 
     init(title: String, author: String, status: ReadingStatus = .toRead, source: String = "manual") {
+        self.uuid = UUID().uuidString.lowercased()
         self.title = title
         self.author = author
         self.statusRaw = status.rawValue
@@ -364,6 +370,7 @@ final class BookCategory {
     var createdAt: Date = Date.now
 
     init(name: String, colorIndex: Int, symbol: String = "tag.fill") {
+        self.uuid = UUID().uuidString.lowercased()
         self.name = name
         self.colorIndex = colorIndex
         self.symbol = symbol
@@ -384,9 +391,10 @@ final class ReadingSession {
     var end: Date? = nil
     var pagesRead: Int = 0
 
-    init() {}
+    init() { self.uuid = UUID().uuidString.lowercased() }
 
     init(book: Book) {
+        self.uuid = UUID().uuidString.lowercased()
         self.bookUUID = book.uuid
         self.bookTitle = book.title
         self.start = .now
@@ -413,6 +421,7 @@ final class Highlight {
     var externalID: String = ""
 
     init(bookTitle: String, author: String, text: String, source: String = "manual") {
+        self.uuid = UUID().uuidString.lowercased()
         self.bookTitle = bookTitle
         self.author = author
         self.text = text
@@ -468,6 +477,7 @@ final class Subscription {
     var createdAt: Date = Date.now
 
     init(name: String, amount: Double, cycle: BillingCycle = .monthly) {
+        self.uuid = UUID().uuidString.lowercased()
         self.name = name
         self.amount = amount
         self.cycleRaw = cycle.rawValue
@@ -506,6 +516,8 @@ final class Bill {
     var createdAt: Date = Date.now
 
     init(name: String, amount: Double = 0, dueDay: Int = 1) {
+        // Set now (not at the next sync), so the expense "Mark paid" logs stays tied to this bill.
+        self.uuid = UUID().uuidString.lowercased()
         self.name = name
         self.amount = amount
         self.dueDay = dueDay
@@ -540,6 +552,7 @@ final class BankAccount {
     var createdAt: Date = Date.now
 
     init(name: String, last4: String = "", kind: String = "card") {
+        self.uuid = UUID().uuidString.lowercased()
         self.name = name
         self.last4 = last4
         self.kind = kind
@@ -579,6 +592,7 @@ final class IdeaProject {
     var updatedAt: Date = Date.now
 
     init(title: String, summary: String = "") {
+        self.uuid = UUID().uuidString.lowercased()
         self.title = title
         self.summary = summary
         self.createdAt = .now
@@ -600,6 +614,7 @@ final class Idea {
     var updatedAt: Date = Date.now
 
     init(title: String, body: String = "", projectUUID: String, parentUUID: String = "") {
+        self.uuid = UUID().uuidString.lowercased()
         self.title = title
         self.body = body
         self.projectUUID = projectUUID
@@ -662,6 +677,7 @@ final class Goal {
     var createdAt: Date = Date.now
 
     init(title: String, kind: GoalKind = .steps, target: Double = 0) {
+        self.uuid = UUID().uuidString.lowercased()
         self.title = title
         self.kindRaw = kind.rawValue
         self.target = target
@@ -725,6 +741,7 @@ final class DocItem {
     var createdAt: Date = Date.now
 
     init(title: String, kind: DocKind = .other, expires: Date? = nil) {
+        self.uuid = UUID().uuidString.lowercased()
         self.title = title
         self.kindRaw = kind.rawValue
         self.expires = expires
@@ -753,9 +770,10 @@ final class FocusSession {
     var end: Date? = nil
     var plannedMinutes: Int = 25
 
-    init() {}
+    init() { self.uuid = UUID().uuidString.lowercased() }
 
     init(task: TaskItem?, minutes: Int) {
+        self.uuid = UUID().uuidString.lowercased()
         self.taskUUID = task?.uuid ?? ""
         self.taskTitle = task?.title ?? ""
         self.start = .now
@@ -782,6 +800,7 @@ final class DayPlan {
     var createdAt: Date = Date.now
 
     init(day: String) {
+        self.uuid = UUID().uuidString.lowercased()
         self.day = day
         self.createdAt = .now
     }
@@ -809,6 +828,7 @@ final class Trip {
     var createdAt: Date = Date.now
 
     init(title: String, destination: String = "") {
+        self.uuid = UUID().uuidString.lowercased()
         self.title = title
         self.destination = destination
         self.createdAt = .now
@@ -859,6 +879,7 @@ final class Booking {
     var createdAt: Date = Date.now
 
     init(title: String, kind: BookingKind = .other) {
+        self.uuid = UUID().uuidString.lowercased()
         self.title = title
         self.kindRaw = kind.rawValue
         self.createdAt = .now
@@ -955,6 +976,7 @@ final class BucketItem {
     var hasLocation: Bool { latitude != 0 || longitude != 0 }
 
     init(title: String, kind: BucketKind = .experience, notes: String = "", targetDate: Date? = nil, excitement: Int = 2) {
+        self.uuid = UUID().uuidString.lowercased()
         self.title = title
         self.kindRaw = kind.rawValue
         self.notes = notes

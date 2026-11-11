@@ -23,19 +23,28 @@ enum BookCovers {
         return dir
     }
 
+    /// Covers you picked yourself: kept with your data, since the system may empty Caches.
+    static var customFolder: URL {
+        let dir = URL.applicationSupportDirectory.appending(path: "Orbit/covers", directoryHint: .isDirectory)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
     static func file(for url: String) -> URL {
         let h = SHA256.hash(data: Data(url.utf8)).prefix(12).map { String(format: "%02x", $0) }.joined()
-        return folder.appending(path: "\(h).jpg")
+        return (url.hasPrefix("orbit-cover:") ? customFolder : folder).appending(path: "\(h).jpg")
     }
 
     /// The cover for `book`, finding a better one if needed.
     static func image(for book: Book) async -> PlatformImage? {
+        // A cover you picked yourself is never searched for or replaced, even if its file is missing on this device.
+        if book.coverURL.hasPrefix("orbit-cover:") { return await image(at: book.coverURL) }
         let current = book.coverURL.isEmpty ? nil : await image(at: upgrade(book.coverURL))
         // A cover you picked yourself, or one that's already sharp and wasn't found by a search, stays.
         let searched = isSearchResult(book.coverURL)
         let tiny = (current?.cg?.height ?? 0) < 300
         let key = book.matchKey
-        if let current, book.coverURL.hasPrefix("orbit-cover:") || (!tiny && (!searched || rechecked.contains(key))) { return current }
+        if let current, !tiny && (!searched || rechecked.contains(key)) { return current }
         guard !Snapshot.isActive, !looking.contains(key) else { return current }
         looking.insert(key)
         defer { looking.remove(key); rechecked.insert(key) }
@@ -58,7 +67,15 @@ enum BookCovers {
         if let m = memory[url] { return m }
         let f = file(for: url)
         if let img = PlatformImage.load(f) { memory[url] = img; return img }
-        guard !broken.contains(url), !url.hasPrefix("orbit-cover:"), let u = URL(string: url) else { return nil }
+        if url.hasPrefix("orbit-cover:") {
+            // Older versions kept them in Caches: read from there, and move it to where it lasts.
+            let old = folder.appending(path: f.lastPathComponent)
+            guard let img = PlatformImage.load(old) else { return nil }
+            try? FileManager.default.moveItem(at: old, to: f)
+            memory[url] = img
+            return img
+        }
+        guard !broken.contains(url), let u = URL(string: url) else { return nil }
         guard let (data, response) = try? await URLSession.shared.data(from: u),
               (response as? HTTPURLResponse)?.statusCode == 200, data.count > 1500,
               let img = PlatformImage(data: data), let cg = img.cg, cg.width > 20, cg.height > 20 else {

@@ -43,6 +43,7 @@ struct OrbitPhoneApp: App {
         OrbitStore.container = container
         BookLibrary.cleanUpKindleIfNeeded(context: container.mainContext)
         WatchBridge.shared.activate()
+        _ = Reminders.shared // become the notification delegate before launch ends, so a tap that opened the app is handled
     }
 
     var body: some Scene {

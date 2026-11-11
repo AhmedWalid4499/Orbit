@@ -35,11 +35,15 @@ enum BillTracker {
     static func payment(_ bill: Bill, due: Date, in transactions: [Transaction]) -> Transaction? {
         let words = bill.matchWords
         guard !words.isEmpty else { return nil }
-        let from = due.adding(days: -20), to = due.adding(days: 11)
+        // Each month's window stops where the next one's starts, so one payment never pays two months.
+        let cal = Calendar.current
+        let prevDue = dueDate(bill, in: cal.date(byAdding: .month, value: -1, to: due.startOfMonth)!)
+        let nextDue = dueDate(bill, in: cal.date(byAdding: .month, value: 1, to: due.startOfMonth)!)
+        let from = max(due.adding(days: -20), prevDue.adding(days: 11)), to = min(due.adding(days: 11), nextDue.adding(days: -20))
         return transactions.first { t in
             guard t.isExpense, t.date >= from, t.date < to else { return false }
             // "Mark paid" logs an expense for that month; it mustn't also pay next month's.
-            if t.source == "bill" { return t.sourceID == paymentID(bill, due: due) }
+            if t.source == "bill" { return t.sourceID == paymentID(bill, due: due) || t.sourceID == "bill:\(bill.name):\(monthKey(due))" }
             let title = t.title.lowercased()
             return words.contains { title.contains($0) }
         }
@@ -77,7 +81,9 @@ enum BillTracker {
     static func setPaid(_ bill: Bill, due: Date, _ paid: Bool, amount: Double? = nil, context: ModelContext) {
         let key = monthKey(due)
         let id = paymentID(bill, due: due)
-        let logged = ((try? context.fetch(FetchDescriptor<Transaction>(predicate: #Predicate { $0.sourceID == id }))) ?? [])
+        // Bills made before they got an id at creation logged their payment under the name.
+        let legacy = "bill:\(bill.name):\(key)"
+        let logged = ((try? context.fetch(FetchDescriptor<Transaction>(predicate: #Predicate { $0.sourceID == id || $0.sourceID == legacy }))) ?? [])
         if paid {
             if !bill.paidMonths.contains(key) { bill.paidMonths.append(key) }
             let value = abs(amount ?? bill.amount)

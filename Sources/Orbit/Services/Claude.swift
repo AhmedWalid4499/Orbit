@@ -157,6 +157,12 @@ struct ClaudeClient {
         self.apiKey = apiKey
     }
 
+    /// The AI is set up (a key or Pro) but nothing may go to it until the person says yes.
+    static var needsConsent: Bool { (Keychain.apiKey != nil || Pro.serverAI) && !AIConsent.granted }
+    static let consentMessage = "Allow Joshu to use the AI first (Settings › AI)."
+    /// Why `ClaudeClient()` gave nothing: no consent yet, or no key and no Pro.
+    static var unavailable: Error { needsConsent ? CloudError(consentMessage) : Failure.noKey }
+
     /// The Messages endpoint: Anthropic directly with your key, or Joshu's AI server with your Joshu sign-in.
     private func messagesRequest() async throws -> URLRequest {
         if let apiKey {

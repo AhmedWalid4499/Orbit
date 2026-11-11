@@ -83,7 +83,7 @@ final class AIAssistant: ObservableObject {
     /// Cheap round trip to confirm the key works.
     func testConnection() async -> String {
         struct Pong: Decodable { let ok: Bool }
-        guard let client = ClaudeClient() else { return ClaudeClient.Failure.noKey.localizedDescription }
+        guard let client = ClaudeClient() else { return ClaudeClient.unavailable.localizedDescription }
         do {
             _ = try await client.structured(Pong.self, system: "Reply with ok=true.", user: "ping",
                                             schema: ["type": "object", "properties": ["ok": ["type": "boolean"]],

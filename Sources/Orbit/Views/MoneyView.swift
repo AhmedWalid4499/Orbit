@@ -9,6 +9,8 @@ struct MoneyView: View {
 
     /// The budget month on screen: a calendar month, or payday to payday after Start new month.
     @State private var period = BudgetPeriod.current
+    /// A new month started on another device, or here from Settings.
+    @AppStorage(BudgetPeriod.key) private var anchorStamp = 0.0
     @State private var confirmNewMonth = false
     private var month: Date { period.start }
     @State private var adding = false
@@ -32,7 +34,7 @@ struct MoneyView: View {
         let days = Calendar.current.dateComponents([.day], from: period.start, to: period.end).day ?? 30
         let grouped = Dictionary(grouping: txns.filter(\.isExpense)) { $0.date.startOfDay }
         return (0..<days).map { i in
-            let d = month.adding(days: i)
+            let d = month.startOfDay.adding(days: i)
             return DayTotal(day: d, total: -(grouped[d]?.reduce(0) { $0 + $1.amount } ?? 0))
         }
     }
@@ -90,6 +92,11 @@ struct MoneyView: View {
             .padding(.bottom, 32)
         }
         .scrollIndicators(.never)
+        .onChange(of: anchorStamp) { period = BudgetPeriod.current }
+        // Past midnight into a new budget month while open: move along if you were looking at the current one.
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in
+            if period.contains(Date.now.adding(days: -1)) { period = BudgetPeriod.current }
+        }
         .sheet(isPresented: $adding) { NewTransactionSheet() }
         .fileImporter(isPresented: $pickingStatement, allowedContentTypes: [.commaSeparatedText, .plainText, .pdf, .text]) { result in
             if case .success(let url) = result { statement = StatementFile(url: url) }

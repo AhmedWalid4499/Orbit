@@ -500,7 +500,7 @@ private let syncedSettings = ["monthlyBudget", "readingGoal", "currencyCode", "a
                               "notify.subscriptions", "notify.documents", "notify.evening", "notify.trips", "notify.morningHour",
                               "notify.habitHour", "notify.journalHour", "notify.eventLead",
                               "merchantRules", "categoryBudgets", "places.home", "places.work", "hiddenTabs", "inbox.windowHours", "inbox.everyHours", "notify.budgets", "notify.bigCharges", "spendAlerts.sent",
-                              "assistant.memory", "notify.weeklyMoney", "budget.periodStart", "profile.photo", "voice.natural", "voice.openai",
+                              "assistant.memory", "notify.weeklyMoney", "budget.periodStart", "subscriptionsDismissed", "profile.photo", "voice.natural", "voice.openai",
                               "ai.consent", "income.salary", "income.payday"]
 
 // MARK: - Sync engine
@@ -991,7 +991,8 @@ final class CloudSync: ObservableObject {
             if status == 401 { throw CloudError("Your Joshu sign-in expired. Sign in again in Settings › Account.") }
             throw CloudError("Sync error \(status)\(msg.map { ": \($0)" } ?? "")")
         }
-        return data.isEmpty ? nil : try? JSONSerialization.jsonObject(with: data)
+        // Functions can return a bare value (join_shared_list returns the list's id as a JSON string).
+        return data.isEmpty ? nil : try? JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed)
     }
 
     // MARK: Public card page

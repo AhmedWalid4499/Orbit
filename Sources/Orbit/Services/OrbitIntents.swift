@@ -72,7 +72,9 @@ struct AskOrbitIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
         let context = try orbitContext()
-        guard let client = ClaudeClient() else { throw IntentError.message("Get Joshu Pro in the app first.") }
+        guard let client = ClaudeClient() else {
+            throw IntentError.message(ClaudeClient.needsConsent ? ClaudeClient.consentMessage : "Get Joshu Pro in the app first.")
+        }
         let system = """
         You are \(AssistantName.current), the user's assistant in Joshu, answering through Siri or Shortcuts. Reply in 1-3 short, spoken-style sentences, plain text, no lists or markdown.
         Use the user's data below when it helps.

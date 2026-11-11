@@ -49,7 +49,8 @@ enum GoogleAuth {
         }
     }
 
-    private static var accessTokens: [String: (token: String, expires: Date)] = [:]
+    /// Only touched on the main actor, so mail, calendar and expenses asking at once can't race on it.
+    @MainActor private static var accessTokens: [String: (token: String, expires: Date)] = [:]
 
     /// Opens the browser for consent and returns the signed-in email address.
     @MainActor
@@ -145,6 +146,7 @@ enum GoogleAuth {
         return (access, tokens["expires_in"] as? Int ?? 3600)
     }
 
+    @MainActor
     static func remove(_ email: String) {
         Keychain.delete("gmail:\(email)")
         accessTokens[email] = nil
@@ -152,6 +154,7 @@ enum GoogleAuth {
         UserDefaults.standard.set(accounts, forKey: "gmailAccounts")
     }
 
+    @MainActor
     static func accessToken(for email: String) async throws -> String {
         if let cached = accessTokens[email], cached.expires > .now { return cached.token }
         guard let refresh = Keychain.read("gmail:\(email)") else { throw GmailError("\(email) needs to be connected again.") }
@@ -395,7 +398,9 @@ final class InboxStore: ObservableObject {
 
     func refresh() async {
         guard isConnected, !loading, !Snapshot.isActive else { return }
-        guard let claude = ClaudeClient() else { error = "Get Joshu Pro to get inbox summaries."; return }
+        guard let claude = ClaudeClient() else {
+            error = ClaudeClient.needsConsent ? ClaudeClient.consentMessage : "Get Joshu Pro to get inbox summaries."; return
+        }
         loading = true
         error = nil
         defer { loading = false }

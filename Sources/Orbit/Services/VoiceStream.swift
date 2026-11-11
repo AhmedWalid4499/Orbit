@@ -12,6 +12,8 @@ final class VoiceStream {
     /// OpenAI's raw audio: 24 kHz, 16-bit, mono.
     private let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 24_000, channels: 1, interleaved: false)!
     private var queued = 0
+    /// Bumped by stop(), so buffers it cancelled don't count against what's queued after it.
+    private var generation = 0
     private var started = false
     private var drained: CheckedContinuation<Void, Never>?
     /// Why the last `say` failed.
@@ -76,19 +78,26 @@ final class VoiceStream {
         return gotAudio
     }
 
-    /// Waits until everything queued has been heard.
+    /// Waits until everything queued has been heard, then lets the audio go (other apps' sound comes back).
     func finish() async {
-        guard queued > 0 else { return }
-        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in drained = c }
+        if queued > 0 {
+            let gen = generation
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in drained = c }
+            guard gen == generation else { return }   // stopped meanwhile
+        }
+        stop()
     }
 
     func stop() {
+        generation += 1
+        let wasStarted = started
         player.stop()
         queued = 0
         drained?.resume()
         drained = nil
         if engine.isRunning { engine.stop() }
         started = false
+        if wasStarted { Speaker.releaseAudioSession() }
     }
 
     private func startEngine() -> Bool {
@@ -112,9 +121,10 @@ final class VoiceStream {
             for i in 0..<Int(frames) { out[i] = Float(Int16(littleEndian: samples[i])) / 32768 }
         }
         queued += 1
+        let gen = generation
         player.scheduleBuffer(buffer) { [weak self] in
             Task { @MainActor in
-                guard let self else { return }
+                guard let self, gen == self.generation else { return }
                 self.queued = max(0, self.queued - 1)
                 if self.queued == 0 { self.drained?.resume(); self.drained = nil }
             }

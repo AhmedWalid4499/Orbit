@@ -238,6 +238,8 @@ struct TaskEditor: View {
     var onQuickAdd: (() -> Void)? = nil
     @State private var hasDue = false
     @State private var saved = false
+    /// Deleted or discarded: nothing left to save when the sheet closes.
+    @State private var gone = false
     @FocusState private var titleFocused: Bool
 
     var body: some View {
@@ -294,7 +296,7 @@ struct TaskEditor: View {
                 if isNew {
                     Button("Cancel") { discard(); dismiss() }.buttonStyle(SoftButtonStyle()).keyboardShortcut(.cancelAction)
                 } else {
-                    Button("Delete", role: .destructive) { context.delete(task); dismiss() }.buttonStyle(SoftButtonStyle())
+                    Button("Delete", role: .destructive) { delete() }.buttonStyle(SoftButtonStyle())
                 }
                 Spacer()
                 Button(isNew ? "Add task" : "Done") { saved = true; finish(); dismiss() }
@@ -311,11 +313,22 @@ struct TaskEditor: View {
     }
 
     private func discard() {
-        if isNew { context.delete(task); try? context.save(); saved = true }
+        if isNew { context.delete(task); try? context.save(); saved = true; gone = true }
+    }
+
+    private func delete() {
+        let hadReminder = task.remindAt != nil || task.hasPlaceReminder
+        context.delete(task)
+        gone = true
+        try? context.save()
+        if hadReminder { Task { await Reminders.shared.reschedule(context: context, apple: AppleSync()) } }
+        dismiss()
     }
 
     /// Saves and schedules any reminder right away.
     private func finish() {
+        // A deleted task can't be read any more.
+        guard !gone, task.modelContext != nil, !task.isDeleted else { return }
         try? context.save()
         if task.remindAt != nil || task.hasPlaceReminder {
             Task { await Reminders.shared.reschedule(context: context, apple: AppleSync()) }

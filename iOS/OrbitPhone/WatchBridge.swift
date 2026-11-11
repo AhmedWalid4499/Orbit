@@ -43,12 +43,15 @@ final class WatchBridge: NSObject, WCSessionDelegate {
         }
 
         let tasks = (try? context.fetch(FetchDescriptor<TaskItem>())) ?? []
+        let habits = (try? context.fetch(FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.createdAt)]))) ?? []
+        // The watch acts on rows by id: items from before ids were given at creation get theirs now.
+        for t in tasks where t.uuid.isEmpty { t.uuid = UUID().uuidString.lowercased() }
+        for h in habits where h.uuid.isEmpty { h.uuid = UUID().uuidString.lowercased() }
         s.tasksDoneToday = tasks.filter { $0.isDone && ($0.completedAt ?? .distantPast) >= today }.count
         s.tasks = tasks.filter { !$0.isDone && ($0.due.map { $0 < tomorrow } ?? false) }
             .sorted { ($0.isOverdue ? 1 : 0, $0.priority) > ($1.isOverdue ? 1 : 0, $1.priority) }
             .prefix(12).map { .init(id: $0.uuid, title: $0.title, priority: $0.priority, overdue: $0.isOverdue) }
 
-        let habits = (try? context.fetch(FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.createdAt)]))) ?? []
         s.habits = habits.map { .init(id: $0.uuid, name: $0.name, symbol: $0.symbol, done: $0.isDone(on: today), streak: $0.currentStreak) }
 
         let txns = (try? context.fetch(FetchDescriptor<Transaction>(sortBy: [SortDescriptor(\.date, order: .reverse)]))) ?? []
@@ -81,11 +84,12 @@ final class WatchBridge: NSObject, WCSessionDelegate {
         var reply = "Done."
         switch action.kind {
         case .completeTask:
-            if let t = ((try? context.fetch(FetchDescriptor<TaskItem>())) ?? []).first(where: { $0.uuid == action.id }) {
+            if !action.id.isEmpty,
+               let t = ((try? context.fetch(FetchDescriptor<TaskItem>())) ?? []).first(where: { !$0.isDone && $0.uuid == action.id }) {
                 t.complete(in: context); reply = "Done: \(t.title)"
             }
         case .toggleHabit:
-            if let h = ((try? context.fetch(FetchDescriptor<Habit>())) ?? []).first(where: { $0.uuid == action.id }) {
+            if !action.id.isEmpty, let h = ((try? context.fetch(FetchDescriptor<Habit>())) ?? []).first(where: { $0.uuid == action.id }) {
                 h.toggle(.now); reply = h.isDone(on: .now) ? "\(h.name) done" : "\(h.name) undone"
             }
         case .capture:

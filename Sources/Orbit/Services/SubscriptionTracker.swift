@@ -31,7 +31,7 @@ enum SubscriptionTracker {
     @discardableResult
     static func detect(context: ModelContext) -> Int {
         let since = Date.now.adding(days: -400)
-        let txns = ((try? context.fetch(FetchDescriptor<Transaction>())) ?? []).filter { $0.isExpense && $0.date >= since }
+        let txns = ((try? context.fetch(FetchDescriptor<Transaction>())) ?? []).filter { $0.isExpense && $0.date >= since && $0.source != "bill" }
         var subs = (try? context.fetch(FetchDescriptor<Subscription>())) ?? []
         let skip = dismissed
         var added = 0
@@ -108,10 +108,20 @@ enum SubscriptionTracker {
         if currency != Fmt.currencyCode, originalAmount > 0 { s.originalAmount = originalAmount; s.originalCurrency = currency }
     }
 
+    /// The next charge after `date`, counted in whole cycles from it (so a charge on the 31st stays at the month's end).
     private static func upcoming(after date: Date, cycle: BillingCycle) -> Date {
-        var next = cycle.next(after: date)
-        while next < Date.now.startOfDay { next = cycle.next(after: next) }
-        return next.startOfDay
+        let cal = Calendar.current
+        func step(_ k: Int) -> Date {
+            switch cycle {
+            case .weekly: return cal.date(byAdding: .day, value: 7 * k, to: date)!
+            case .monthly: return cal.date(byAdding: .month, value: k, to: date)!
+            case .quarterly: return cal.date(byAdding: .month, value: 3 * k, to: date)!
+            case .yearly: return cal.date(byAdding: .year, value: k, to: date)!
+            }
+        }
+        var k = 1
+        while step(k) < Date.now.startOfDay && k < 2000 { k += 1 }
+        return step(k).startOfDay
     }
 
     static func monthlyTotal(_ subs: [Subscription]) -> Double { subs.reduce(0) { $0 + $1.monthlyCost } }

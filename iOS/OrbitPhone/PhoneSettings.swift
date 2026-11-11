@@ -19,9 +19,8 @@ struct PhoneSettings: View {
                         Avatar(name: userName.isEmpty ? "Me" : userName, size: 56)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(userName.isEmpty ? "Your name" : userName).font(Theme.ui(17, weight: .semibold))
-                            PhotosPicker(selection: $photo, matching: .images) {
-                                Text(profile.photo == nil ? "Add a photo" : "Change photo").font(Theme.ui(13))
-                            }
+                            let label = profile.photo == nil ? "Add a photo" : "Change photo"
+                            PhotosPicker(selection: $photo, matching: .images) { Text(label).font(Theme.ui(13)) }
                         }
                     }
                     .padding(.vertical, 4)

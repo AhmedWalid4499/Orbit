@@ -244,7 +244,7 @@ struct UpdatePill: View {
     @State private var showing = false
 
     var body: some View {
-        if let release = updater.available {
+        if updater.available != nil {
             Button { showing = true } label: {
                 Label("New version available", systemImage: "arrow.down.circle.fill")
                     .font(Theme.ui(12, weight: .semibold))

@@ -250,6 +250,8 @@ final class Reminders: NSObject, ObservableObject, UNUserNotificationCenterDeleg
         // Your own reminders (at a time or a place) always get a slot; the automatic ones fill the rest.
         let smart = SmartReminders.requests(tasks: allTasks, prefix: prefix)
         requests += smart.timed
+        // Place reminders set on another device (synced from the Mac) need location access here too.
+        if !smart.places.isEmpty { SmartReminders.ensureLocationAccess() }
         let pending = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(prefix) }
         center.removePendingNotificationRequests(withIdentifiers: pending)
         for r in smart.places { try? await center.add(r) }

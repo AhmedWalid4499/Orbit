@@ -73,8 +73,8 @@ enum BudgetPeriod {
     /// Days gone and days in the budget month, for pace ("day 12 of 30").
     static func day(of p: DateInterval = current, now: Date = .now) -> (day: Int, of: Int) {
         let cal = Calendar.current
-        let total = cal.dateComponents([.day], from: p.start, to: p.end).day ?? 30
-        let d = (cal.dateComponents([.day], from: p.start, to: now.startOfDay).day ?? 0) + 1
+        let total = cal.dateComponents([.day], from: p.start.startOfDay, to: p.end).day ?? 30
+        let d = (cal.dateComponents([.day], from: p.start.startOfDay, to: now.startOfDay).day ?? 0) + 1
         return (min(max(d, 1), total), total)
     }
 }

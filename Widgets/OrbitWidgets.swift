@@ -35,6 +35,16 @@ struct WidgetSnapshot: Codable {
         d.dateDecodingStrategy = .iso8601
         return try? d.decode(WidgetSnapshot.self, from: data)
     }
+
+    /// Written on an earlier day (past midnight, before Joshu ran again): yesterday's ticks and "due today" aren't
+    /// today's, so habits show as not done yet and the due list waits for a refresh.
+    func asOf(_ date: Date) -> (snapshot: WidgetSnapshot, stale: Bool) {
+        guard !Calendar.current.isDate(generatedAt, inSameDayAs: date) else { return (self, false) }
+        var s = self
+        s.habits = habits.map { .init(name: $0.name, symbol: $0.symbol, done: false, streak: $0.streak, color: $0.color) }
+        s.tasks = []
+        return (s, true)
+    }
 }
 
 // MARK: - Look
@@ -56,17 +66,27 @@ enum W {
 struct Entry: TimelineEntry {
     let date: Date
     let snapshot: WidgetSnapshot?
+    /// The snapshot is from an earlier day (see `WidgetSnapshot.asOf`).
+    var stale = false
+
+    /// An entry for `date`, with the snapshot as it stands that day.
+    static func at(_ date: Date, _ snap: WidgetSnapshot?) -> Entry {
+        guard let r = snap?.asOf(date) else { return Entry(date: date, snapshot: nil) }
+        return Entry(date: date, snapshot: r.snapshot, stale: r.stale)
+    }
 }
 
 struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> Entry { Entry(date: .now, snapshot: nil) }
-    func getSnapshot(in context: Context, completion: @escaping (Entry) -> Void) { completion(Entry(date: .now, snapshot: WidgetSnapshot.load())) }
+    func getSnapshot(in context: Context, completion: @escaping (Entry) -> Void) { completion(.at(.now, WidgetSnapshot.load())) }
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> Void) {
         let snap = WidgetSnapshot.load()
-        // One entry now and one at each upcoming event start, so "next up" moves along on its own.
+        // One entry now and one at each upcoming event start, so "next up" moves along on its own, plus one at
+        // midnight so yesterday's habits and due tasks don't carry into the new day.
         var dates = [Date.now]
         dates += (snap?.events ?? []).map(\.start).filter { $0 > .now }.prefix(6)
-        let entries = dates.map { Entry(date: $0, snapshot: snap) }
+        if let midnight = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: .now)) { dates.append(midnight) }
+        let entries = dates.sorted().map { Entry.at($0, snap) }
         completion(Timeline(entries: entries, policy: .after(.now.addingTimeInterval(30 * 60))))
     }
 }
@@ -112,7 +132,7 @@ struct TodayWidgetView: View {
             }
             Spacer(minLength: 0)
             HStack(spacing: 6) {
-                pill("\(s.tasks.count)", "due", W.pink)
+                pill(entry.stale ? "–" : "\(s.tasks.count)", "due", W.pink)
                 pill("\(s.habits.filter(\.done).count)/\(s.habits.count)", "habits", W.lime)
             }
         }
@@ -128,8 +148,7 @@ struct TodayWidgetView: View {
             }
             VStack(alignment: .leading, spacing: 5) {
                 Text("Due today").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
-                if s.tasks.isEmpty { Text("All clear 🎉").font(.caption) }
-                ForEach(Array(s.tasks.prefix(4).enumerated()), id: \.offset) { _, t in taskRow(t) }
+                dueTasks(s)
                 Spacer(minLength: 0)
                 habitsDots(s)
             }
@@ -144,8 +163,7 @@ struct TodayWidgetView: View {
             ForEach(Array(upcoming.prefix(4).enumerated()), id: \.offset) { _, e in eventRow(e) }
             Divider()
             Text("Due today").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
-            if s.tasks.isEmpty { Text("All clear 🎉").font(.caption) }
-            ForEach(Array(s.tasks.prefix(4).enumerated()), id: \.offset) { _, t in taskRow(t) }
+            dueTasks(s)
             Spacer(minLength: 0)
             HStack {
                 habitsDots(s)
@@ -166,6 +184,12 @@ struct TodayWidgetView: View {
                 Text(e.allDay ? "All day" : "\(W.time(e.start)) – \(W.time(e.end))").font(.system(size: 10)).foregroundStyle(.secondary)
             }
         }
+    }
+
+    @ViewBuilder private func dueTasks(_ s: WidgetSnapshot) -> some View {
+        if entry.stale { Text("Open Joshu to refresh").font(.caption).foregroundStyle(.secondary) }
+        else if s.tasks.isEmpty { Text("All clear 🎉").font(.caption) }
+        ForEach(Array(s.tasks.prefix(4).enumerated()), id: \.offset) { _, t in taskRow(t) }
     }
 
     private func taskRow(_ t: WidgetSnapshot.Task) -> some View {

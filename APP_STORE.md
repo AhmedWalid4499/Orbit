@@ -49,7 +49,10 @@ What's left needs your accounts and your OK. In order:
 Gmail reading and sending are "restricted" Google scopes. Until Google verifies Joshu, only up to 100 test users you
 add can connect Gmail.
 - Public launch needs Google's OAuth verification plus a yearly CASA security assessment, a paid third-party audit.
-- Until then, either keep Gmail as an invite-only beta or launch without Gmail on the App Store.
+- Decision (Nov 2026): Gmail, YouTube and LinkedIn stay in the App Store build. Add every TestFlight tester's Google
+  address as a test user (Google Cloud › OAuth consent screen › Test users, up to 100), and add the review account's too.
+  In the App Review notes, say these are optional Google connections in testing with Google, give the review Google
+  account (added as a test user) or ask the reviewer to skip them; everything else works without them.
 - YouTube (read-only) only needs the lighter "sensitive scope" verification.
 
 ## 4b. Apple Wallet pass for the card

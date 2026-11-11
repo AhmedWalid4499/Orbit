@@ -111,7 +111,8 @@ app = {
     "LD_RUNPATH_SEARCH_PATHS": "$(inherited) @executable_path/Frameworks",
     "PRODUCT_BUNDLE_IDENTIFIER": BUNDLE_ID,
     "PRODUCT_NAME": "Orbit",
-    "JOSHU_SIGN_IN_WITH_APPLE": "YES" if APP_STORE else "NO",
+    "JOSHU_SIGN_IN_WITH_APPLE": "YES",  # the paid team can sign every build with Sign in with Apple
+    "JOSHU_APP_STORE": "YES" if APP_STORE else "NO",
 }
 if APP_STORE:
     app["CODE_SIGN_ENTITLEMENTS"] = "Support/OrbitPhone-AppStore.entitlements"

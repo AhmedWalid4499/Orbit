@@ -5,7 +5,8 @@ import SwiftUI
 /// Joshu Pro: the subscription that unlocks the AI assistant (named by you) and everything built on it.
 ///
 /// Free: everything except the AI. That means no assistant, morning brief, email summaries, day summary, money coach,
-/// LinkedIn tab (it's the AI reading your Gmail) or AI extras, and one email account.
+/// LinkedIn tab (it's the AI reading your Gmail) or AI extras, and one email account. (Email and LinkedIn are off
+/// while GoogleServices is off.)
 /// Pro ($7.99 a month or $59.99 a year): all of it, with the AI paid for by Joshu through its own server, so there's
 /// no key to set up.
 ///

@@ -40,10 +40,10 @@ final class YouTubeStore: ObservableObject {
     private let refreshKey = "youtube-refresh"
     private var access: (token: String, expires: Date)?
 
-    var isConnected: Bool { !Snapshot.isDemo && Keychain.read(refreshKey) != nil }
+    var isConnected: Bool { GoogleServices.enabled && !Snapshot.isDemo && Keychain.read(refreshKey) != nil }
 
     private init() {
-        guard !Snapshot.isDemo else { return }  // screenshots never show your channel
+        guard GoogleServices.enabled, !Snapshot.isDemo else { return }  // screenshots never show your channel
         let d = UserDefaults.standard
         channel = d.data(forKey: "youtube.channel").flatMap { try? JSONDecoder().decode(Channel.self, from: $0) }
         videos = d.data(forKey: "youtube.videos").flatMap { try? JSONDecoder().decode([Video].self, from: $0) } ?? []
@@ -70,6 +70,7 @@ final class YouTubeStore: ObservableObject {
     }
 
     func connect() async {
+        guard GoogleServices.enabled else { return }
         error = nil
         do {
             let t = try await GoogleAuth.authorize(scope: Self.scope)
@@ -96,7 +97,7 @@ final class YouTubeStore: ObservableObject {
     }
 
     func refresh() async {
-        guard !loading, let refresh = Keychain.read(refreshKey) else { return }
+        guard GoogleServices.enabled, !loading, let refresh = Keychain.read(refreshKey) else { return }
         loading = true
         error = nil
         defer { loading = false }

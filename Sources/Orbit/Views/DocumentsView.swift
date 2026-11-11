@@ -28,7 +28,7 @@ struct DocumentsView: View {
                 if sorted.isEmpty {
                     VStack(spacing: 10) {
                         Image(systemName: "doc.text.magnifyingglass").font(.system(size: 38, weight: .light))
-                        Text("Add your passport, ID, driving licence, car registration and insurance. Warranties from order emails show up here by themselves.")
+                        Text("Add your passport, ID, driving licence, car registration and insurance.\(GoogleServices.enabled ? " Warranties from order emails show up here by themselves." : "")")
                             .font(Theme.ui(14)).multilineTextAlignment(.center)
                         Button("Add your first document") { adding = true }.buttonStyle(SoftButtonStyle())
                     }

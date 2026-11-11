@@ -183,7 +183,7 @@ struct MoneyCoachCard: View {
             } else if let e = coach.error {
                 Label(e, systemImage: "exclamationmark.triangle.fill").font(Theme.ui(12))
             } else if !coach.loading {
-                Text("Add a few expenses (or connect Gmail) and \(AssistantName.current) will suggest where you can save.").font(Theme.ui(13)).opacity(0.8)
+                Text("Add a few expenses\(GoogleServices.enabled ? " (or connect Gmail)" : "") and \(AssistantName.current) will suggest where you can save.").font(Theme.ui(13)).opacity(0.8)
             } else {
                 Text("\(AssistantName.current) is looking at your spending…").font(Theme.display(18, weight: .regular))
             }

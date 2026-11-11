@@ -171,6 +171,7 @@ struct PhoneRoot: View {
 
     /// Jumps to a Mac-style section (from a notification, Siri or a tile).
     private func show(_ t: Tab) {
+        guard t.isAvailable else { tab = .today; return }
         switch t {
         case .today: tab = .today
         case .tasks: tab = .tasks
@@ -198,8 +199,8 @@ struct PhoneSection: View {
         case .bucket: PhoneBucket()
         case .documents: PhoneDocuments()
         case .github: PhoneGitHub()
-        case .youtube: PhoneYouTube()
-        case .linkedin: LinkedInView().phoneChrome("LinkedIn")
+        case .youtube where tab.isAvailable: PhoneYouTube()
+        case .linkedin where tab.isAvailable: LinkedInView().phoneChrome("LinkedIn")
         default: EmptyView()
         }
     }

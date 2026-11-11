@@ -4,6 +4,13 @@ import SwiftData
 import Network
 import CryptoKit
 
+/// Joshu is Apple-only: Gmail, Google Calendar, YouTube and LinkedIn (read from Gmail) are switched off, because
+/// connecting them needs Google's restricted-scope app verification. With this off nothing talks to those Google APIs
+/// and nothing offers to connect them; the code stays so it can come back by flipping this.
+enum GoogleServices {
+    static let enabled = false
+}
+
 // MARK: - Google OAuth (desktop loopback + PKCE)
 
 /// Signs in to Google accounts once and keeps a refresh token per account in the Keychain,
@@ -55,6 +62,7 @@ enum GoogleAuth {
     /// Opens the browser for consent and returns the signed-in email address.
     @MainActor
     static func signIn(hint: String? = nil) async throws -> String {
+        guard GoogleServices.enabled else { throw GmailError("Google connections aren't available in Joshu.") }
         let tokens = try await authorize(scope: scope, hint: hint)
         let email = try await profileEmail(accessToken: tokens.access)
         Keychain.write(tokens.refresh, account: "gmail:\(email)")
@@ -68,6 +76,7 @@ enum GoogleAuth {
     /// Google's consent screen for `scope` (Gmail, YouTube…), returning the tokens.
     @MainActor
     static func authorize(scope: String, hint: String? = nil) async throws -> (refresh: String, access: String, expiresIn: Int) {
+        guard GoogleServices.enabled else { throw GmailError("Google connections aren't available in Joshu.") }
         guard isConfigured else { throw GmailError("Add your Google OAuth client ID and secret first.") }
         let verifier = randomURLSafe(64)
         let challenge = Data(SHA256.hash(data: Data(verifier.utf8))).base64URL
@@ -139,6 +148,7 @@ enum GoogleAuth {
 
     /// A fresh access token from a saved refresh token.
     static func refreshAccess(_ refresh: String) async throws -> (token: String, expiresIn: Int) {
+        guard GoogleServices.enabled else { throw GmailError("Google connections aren't available in Joshu.") }
         let tokens = try await tokenRequest([
             "grant_type": "refresh_token", "refresh_token": refresh, "client_id": clientID, "client_secret": clientSecret,
         ])
@@ -156,6 +166,7 @@ enum GoogleAuth {
 
     @MainActor
     static func accessToken(for email: String) async throws -> String {
+        guard GoogleServices.enabled else { throw GmailError("Google connections aren't available in Joshu.") }
         if let cached = accessTokens[email], cached.expires > .now { return cached.token }
         guard let refresh = Keychain.read("gmail:\(email)") else { throw GmailError("\(email) needs to be connected again.") }
         let tokens = try await tokenRequest([
@@ -317,7 +328,7 @@ struct InboxDigest: Codable, Equatable {
 final class InboxStore: ObservableObject {
     static let shared = InboxStore()
 
-    @Published private(set) var accounts: [String] = UserDefaults.standard.stringArray(forKey: "gmailAccounts") ?? []
+    @Published private(set) var accounts: [String] = InboxStore.storedAccounts
     @Published private(set) var digest: InboxDigest?
     @Published private(set) var loading = false
     @Published private(set) var error: String?
@@ -334,7 +345,13 @@ final class InboxStore: ObservableObject {
 
     private let cacheKey = "inboxDigestCache"
 
+    /// Connected Gmail accounts; none while Google connections are off.
+    private static var storedAccounts: [String] {
+        GoogleServices.enabled ? UserDefaults.standard.stringArray(forKey: "gmailAccounts") ?? [] : []
+    }
+
     private init() {
+        guard GoogleServices.enabled else { return }
         if Snapshot.isDemo {
             accounts = ["alex@example.com"]
             digest = InboxDigest(overview: "A quiet inbox: one reply needed and a delivery on its way.", headline: "1 reply, a delivery and a receipt",
@@ -349,11 +366,12 @@ final class InboxStore: ObservableObject {
         }
     }
 
-    var isConnected: Bool { !accounts.isEmpty }
+    var isConnected: Bool { GoogleServices.enabled && !accounts.isEmpty }
 
-    func reloadAccounts() { accounts = UserDefaults.standard.stringArray(forKey: "gmailAccounts") ?? [] }
+    func reloadAccounts() { accounts = Self.storedAccounts }
 
     func addAccount(hint: String? = nil) async {
+        guard GoogleServices.enabled else { return }
         // Joshu Free connects one email account; more is part of Pro.
         if hint == nil, !Pro.shared.canAddEmail(existing: accounts.count) {
             error = "Joshu Free connects one email account. Get Joshu Pro to add more."
@@ -397,7 +415,7 @@ final class InboxStore: ObservableObject {
     }
 
     func refresh() async {
-        guard isConnected, !loading, !Snapshot.isActive else { return }
+        guard GoogleServices.enabled, isConnected, !loading, !Snapshot.isActive else { return }
         guard let claude = ClaudeClient() else {
             error = ClaudeClient.needsConsent ? ClaudeClient.consentMessage : "Get Joshu Pro to get inbox summaries."; return
         }

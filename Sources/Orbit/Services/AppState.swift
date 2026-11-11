@@ -15,7 +15,11 @@ enum Tab: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 
     /// Documents and YouTube were retired as tabs (YouTube stays connected for the assistant); old links to them still open.
-    static var allCases: [Tab] { [.today, .assistant, .insights, .calendar, .tasks, .habits, .bucket, .money, .notes, .ideas, .reading, .github, .linkedin] }
+    /// LinkedIn reads LinkedIn's emails in Gmail, so it's gone while Google connections are off (GoogleServices).
+    static var allCases: [Tab] { [.today, .assistant, .insights, .calendar, .tasks, .habits, .bucket, .money, .notes, .ideas, .reading, .github] + (GoogleServices.enabled ? [.linkedin] : []) }
+
+    /// Whether the tab can be opened at all: YouTube and LinkedIn need Google connections.
+    var isAvailable: Bool { (self != .youtube && self != .linkedin) || GoogleServices.enabled }
 
     var title: String {
         switch self {
@@ -67,7 +71,7 @@ enum Tab: String, CaseIterable, Identifiable {
     }
 
     /// Nav groups: day, plan, life.
-    static let groups: [[Tab]] = [[.today, .assistant, .insights], [.calendar, .tasks, .habits, .bucket], [.money, .notes, .ideas, .reading, .github, .linkedin]]
+    static let groups: [[Tab]] = [[.today, .assistant, .insights], [.calendar, .tasks, .habits, .bucket], [.money, .notes, .ideas, .reading, .github, .linkedin].filter(\.isAvailable)]
 
     /// Tabs you turned off in Settings › General › Tabs (synced). Today is always there.
     static var hidden: Set<Tab> {
@@ -83,7 +87,7 @@ enum Tab: String, CaseIterable, Identifiable {
         case .assistant: "Chat with your AI and see past chats"
         case .ideas: "Writing projects and the ideas that grow in them"
         case .insights: "Charts of your week and month"
-        case .calendar: "Apple and Google calendars"
+        case .calendar: GoogleServices.enabled ? "Apple and Google calendars" : "Your Apple calendars"
         case .tasks: "To-dos and reminders"
         case .habits: "Daily habits and streaks"
         case .bucket: "Dreams, trips and places to go"
@@ -107,7 +111,9 @@ final class AppState: ObservableObject {
     static weak var current: AppState?
     init() { if AppState.current == nil { AppState.current = self } }
 
-    @Published var tab: Tab = .today
+    @Published var tab: Tab = .today {
+        didSet { if !tab.isAvailable { tab = .today } }
+    }
     @Published var searchOpen = false
     /// The animated tour of what Orbit can do (first launch, or Settings › General › Take the tour).
     @Published var tourOpen = false

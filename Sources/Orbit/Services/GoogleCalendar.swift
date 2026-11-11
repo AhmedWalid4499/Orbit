@@ -28,17 +28,18 @@ final class GoogleCalendarStore: ObservableObject {
     static let enableAPIURL = URL(string: "https://console.cloud.google.com/apis/library/calendar-json.googleapis.com")!
 
     func events(from start: Date, to end: Date) -> [GoogleEvent] {
-        guard enabled else { return [] }
+        guard GoogleServices.enabled, enabled else { return [] }
         return all.filter { $0.start < end && $0.end > start }
     }
 
     func refreshIfDue() async {
+        guard GoogleServices.enabled else { return }
         if let lastRefresh, Date.now.timeIntervalSince(lastRefresh) < 15 * 60 { return }
         await refresh()
     }
 
     func refresh() async {
-        guard enabled, !Snapshot.isActive else { return }
+        guard GoogleServices.enabled, enabled, !Snapshot.isActive else { return }
         let accounts = InboxStore.shared.accounts
         guard !accounts.isEmpty else { all = []; return }
         let start = Date.now.startOfDay.adding(days: -45), end = Date.now.startOfDay.adding(days: 180)
@@ -78,6 +79,7 @@ final class GoogleCalendarStore: ObservableObject {
 
     /// Re-runs Google sign-in for an account so it also allows Calendar.
     func reconnect(_ account: String) async {
+        guard GoogleServices.enabled else { return }
         await InboxStore.shared.addAccount(hint: account)
         lastRefresh = nil
         await refresh()
@@ -143,7 +145,9 @@ struct GoogleCalendarBanner: View {
     @ObservedObject private var store = GoogleCalendarStore.shared
 
     var body: some View {
-        if store.apiDisabled {
+        if !GoogleServices.enabled {
+            EmptyView()
+        } else if store.apiDisabled {
             banner("Turn on Google Calendar for your Joshu project (one click), then come back.",
                    action: "Enable Calendar API") { Platform.open(GoogleCalendarStore.enableAPIURL) }
         } else if let account = store.needsConsent.sorted().first {

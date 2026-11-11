@@ -9,7 +9,7 @@ import CryptoKit
 enum AppStoreBuild {
     static let isOn: Bool = {
         #if os(iOS)
-        (Bundle.main.object(forInfoDictionaryKey: "JoshuSignInWithApple") as? String) == "YES"
+        (Bundle.main.object(forInfoDictionaryKey: "JoshuAppStore") as? String) == "YES"
         #else
         false
         #endif
@@ -17,7 +17,15 @@ enum AppStoreBuild {
 }
 
 enum AppleSignIn {
-    static var available: Bool { AppStoreBuild.isOn }
+    /// Apple's own sign-in sheet: iPhone builds signed with Sign in with Apple. The Mac signs in with Apple on the web
+    /// instead (`CloudAuth.signInWithAppleOnWeb`), since its app isn't signed with that capability.
+    static var available: Bool {
+        #if os(iOS)
+        (Bundle.main.object(forInfoDictionaryKey: "JoshuSignInWithApple") as? String) == "YES"
+        #else
+        false
+        #endif
+    }
 
 
     /// A one-time random string; Apple gets its SHA-256 and puts it in the token, the server checks it against this.

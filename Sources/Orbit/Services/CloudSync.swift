@@ -91,7 +91,28 @@ enum CloudAuth {
                 UserDefaults.standard.set(Date.now.timeIntervalSince1970, forKey: "auth.googleViaServer")
             }
         }
-        try await signInWithGoogleViaServer()
+        try await signInViaServer(provider: "google", name: "Google")
+    }
+
+    /// Sign in with Apple through the sync server's web page (the Mac, whose app isn't signed with Apple's sign-in sheet).
+    static func signInWithAppleOnWeb() async throws {
+        guard SupabaseConfig.isConfigured else { throw CloudError("Sync isn't set up in this copy of Joshu.") }
+        try await signInViaServer(provider: "apple", name: "Apple")
+    }
+
+    /// Which sign-ins the sync server has switched on ("apple", "google", "email"). Asked once per launch.
+    private static var providersCache: Set<String>?
+    static func enabledProviders() async -> Set<String> {
+        if let providersCache { return providersCache }
+        guard SupabaseConfig.isConfigured, let url = URL(string: "\(SupabaseConfig.url)/auth/v1/settings") else { return [] }
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 10
+        req.setValue(SupabaseConfig.key, forHTTPHeaderField: "apikey")
+        guard let (data, _) = try? await URLSession.shared.data(for: req),
+              let external = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])?["external"] as? [String: Any] else { return [] }
+        let on = Set(external.compactMap { k, v in (v as? Bool) == true ? k : nil })
+        providersCache = on
+        return on
     }
 
     /// Sign in with Apple: Apple's sign-in sheet hands Joshu a token for this app (and the nonce it was made with),
@@ -103,8 +124,8 @@ enum CloudAuth {
         session = s
     }
 
-    /// Google sign-in through the sync server's own Google page (shows the server's address).
-    private static func signInWithGoogleViaServer() async throws {
+    /// Sign-in through the sync server's own page for `provider` (Google or Apple), in a browser window.
+    private static func signInViaServer(provider: String, name: String) async throws {
         pending?.continuation.resume(throwing: CancellationError())
         var bytes = [UInt8](repeating: 0, count: 48)
         _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
@@ -113,14 +134,14 @@ enum CloudAuth {
         let challenge = Data(SHA256.hash(data: Data(verifier.utf8))).base64EncodedString()
             .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
         var comps = URLComponents(string: "\(SupabaseConfig.url)/auth/v1/authorize")!
-        comps.queryItems = [.init(name: "provider", value: "google"), .init(name: "redirect_to", value: callbackURL),
+        comps.queryItems = [.init(name: "provider", value: provider), .init(name: "redirect_to", value: callbackURL),
                             .init(name: "code_challenge", value: challenge), .init(name: "code_challenge_method", value: "s256")]
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
             pending = (verifier, cont)
             Task { @MainActor in
                 // The sign-in window hands the redirect straight back (no reliance on which app owns the link scheme).
                 if let back = await Platform.webAuth(comps.url!, callbackScheme: "com.personal.orbit") { handleCallback(back) }
-                else if let p = pending { pending = nil; p.continuation.resume(throwing: CloudError("Google sign-in was cancelled.")) }
+                else if let p = pending { pending = nil; p.continuation.resume(throwing: CloudError("\(name) sign-in was cancelled.")) }
             }
         }
     }
@@ -136,7 +157,7 @@ enum CloudAuth {
             Task {
                 do {
                     let json = try await auth("token?grant_type=pkce", body: ["auth_code": code, "code_verifier": p.verifier])
-                    guard let s = parseSession(json) else { throw CloudError("Google sign-in didn't finish.") }
+                    guard let s = parseSession(json) else { throw CloudError("Sign-in didn't finish.") }
                     session = s
                     Platform.bringToFront()
                     p.continuation.resume()
@@ -145,7 +166,7 @@ enum CloudAuth {
                 }
             }
         } else {
-            let message = value("error_description")?.replacingOccurrences(of: "+", with: " ") ?? "Google sign-in was cancelled."
+            let message = value("error_description")?.replacingOccurrences(of: "+", with: " ") ?? "Sign-in was cancelled."
             p.continuation.resume(throwing: CloudError(message))
         }
     }
@@ -556,6 +577,12 @@ final class CloudSync: ObservableObject {
 
     func signInWithGoogle(context: ModelContext) async throws {
         try await CloudAuth.signInWithGoogle()
+        self.email = CloudAuth.session?.email
+        await firstSync(context: context)
+    }
+
+    func signInWithAppleOnWeb(context: ModelContext) async throws {
+        try await CloudAuth.signInWithAppleOnWeb()
         self.email = CloudAuth.session?.email
         await firstSync(context: context)
     }

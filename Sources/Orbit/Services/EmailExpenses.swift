@@ -32,7 +32,7 @@ final class EmailExpenses: ObservableObject {
     static let subjectQuery = #"subject:(receipt OR invoice OR "order confirmation" OR "payment received" OR "payment confirmation" OR "payment successful" OR "you paid" OR "your order" OR "your purchase" OR charged OR transaction OR "subscription" OR "renewal" OR "bill" OR "booking confirmation" OR "reservation" OR itinerary OR "e-ticket" OR "your trip" OR "your flight" OR "حجز" OR "إيصال" OR "فاتورة" OR "عملية")"#
 
     func syncIfDue(context: ModelContext) async {
-        guard enabled, InboxStore.shared.isConnected, AIAssistant.shared.hasKey else { return }
+        guard GoogleServices.enabled, enabled, InboxStore.shared.isConnected, AIAssistant.shared.hasKey else { return }
         guard Date.now.timeIntervalSince1970 - lastSync > 3 * 3600 else { return }
         await sync(context: context)
     }
@@ -48,7 +48,7 @@ final class EmailExpenses: ObservableObject {
     }
 
     func sync(context: ModelContext) async {
-        guard !running, !Snapshot.isActive else { return }
+        guard GoogleServices.enabled, !running, !Snapshot.isActive else { return }
         guard let claude = ClaudeClient() else { status = "This is part of Joshu Pro."; return }
         let accounts = InboxStore.shared.accounts
         guard !accounts.isEmpty else { status = "Connect Gmail in Settings › Connections first."; return }

@@ -28,7 +28,7 @@ struct TripsSection: View {
                 .buttonStyle(SoftButtonStyle())
             }
             if sorted.isEmpty {
-                Text("Plan a trip from a travel dream below, or start a new one. Flights and hotels from your email are added by themselves.")
+                Text("Plan a trip from a travel dream below, or start a new one.\(GoogleServices.enabled ? " Flights and hotels from your email are added by themselves." : "")")
                     .font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary)
             }
             ScrollView(.horizontal) {
@@ -41,7 +41,7 @@ struct TripsSection: View {
                 }
             }
             .scrollIndicators(.never)
-            if !unassigned.isEmpty {
+            if GoogleServices.enabled, !unassigned.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Found in your email", systemImage: "envelope.fill").font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
                     ForEach(unassigned) { b in
@@ -251,7 +251,7 @@ struct TripSheet: View {
             ScrollView {
                 VStack(spacing: 6) {
                     if mine.isEmpty {
-                        Text("Flights and hotels in your email show up here by themselves. You can also add them by hand.")
+                        Text(GoogleServices.enabled ? "Flights and hotels in your email show up here by themselves. You can also add them by hand." : "Add flights, hotels and plans by hand.")
                             .font(Theme.ui(12)).foregroundStyle(Theme.inkMuted).frame(maxWidth: .infinity, alignment: .leading)
                     }
                     ForEach(mine) { b in

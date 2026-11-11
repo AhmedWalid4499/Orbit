@@ -14,11 +14,14 @@ struct ProSheet: View {
     private var features: [(String, String, Color)] { [
         ("Your own AI assistant, named by you: ask anything, plan, write, code, by voice or text", "sparkles", Theme.lime),
         ("Morning brief and a summary of your day", "sun.max.fill", Theme.peach),
-        ("Email summaries: what needs a reply, what matters", "envelope.fill", Theme.pink),
         ("Money coach and smart money insights", "chart.line.uptrend.xyaxis", Theme.mint),
+    ] + (GoogleServices.enabled ? [
+        ("Email summaries: what needs a reply, what matters", "envelope.fill", Theme.pink),
         ("LinkedIn job alerts, read from your email", "briefcase.fill", Theme.cyan),
         ("Connect as many email accounts as you like", "tray.2.fill", Theme.lavender),
-    ] }
+    ] : [
+        ("Smart capture: one line, sorted into tasks, events and spending", "text.badge.plus", Theme.cyan),
+    ]) }
 
     var body: some View {
         ScrollView {
@@ -65,7 +68,7 @@ struct ProSheet: View {
                 }
                 if let m = pro.message { Text(m).font(Theme.ui(13)).foregroundStyle(Theme.inkSecondary) }
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Free keeps everything else: tasks, calendar, habits, money, reading, ideas, notes, sync across your devices, and one email account.")
+                    Text("Free keeps everything else: tasks, calendar, habits, money, reading, ideas, notes, sync across your devices\(GoogleServices.enabled ? ", and one email account" : "").")
                         .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
                     Text("Payment is charged to your Apple ID. The subscription renews automatically unless you cancel at least 24 hours before the end of the period; manage or cancel it in your App Store account settings. The assistant's use is fair-use limited.")
                         .font(Theme.ui(11)).foregroundStyle(Theme.inkMuted).fixedSize(horizontal: false, vertical: true)
@@ -137,7 +140,7 @@ struct ProSettingsRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(pro.isPro ? "Joshu Pro" : "Joshu Free").font(.headline)
                 Text(pro.isPro ? (pro.ownKey && !pro.storeActive && !pro.serverActive ? "Using your own Anthropic key" : "\(AssistantName.current) and all smart features are on")
-                     : "Upgrade for your AI assistant, briefs, email summaries and more").font(.caption).foregroundStyle(.secondary)
+                     : "Upgrade for your AI assistant, briefs, \(GoogleServices.enabled ? "email summaries" : "money coach") and more").font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
             if pro.storeActive {

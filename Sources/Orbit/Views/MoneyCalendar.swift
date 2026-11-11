@@ -116,7 +116,7 @@ struct MoneyCalendar: View {
                 let total = items.compactMap(\.amount).reduce(0, +)
                 if total > 0 { Text("About \(Fmt.money(total)) in known amounts").font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary) }
                 if items.isEmpty {
-                    EmptyHint(symbol: "checkmark.seal", text: "Nothing due. Bills from email and recurring payments show up here.")
+                    EmptyHint(symbol: "checkmark.seal", text: GoogleServices.enabled ? "Nothing due. Bills from email and recurring payments show up here." : "Nothing due. Bills and recurring payments show up here.")
                 }
                 ForEach(items) { DueRow(item: $0) }
             }

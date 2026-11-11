@@ -21,7 +21,7 @@ What's left needs your accounts and your OK. In order:
 4. Run `scripts/deploy-server.sh`.
 5. Admin page: run `supabase/admin.sql`, with the last line uncommented and your email in it. Then open
    https://ahmedwalid4499.github.io/Orbit/admin/ and sign in. Add that address to Supabase › Authentication ›
-   URL Configuration › Redirect URLs so "Sign in with Google" can come back to it.
+   URL Configuration › Redirect URLs so sign-in can come back to it.
 
 ## 3. App Store Connect
 1. **Create the app.** Use bundle ID `com.ahmedwalid.orbit` (iPhone; keep it, it's invisible to users).
@@ -45,15 +45,13 @@ What's left needs your accounts and your OK. In order:
    Deleting an account uses them to end Sign in with Apple, as Apple requires.
 7. **Review notes.** Say that Joshu Pro needs a free account, because the assistant runs on the account across devices. Give a demo Joshu account with Pro (grant it with the same SQL as yours), so the reviewer can try the AI assistant.
 
-## 4. Google sign-in (Gmail) for the public
-Gmail reading and sending are "restricted" Google scopes. Until Google verifies Joshu, only up to 100 test users you
-add can connect Gmail.
-- Public launch needs Google's OAuth verification plus a yearly CASA security assessment, a paid third-party audit.
-- Decision (Nov 2026): Gmail, YouTube and LinkedIn stay in the App Store build. Add every TestFlight tester's Google
-  address as a test user (Google Cloud › OAuth consent screen › Test users, up to 100), and add the review account's too.
-  In the App Review notes, say these are optional Google connections in testing with Google, give the review Google
-  account (added as a test user) or ask the reviewer to skip them; everything else works without them.
-- YouTube (read-only) only needs the lighter "sensitive scope" verification.
+## 4. Sign in with Apple only (Nov 2026)
+Joshu signs in with Apple only and has no Google connections (Gmail, Google Calendar, YouTube and LinkedIn are switched
+off by `GoogleServices.enabled` in `Services/Gmail.swift`), so no Google app verification is needed.
+Turn Apple on for the account server once: follow `SIGN_IN_WITH_APPLE.md` (Services ID, key,
+`scripts/setup-apple-signin.sh`, Supabase › Authentication › Apple). Until then the app still shows email and Google
+sign-in. The Secret Key for the Mac's web sign-in expires every 6 months; rerun the script before then.
+App Review signs in with their own Apple ID; Pro is bought in the sandbox, so no demo account is needed for sign-in.
 
 ## 4b. Apple Wallet pass for the card
 Run `scripts/setup-wallet-pass.sh` once in Terminal: it makes a certificate request, you create a Pass Type ID
@@ -62,13 +60,11 @@ secrets and deploys `supabase/functions/wallet-pass`. "Add to Apple Wallet" appe
 
 ## The App Store build leaves out
 `AppStoreBuild.isOn` (set by `gen-ios-project.py --app-store`): your own Anthropic key no longer unlocks Pro features
-(it still powers the AI), the OpenAI voice key, Goodreads website updates (read-only import stays) and the LinkedIn
-developer-app setup. Everyday installs keep all of them.
+(it still powers the AI), the OpenAI voice key and Goodreads website updates (read-only import stays). Everyday installs keep all of them.
 
 ## 5. Things App Review may push back on
 - **Goodreads updates** work by driving Goodreads' website with your sign-in (Goodreads has no API). Keep it, but
   expect it may need to come out if Goodreads or Apple object.
-- **LinkedIn tab** reads LinkedIn's emails in your Gmail; it depends on the Google verification above.
 - **Health** needs a clear reason in the review notes (habits are ticked from workouts and steps; read-only).
 - **Bank texts and Apple Pay** go through Shortcuts automations that the user sets up; that's allowed.
 

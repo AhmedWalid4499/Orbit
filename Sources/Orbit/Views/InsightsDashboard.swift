@@ -28,7 +28,7 @@ struct InsightsDashboard: View {
                 } actions: { EmptyView() }
                 tiles(mood)
                 HealthCard()
-                YouTubeCard()
+                if GoogleServices.enabled { YouTubeCard() }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: Platform.isPhone ? 300 : 360), spacing: 16, alignment: .top)], spacing: 16) {
                     spendingByMonth
                     spendingByCategory

@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-/// Connections on iPhone. Google, GitHub and the API key arrive from your Orbit account, so this shows what's
+/// Connections on iPhone. Google (only while GoogleServices is on), GitHub and the API key arrive from your Orbit account, so this shows what's
 /// connected rather than the Mac's one-time setup guides.
 struct PhoneConnections: View {
     @Environment(\.modelContext) private var context
@@ -23,6 +23,7 @@ struct PhoneConnections: View {
                 }
             }
 
+            if GoogleServices.enabled {
             Section {
                 if inbox.accounts.isEmpty {
                     row("envelope.fill", Theme.pink, "Gmail", detail: "Connect Gmail and your assistant summarises your inbox on Today. Accounts you added on another device come here on their own.")
@@ -56,6 +57,7 @@ struct PhoneConnections: View {
                 InboxWindowControls()
             } header: {
                 Text("Google")
+            }
             }
 
             Section("GitHub") {

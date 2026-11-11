@@ -465,9 +465,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 106;
+				CURRENT_PROJECT_VERSION = 108;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.48.0;
+				MARKETING_VERSION = 1.48.1;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -495,7 +495,8 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = com.ahmedwalid.orbit;
 				PRODUCT_NAME = Orbit;
-				JOSHU_SIGN_IN_WITH_APPLE = NO;
+				JOSHU_SIGN_IN_WITH_APPLE = YES;
+				JOSHU_APP_STORE = NO;
 				CODE_SIGN_ENTITLEMENTS = Support/OrbitPhone.entitlements;
 			};
 			name = Debug;
@@ -504,9 +505,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 106;
+				CURRENT_PROJECT_VERSION = 108;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.48.0;
+				MARKETING_VERSION = 1.48.1;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -534,7 +535,8 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = com.ahmedwalid.orbit;
 				PRODUCT_NAME = Orbit;
-				JOSHU_SIGN_IN_WITH_APPLE = NO;
+				JOSHU_SIGN_IN_WITH_APPLE = YES;
+				JOSHU_APP_STORE = NO;
 				CODE_SIGN_ENTITLEMENTS = Support/OrbitPhone.entitlements;
 			};
 			name = Release;
@@ -543,9 +545,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 106;
+				CURRENT_PROJECT_VERSION = 108;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.48.0;
+				MARKETING_VERSION = 1.48.1;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -565,9 +567,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 106;
+				CURRENT_PROJECT_VERSION = 108;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.48.0;
+				MARKETING_VERSION = 1.48.1;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -587,9 +589,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 106;
+				CURRENT_PROJECT_VERSION = 108;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.48.0;
+				MARKETING_VERSION = 1.48.1;
 				SDKROOT = watchos;
 				SUPPORTED_PLATFORMS = "watchos watchsimulator";
 				TARGETED_DEVICE_FAMILY = 4;
@@ -613,9 +615,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 106;
+				CURRENT_PROJECT_VERSION = 108;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.48.0;
+				MARKETING_VERSION = 1.48.1;
 				SDKROOT = watchos;
 				SUPPORTED_PLATFORMS = "watchos watchsimulator";
 				TARGETED_DEVICE_FAMILY = 4;
@@ -639,9 +641,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 106;
+				CURRENT_PROJECT_VERSION = 108;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.48.0;
+				MARKETING_VERSION = 1.48.1;
 				SDKROOT = watchos;
 				SUPPORTED_PLATFORMS = "watchos watchsimulator";
 				TARGETED_DEVICE_FAMILY = 4;
@@ -662,9 +664,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 106;
+				CURRENT_PROJECT_VERSION = 108;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.48.0;
+				MARKETING_VERSION = 1.48.1;
 				SDKROOT = watchos;
 				SUPPORTED_PLATFORMS = "watchos watchsimulator";
 				TARGETED_DEVICE_FAMILY = 4;

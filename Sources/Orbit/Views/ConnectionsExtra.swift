@@ -10,8 +10,10 @@ struct OtherConnections: View {
     @State private var confirm: String?
 
     var body: some View {
-        Section("YouTube") { YouTubeConnectionRow() }
-        Section("LinkedIn") { LinkedInConnectionRow() }
+        if GoogleServices.enabled {
+            Section("YouTube") { YouTubeConnectionRow() }
+            Section("LinkedIn") { LinkedInConnectionRow() }
+        }
         Section("Health") { HealthConnectionRow() }
         Section("Outlook") { OutlookCalendarRow() }
         Section {

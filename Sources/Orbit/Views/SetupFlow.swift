@@ -248,7 +248,7 @@ struct SetupFlow: View {
                            Theme.cyan, done: apple.calendarEnabled) {
                     Task { await apple.connectCalendar(); await apple.connectReminders() }
                 }
-                if GoogleAuth.isConfigured {
+                if GoogleServices.enabled && GoogleAuth.isConfigured {
                     connectRow("envelope.fill", "Gmail & Google Calendar",
                                inbox.accounts.isEmpty ? "Receipts, bookings and what needs a reply" : inbox.accounts.joined(separator: ", "),
                                Theme.pink, done: !inbox.accounts.isEmpty) {

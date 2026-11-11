@@ -42,8 +42,8 @@ struct RootView: View {
                 case .documents: DocumentsView()
                 case .bucket: BucketListView()
                 case .github: GitHubView()
-                case .youtube: YouTubeView()
-                case .linkedin: LinkedInView()
+                case .youtube: if Tab.youtube.isAvailable { YouTubeView() }
+                case .linkedin: if Tab.linkedin.isAvailable { LinkedInView() }
                 }
             }
             // Content that's taller than the window is cut at the bottom, never pushing the top bar out of view.

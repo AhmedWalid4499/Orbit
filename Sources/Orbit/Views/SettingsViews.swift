@@ -101,7 +101,7 @@ struct GeneralSettings: View {
     }
 }
 
-/// Apple Calendar and Reminders, Google, GitHub, reading sources.
+/// Apple Calendar and Reminders, Google (only while GoogleServices is on), GitHub, reading sources.
 struct ConnectionsSettings: View {
     @EnvironmentObject private var apple: AppleSync
     @ObservedObject private var gh = GitHubStore.shared
@@ -123,10 +123,12 @@ struct ConnectionsSettings: View {
                           connect: { Task { await apple.connectReminders() } },
                           disconnect: apple.disconnectReminders)
         }
-        Section {
-            GmailSettings()
-        } header: {
-            HStack(spacing: 6) { BrandLogo(brand: .gmail, size: 14, style: .glyph); BrandLogo(brand: .googleCalendar, size: 14, style: .glyph); Text("Google: Gmail and Calendar") }
+        if GoogleServices.enabled {
+            Section {
+                GmailSettings()
+            } header: {
+                HStack(spacing: 6) { BrandLogo(brand: .gmail, size: 14, style: .glyph); BrandLogo(brand: .googleCalendar, size: 14, style: .glyph); Text("Google: Gmail and Calendar") }
+            }
         }
         Section {
             if gh.isConnected {
@@ -450,8 +452,8 @@ struct AccountSettings: View {
                             Button("Sign Out and Keep a Copy Here") { signOut(keep: true) }
                         } message: {
                             Text(cloud.syncSecrets
-                                 ? "Everything is saved to your account first, then removed from this device, with your chats and connected accounts like Gmail. Sign in again and it all comes back. Keep a copy only on a device that's just yours."
-                                 : "Everything is saved to your account first, then removed from this device. Key sync is off, so your API keys and connected accounts like Gmail aren't saved: you'd need to add them again. Keep a copy only on a device that's just yours.")
+                                 ? "Everything is saved to your account first, then removed from this device, with your chats and connected accounts like GitHub. Sign in again and it all comes back. Keep a copy only on a device that's just yours."
+                                 : "Everything is saved to your account first, then removed from this device. Key sync is off, so your API keys and connected accounts like GitHub aren't saved: you'd need to add them again. Keep a copy only on a device that's just yours.")
                         }
                     Button("Delete Account…", role: .destructive) { confirmDelete = true }
                         .confirmationDialog("Delete your Joshu account?", isPresented: $confirmDelete, titleVisibility: .visible) {
@@ -502,7 +504,7 @@ struct KeySyncSection: View {
                 case .off:
                     Text("Sign in to sync them.").font(.caption).foregroundStyle(.secondary)
                 }
-                Text("Your Anthropic key, GitHub token, Google sign-ins for Gmail and Calendar, and their settings arrive on every device you sign in to, with nothing to type. They're stored encrypted in your account.")
+                Text("Your Anthropic key, GitHub token\(GoogleServices.enabled ? ", Google sign-ins for Gmail and Calendar" : ""), and their settings arrive on every device you sign in to, with nothing to type. They're stored encrypted in your account.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

@@ -38,6 +38,7 @@ final class LinkedInStore: ObservableObject {
     private let file = URL.applicationSupportDirectory.appending(path: "Orbit/linkedin.json")
 
     private init() {
+        guard GoogleServices.enabled else { return }  // its items all come from Gmail
         if Snapshot.isDemo { items = Self.demo; return }
         load()
     }
@@ -52,7 +53,7 @@ final class LinkedInStore: ObservableObject {
     }
 
     func refreshIfDue() async {
-        guard enabled, AIAssistant.shared.hasKey, InboxStore.shared.isConnected, !Snapshot.isActive else { return }
+        guard GoogleServices.enabled, enabled, AIAssistant.shared.hasKey, InboxStore.shared.isConnected, !Snapshot.isActive else { return }
         if Date.now.timeIntervalSince1970 - lastSync > 3600 { await refresh() }
     }
 
@@ -64,7 +65,7 @@ final class LinkedInStore: ObservableObject {
 
     /// Reads LinkedIn's job-alert emails from the last 60 days in every connected inbox.
     func refresh() async {
-        guard !loading, enabled, !Snapshot.isActive else { return }
+        guard GoogleServices.enabled, !loading, enabled, !Snapshot.isActive else { return }
         let accounts = InboxStore.shared.accounts
         guard !accounts.isEmpty else { status = "Connect Gmail in Settings › Connections first."; return }
         loading = true

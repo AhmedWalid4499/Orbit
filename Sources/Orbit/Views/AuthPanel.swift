@@ -1,8 +1,9 @@
 import SwiftUI
 import SwiftData
 
-/// Sign in or create an Orbit account: email first (Create account / Sign in), then the usual
-/// "Sign in with Google" button. Used in the first-launch welcome on Mac and iPhone and in Settings › Account.
+/// Sign in to your Joshu account with Apple: Apple's own sheet on iPhone, Apple's web page on the Mac. Email and Google
+/// stay behind a small link for accounts made with them before (and are the only options until the sync server has
+/// Sign in with Apple switched on). Used in the first-launch welcome on Mac and iPhone and in Settings › Account.
 struct AuthPanel: View {
     @Environment(\.modelContext) private var context
     @ObservedObject private var cloud = CloudSync.shared
@@ -14,63 +15,38 @@ struct AuthPanel: View {
     @State private var isError = false
     @State private var googleTask: Task<Void, Never>?
 
+    /// Whether the sync server has Sign in with Apple switched on (nil while asking).
+    @State private var appleReady: Bool? = Snapshot.isDemo ? true : nil
+    @State private var showOther = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Picker("", selection: $creating) {
-                Text("Create account").tag(true)
-                Text("Sign in").tag(false)
-            }
-            .pickerStyle(.segmented).labelsHidden()
-            .onChange(of: creating) { message = nil }
-
-            VStack(spacing: 10) {
-                field {
-                    TextField("Email", text: $email)
-                        .textContentType(.username)
-                        #if os(iOS)
-                        .keyboardType(.emailAddress).textInputAutocapitalization(.never).autocorrectionDisabled()
-                        #endif
+            if appleReady == true {
+                // Joshu signs in with Apple. Email and Google stay only for accounts made with them before.
+                appleButton
+                Button(showOther ? "Hide other sign-in options" : "Made your account with email or Google before?") {
+                    withAnimation(.snappy) { showOther.toggle(); message = nil }
                 }
-                field {
-                    SecureField(creating ? "Password (at least 6 characters)" : "Password", text: $password)
-                        .textContentType(creating ? .newPassword : .password)
-                        .onSubmit(submit)
+                .buttonStyle(.orbitLink).font(Theme.ui(12))
+                if showOther {
+                    emailFields(create: false)
+                    GoogleSignInButton(working: working, action: google)
+                    cancelGoogle
                 }
-            }
-
-            Button(action: submit) {
-                HStack {
-                    if working { ProgressView().controlSize(.small).tint(Theme.onInverse) }
-                    Text(creating ? "Create account" : "Sign in")
+            } else if appleReady == false {
+                // Until Apple is switched on for the sync server, the earlier ways keep working.
+                Picker("", selection: $creating) {
+                    Text("Create account").tag(true)
+                    Text("Sign in").tag(false)
                 }
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(PrimaryButtonStyle())
-            .disabled(working || !email.contains("@") || password.count < 6)
-            .keyboardShortcut(.defaultAction)
-
-            if !creating {
-                Button("Forgot password?") {
-                    Task {
-                        do { try await CloudAuth.resetPassword(email: email); show("Check \(email) for a link to reset your password.") }
-                        catch { show(error.localizedDescription, error: true) }
-                    }
-                }
-                .buttonStyle(.orbitLink).font(Theme.ui(12)).disabled(!email.contains("@"))
-            }
-
-            HStack(spacing: 10) {
-                Rectangle().fill(Theme.line).frame(height: 1)
-                Text("or").font(Theme.ui(12)).foregroundStyle(Theme.inkMuted)
-                Rectangle().fill(Theme.line).frame(height: 1)
-            }
-
-            if AppleSignIn.available {
-                AppleSignInButton(working: working) { token, nonce, name in apple(token, nonce, name) } onError: { show($0, error: true) }
-            }
-            GoogleSignInButton(working: working, action: google)
-            if let googleTask {
-                Button("Cancel") { googleTask.cancel() }.buttonStyle(.orbitLink).font(Theme.ui(12))
+                .pickerStyle(.segmented).labelsHidden()
+                .onChange(of: creating) { message = nil }
+                emailFields(create: creating)
+                divider
+                GoogleSignInButton(working: working, action: google)
+                cancelGoogle
+            } else {
+                ProgressView().frame(maxWidth: .infinity).padding(.vertical, 10)
             }
 
             if let message {
@@ -80,6 +56,69 @@ struct AuthPanel: View {
             }
             Text("Your account keeps your data in sync between your devices and backs it up. Only you can see it.")
                 .font(Theme.ui(11)).foregroundStyle(Theme.inkMuted).fixedSize(horizontal: false, vertical: true)
+        }
+        .task {
+            if appleReady == nil { appleReady = await CloudAuth.enabledProviders().contains("apple") }
+        }
+    }
+
+    @ViewBuilder
+    private var appleButton: some View {
+        if AppleSignIn.available {
+            AppleSignInButton(working: working) { token, nonce, name in apple(token, nonce, name) } onError: { show($0, error: true) }
+        } else {
+            WebAppleSignInButton(working: working, action: appleOnWeb)
+        }
+    }
+
+    private var divider: some View {
+        HStack(spacing: 10) {
+            Rectangle().fill(Theme.line).frame(height: 1)
+            Text("or").font(Theme.ui(12)).foregroundStyle(Theme.inkMuted)
+            Rectangle().fill(Theme.line).frame(height: 1)
+        }
+    }
+
+    @ViewBuilder
+    private var cancelGoogle: some View {
+        if let googleTask {
+            Button("Cancel") { googleTask.cancel() }.buttonStyle(.orbitLink).font(Theme.ui(12))
+        }
+    }
+
+    @ViewBuilder
+    private func emailFields(create: Bool) -> some View {
+        VStack(spacing: 10) {
+            field {
+                TextField("Email", text: $email)
+                    .textContentType(.username)
+                    #if os(iOS)
+                    .keyboardType(.emailAddress).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    #endif
+            }
+            field {
+                SecureField(create ? "Password (at least 6 characters)" : "Password", text: $password)
+                    .textContentType(create ? .newPassword : .password)
+                    .onSubmit(submit)
+            }
+        }
+        Button(action: submit) {
+            HStack {
+                if working { ProgressView().controlSize(.small).tint(Theme.onInverse) }
+                Text(create ? "Create account" : "Sign in")
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(PrimaryButtonStyle())
+        .disabled(working || !email.contains("@") || password.count < 6)
+        if !create {
+            Button("Forgot password?") {
+                Task {
+                    do { try await CloudAuth.resetPassword(email: email); show("Check \(email) for a link to reset your password.") }
+                    catch { show(error.localizedDescription, error: true) }
+                }
+            }
+            .buttonStyle(.orbitLink).font(Theme.ui(12)).disabled(!email.contains("@"))
         }
     }
 
@@ -102,6 +141,16 @@ struct AuthPanel: View {
         }
     }
 
+    private func appleOnWeb() {
+        working = true; message = nil
+        Task {
+            defer { working = false }
+            do { try await cloud.signInWithAppleOnWeb(context: context) }
+            catch is CancellationError {}
+            catch { show(error.localizedDescription, error: true) }
+        }
+    }
+
     private func apple(_ token: String, _ nonce: String, _ name: String?) {
         working = true; message = nil
         Task {
@@ -118,7 +167,7 @@ struct AuthPanel: View {
         Task {
             defer { working = false }
             do {
-                if creating {
+                if creating && appleReady != true {
                     switch try await cloud.signUp(email: e, password: password, context: context) {
                     case .signedIn: password = ""
                     case .checkEmail:
@@ -186,5 +235,28 @@ struct GoogleG: View {
                     Circle().trim(from: 0, to: to / 360).stroke(c, style: StrokeStyle(lineWidth: w)).frame(width: r * 2, height: r * 2)
                 }
             }
+    }
+}
+
+/// "Sign in with Apple" for the Mac, in Apple's style (black, or white in dark mode), opening Apple's page in a browser window.
+struct WebAppleSignInButton: View {
+    var working = false
+    let action: () -> Void
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Image(systemName: "apple.logo").font(.system(size: 16, weight: .medium))
+                Text("Sign in with Apple").font(.system(size: 15, weight: .medium))
+                if working { ProgressView().controlSize(.small) }
+            }
+            .foregroundStyle(scheme == .dark ? Color.black : .white)
+            .frame(maxWidth: .infinity).frame(height: 44)
+            .background(RoundedRectangle(cornerRadius: 12).fill(scheme == .dark ? Color.white : .black))
+            .contentShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .disabled(working)
     }
 }

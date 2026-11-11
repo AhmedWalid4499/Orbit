@@ -13,10 +13,12 @@ struct ProWelcome: View {
     private let unlocked: [(String, String, String, Color)] = [
         ("sparkles", "Your own assistant", "Ask, plan, write and code, by voice or text", Theme.lime),
         ("sun.max.fill", "Morning brief", "What matters today, ready when you wake up", Theme.peach),
-        ("envelope.fill", "Email summaries", "What needs a reply, and what can wait", Theme.pink),
+        GoogleServices.enabled ? ("envelope.fill", "Email summaries", "What needs a reply, and what can wait", Theme.pink)
+            : ("moon.stars.fill", "Day summary", "How your day went, in a few lines", Theme.pink),
         ("chart.line.uptrend.xyaxis", "Money coach", "Where your money goes, and how to keep more", Theme.mint),
         ("waveform", "Hands-free", "Just say “Hey” and its name", Theme.cyan),
-        ("briefcase.fill", "LinkedIn job alerts", "Every alert, laid out job by job", Theme.lavender),
+        GoogleServices.enabled ? ("briefcase.fill", "LinkedIn job alerts", "Every alert, laid out job by job", Theme.lavender)
+            : ("text.badge.plus", "Smart capture", "One line, sorted into tasks, events and spending", Theme.lavender),
     ]
 
     var body: some View {
@@ -72,7 +74,7 @@ struct ProWelcome: View {
                     }
                     .frame(maxWidth: 420)
 
-                    Text("Your assistant works by sending what each request needs (your message, and the parts of your day, money, health, notes or email it's about) to Anthropic's Claude AI. It isn't used to train their models.")
+                    Text("Your assistant works by sending what each request needs (your message, and the parts of your day, money, health, notes\(GoogleServices.enabled ? " or email" : "") it's about) to Anthropic's Claude AI. It isn't used to train their models.")
                         .font(Theme.ui(12)).foregroundStyle(Theme.inkMuted).multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true).frame(maxWidth: 460)
                     VStack(spacing: 10) {

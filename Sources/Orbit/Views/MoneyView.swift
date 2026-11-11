@@ -427,7 +427,7 @@ struct EmailExpensesChip: View {
     @State private var showing = false
 
     var body: some View {
-        if inbox.isConnected && importer.enabled {
+        if GoogleServices.enabled && inbox.isConnected && importer.enabled {
             Button { showing = true } label: {
                 HStack(spacing: 6) {
                     if importer.running { ProgressView().controlSize(.mini) } else { Image(systemName: "envelope.badge") }

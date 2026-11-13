@@ -89,6 +89,11 @@ enum StoreShots {
             ("header-3000x1000.png", AnyView(StoreBanner(screens: [screen("today"), screen("calendar"), screen("habits"), screen("money")], layout: .header)), CGSize(width: 3000, height: 1000)),
             ("banner-1080x1920.png", AnyView(StoreBanner(screens: [screen("today"), screen("habits")], layout: .tall)), CGSize(width: 1080, height: 1920)),
             ("pro-promo-1024.png", AnyView(ProPromo()), CGSize(width: 1024, height: 1024)),
+            // App Store Connect featuring artwork, at the exact sizes it accepts.
+            ("featuring-5244x2950.png", AnyView(StoreBanner(screens: [screen("today"), screen("habits"), screen("money")], layout: .wide)), CGSize(width: 5244, height: 2950)),
+            ("featuring-3840x2560.png", AnyView(StoreBanner(screens: [screen("today"), screen("habits"), screen("money")], layout: .wide)), CGSize(width: 3840, height: 2560)),
+            ("featuring-1920x1280.png", AnyView(StoreBanner(screens: [screen("today"), screen("habits"), screen("money")], layout: .wide)), CGSize(width: 1920, height: 1280)),
+            ("featuring-3840x1646.png", AnyView(StoreBanner(screens: [screen("today"), screen("habits"), screen("money")], layout: .header)), CGSize(width: 3840, height: 1646)),
         ]
         for (file, view, size) in jobs {
             let renderer = ImageRenderer(content: view.frame(width: size.width, height: size.height).environment(\.colorScheme, .light))

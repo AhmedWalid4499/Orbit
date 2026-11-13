@@ -137,7 +137,7 @@ struct LogBankMessageIntent: AppIntent {
 /// For a Shortcuts automation: "When I tap any Wallet card" → Log Card Payment with Amount, Merchant and Card.
 struct LogCardPaymentIntent: AppIntent {
     static let title: LocalizedStringResource = "Log Card Payment"
-    static let description = IntentDescription("Adds an Apple Pay payment to Money. Use it in a Wallet “Transaction” automation and pass the Amount, Merchant and Card it provides.")
+    static let description = IntentDescription("Adds a card payment to Money. Use it in a Wallet “Transaction” automation and pass the Amount, Merchant and Card it provides.")
 
     @Parameter(title: "Amount") var amount: String
     @Parameter(title: "Merchant", default: "") var merchant: String
@@ -159,7 +159,7 @@ struct LogCardPaymentIntent: AppIntent {
 /// Saves a place to Bucket list › Go to. Shared from Google or Apple Maps through the "Joshu Go To" shortcut, or said to Siri.
 struct AddPlaceIntent: AppIntent {
     static let title: LocalizedStringResource = "Add Place to Go To"
-    static let description = IntentDescription("Saves a restaurant, café, shop, museum or any place to your Go to list, from its name or a Google or Apple Maps link. Joshu finds it on the map and works out what kind of place it is.")
+    static let description = IntentDescription("Saves a restaurant, café, shop, museum or any place to your Go to list, from its name or a maps link. Joshu finds it on the map and works out what kind of place it is.")
 
     @Parameter(title: "Place", requestValueDialog: "Which place?") var place: String
     @Parameter(title: "Notes", default: "") var notes: String

@@ -43,8 +43,7 @@ What's left needs your accounts and your OK. In order:
       a localization (display name "Joshu Pro Monthly" / "Joshu Pro Yearly", description "The assistant and everything
       it does, every month" / "…every year"), and Review Information: a screenshot of the Joshu Pro screen
       (I can render one) and the note "Unlocks the AI assistant".
-   4. Optional: **Introductory offer** on the yearly plan, for example a 1-week free trial. The app shows Apple's own
-      purchase sheet, which states the trial, so no app change is needed.
+   4. **No free trial** (decided Nov 2026): leave Introductory Offers empty.
    5. **The first time only:** subscriptions are reviewed together with an app version. On the version page, under
       **In-App Purchases and Subscriptions**, add both before you press Submit for Review.
    6. **Users and Access › Sandbox › Test Accounts:** add a sandbox Apple ID. On your iPhone, Settings › Developer ›

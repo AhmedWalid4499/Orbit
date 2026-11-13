@@ -77,8 +77,34 @@ enum StoreShots {
         return true
     }
 
+    /// `ORBIT_STORE_BANNERS=<folder with the raw iPhone screens>`: wide and tall banners and the Joshu Pro promo image,
+    /// written to <folder>/banners.
+    static func renderBannersIfRequested() -> Bool {
+        guard let dir = ProcessInfo.processInfo.environment["ORBIT_STORE_BANNERS"] else { return false }
+        let input = URL(fileURLWithPath: dir), out = input.appending(path: "banners")
+        try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+        func screen(_ name: String) -> Image { Image(nsImage: NSImage(contentsOf: input.appending(path: "\(name).png")) ?? NSImage()) }
+        let jobs: [(String, AnyView, CGSize)] = [
+            ("banner-1920x1080.png", AnyView(StoreBanner(screens: [screen("today"), screen("habits"), screen("money")], layout: .wide)), CGSize(width: 1920, height: 1080)),
+            ("header-3000x1000.png", AnyView(StoreBanner(screens: [screen("today"), screen("calendar"), screen("habits"), screen("money")], layout: .header)), CGSize(width: 3000, height: 1000)),
+            ("banner-1080x1920.png", AnyView(StoreBanner(screens: [screen("today"), screen("habits")], layout: .tall)), CGSize(width: 1080, height: 1920)),
+            ("pro-promo-1024.png", AnyView(ProPromo()), CGSize(width: 1024, height: 1024)),
+        ]
+        for (file, view, size) in jobs {
+            let renderer = ImageRenderer(content: view.frame(width: size.width, height: size.height).environment(\.colorScheme, .light))
+            renderer.scale = 1
+            guard let cg = renderer.cgImage else { continue }
+            try? NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])?.write(to: out.appending(path: file))
+        }
+        print("Banners written to \(out.path)")
+        fflush(stdout)
+        NSApp.terminate(nil)
+        return true
+    }
+
     static func renderIfRequested() {
         if renderProLogoIfRequested() { return }
+        if renderBannersIfRequested() { return }
         guard let dir = ProcessInfo.processInfo.environment["ORBIT_STORE_SHOTS"] else { return }
         let input = URL(fileURLWithPath: dir), out = input.appending(path: "out")
         try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
@@ -193,5 +219,93 @@ struct MacStoreShotView: View {
         .frame(width: 1440, height: 900)
         .clipped()
         .environment(\.colorScheme, .light)
+    }
+}
+
+/// Wide, header and tall banners: the logo and headline next to Joshu on a few iPhones.
+struct StoreBanner: View {
+    enum Layout { case wide, header, tall }
+    let screens: [Image]
+    let layout: Layout
+
+    private var tags: [String] { ["Tasks", "Calendar", "Habits", "Focus", "Money", "Notes", "Reading", "Goals"] }
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width, h = geo.size.height
+            let unit = min(w, h)
+            ZStack {
+                Color(hex: 0xFBFBF8)
+                Circle().fill(Theme.lime.opacity(0.8)).frame(width: unit * 1.1).blur(radius: unit * 0.2).offset(x: -w * 0.32, y: -h * 0.3)
+                Circle().fill(Theme.cyan.opacity(0.55)).frame(width: unit * 1.0).blur(radius: unit * 0.22).offset(x: w * 0.3, y: h * 0.32)
+                Circle().fill(Theme.pink.opacity(0.5)).frame(width: unit * 0.8).blur(radius: unit * 0.2).offset(x: w * 0.1, y: -h * 0.35)
+                if layout == .tall {
+                    VStack(spacing: unit * 0.04) {
+                        copy(unit: unit, center: true)
+                        phones(height: h * 0.52)
+                    }
+                    .padding(.top, h * 0.06)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                } else {
+                    HStack(spacing: w * 0.03) {
+                        copy(unit: unit, center: false)
+                            .frame(width: layout == .header ? w * 0.36 : w * 0.42, alignment: .leading)
+                        phones(height: h * (layout == .header ? 0.84 : 0.78))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .padding(.horizontal, w * 0.06)
+                }
+            }
+            .frame(width: w, height: h)
+            .clipped()
+        }
+    }
+
+    private func copy(unit: CGFloat, center: Bool) -> some View {
+        VStack(alignment: center ? .center : .leading, spacing: unit * 0.035) {
+            HStack(spacing: unit * 0.025) {
+                ProLogo(size: unit * 0.11, classic: true)
+                Text("Joshu").font(Theme.display(unit * 0.075)).foregroundStyle(Theme.ink)
+            }
+            Text(center ? "Your whole day,\nin one calm place" : "Your whole day, in one calm place")
+                .font(Theme.display(unit * (layout == .header ? 0.085 : 0.075)))
+                .foregroundStyle(Theme.ink).multilineTextAlignment(center ? .center : .leading)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("Tasks, calendar, habits, focus, money and reading, together on your iPhone.")
+                .font(Theme.ui(unit * 0.03, weight: .medium)).foregroundStyle(Color(hex: 0x55555C))
+                .multilineTextAlignment(center ? .center : .leading).fixedSize(horizontal: false, vertical: true)
+            FlowLayout(spacing: unit * 0.01) {
+                ForEach(tags, id: \.self) { t in
+                    Text(t).font(Theme.ui(unit * 0.022, weight: .semibold)).foregroundStyle(Theme.ink)
+                        .padding(.horizontal, unit * 0.018).padding(.vertical, unit * 0.009)
+                        .background(Capsule().fill(Color.white.opacity(0.85)))
+                }
+            }
+        }
+        .padding(.horizontal, center ? unit * 0.08 : 0)
+    }
+
+    private func phones(height: CGFloat) -> some View {
+        HStack(alignment: .bottom, spacing: height * 0.05) {
+            ForEach(Array(screens.enumerated()), id: \.offset) { i, img in
+                IPhoneFrame(image: img)
+                    .frame(height: height * (i == screens.count / 2 ? 1 : 0.9))
+            }
+        }
+    }
+}
+
+/// The Joshu Pro promotional image for the App Store (1024 × 1024): the Pro logo on a soft glow, no text.
+struct ProPromo: View {
+    var body: some View {
+        ZStack {
+            Color(hex: 0xFBFBF8)
+            Circle().fill(Theme.lime.opacity(0.75)).frame(width: 760).blur(radius: 140).offset(x: -220, y: -220)
+            Circle().fill(Theme.purple.opacity(0.5)).frame(width: 700).blur(radius: 150).offset(x: 240, y: 240)
+            Circle().fill(Theme.cyan.opacity(0.45)).frame(width: 520).blur(radius: 120).offset(x: 220, y: -200)
+            ProLogo(size: 560)
+                .shadow(color: .black.opacity(0.18), radius: 40, y: 20)
+        }
+        .frame(width: 1024, height: 1024)
     }
 }

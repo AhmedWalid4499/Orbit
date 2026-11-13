@@ -13,6 +13,9 @@ struct PhoneTasks: View {
     @State private var filter: Filter = .today
     @AppStorage("tasksArea") private var areaRaw = ""
     private var area: Area? { Area(rawValue: areaRaw) }
+    /// Set by an iPhone Focus (Focus filters): only these areas show.
+    @AppStorage(FocusAreas.key) private var focusAreasRaw = ""
+    private var focusAreas: Set<Area> { FocusAreas.parse(focusAreasRaw) }
     @State private var draft = ""
     @State private var editing: TaskItem?
     @FocusState private var adding: Bool
@@ -20,7 +23,7 @@ struct PhoneTasks: View {
     private var tomorrow: Date { Date.now.startOfDay.adding(days: 1) }
 
     private func items(for f: Filter) -> [TaskItem] {
-        let open = tasks.filter { !$0.isDone && (area == nil || $0.area == area) }
+        let open = tasks.filter { !$0.isDone && (area == nil || $0.area == area) && FocusAreas.allows($0.area, in: focusAreas) }
         let list: [TaskItem]
         switch f {
         case .today: list = open.filter { ($0.due ?? .distantFuture) < tomorrow }
@@ -117,6 +120,11 @@ struct PhoneTasks: View {
                     }
                 }
             } else {
+                if !focusAreas.isEmpty && filter != .completed {
+                    Label("Focus is on: showing \(FocusAreas.names(focusAreas)) only", systemImage: "moon.fill")
+                        .font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
+                        .listRowSeparator(.hidden).listRowBackground(Color.clear)
+                }
                 let list = items(for: filter)
                 if list.isEmpty { hint(filter == .completed ? "checkmark.circle" : "checkmark.seal", filter == .completed ? "Nothing completed yet." : "Nothing here. Nice.") }
                 ForEach(list) { row($0, showDue: filter != .today || $0.isOverdue) }

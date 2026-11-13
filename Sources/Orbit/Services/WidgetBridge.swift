@@ -16,8 +16,9 @@ enum WidgetBridge {
 
     private struct WidgetSnapshot: Codable {
         struct Event: Codable { let title: String; let start: Date; let end: Date; let allDay: Bool; let color: String }
-        struct Task: Codable { let title: String; let area: String; let overdue: Bool; let priority: Int }
-        struct Habit: Codable { let name: String; let symbol: String; let done: Bool; let streak: Int; let color: String }
+        /// id: the task's or habit's uuid, for the widgets' tick-off buttons.
+        struct Task: Codable { let title: String; let area: String; let overdue: Bool; let priority: Int; var id: String? }
+        struct Habit: Codable { let name: String; let symbol: String; let done: Bool; let streak: Int; let color: String; var id: String? }
         struct Dream: Codable { let title: String; let date: Date }
         /// cover: file name in the covers folder next to widget.json ("" while it downloads).
         struct ShelfBook: Codable { let title: String; let author: String; let reading: Bool; let progress: Double; let cover: String }
@@ -35,6 +36,13 @@ enum WidgetBridge {
     }
 
     private static var lastWritten: Data?
+    /// The app's AppleSync, so widget buttons (run with Joshu in the background) can refresh with your calendar too.
+    private static weak var lastApple: AppleSync?
+
+    /// After a widget or Control Center button changed something.
+    static func refresh(context: ModelContext) {
+        update(context: context, apple: lastApple ?? AppleSync())
+    }
 
     static var folder: URL? {
         #if os(iOS)
@@ -46,14 +54,22 @@ enum WidgetBridge {
 
     static func update(context: ModelContext, apple: AppleSync) {
         guard !Orbit.Snapshot.isActive else { return }
+        lastApple = apple
+        let shown = FocusAreas.current   // an iPhone Focus can narrow the widgets to some areas
         let now = Date.now, today = now.startOfDay, tomorrow = today.adding(days: 1)
         let local = ((try? context.fetch(FetchDescriptor<EventItem>())) ?? []).filter { $0.start < tomorrow && $0.end > today }
         let entries = CalEntry.merge(local: local, apple: apple.events(from: today, to: tomorrow),
                                      google: GoogleCalendarStore.shared.events(from: today, to: tomorrow))
         let tasks = ((try? context.fetch(FetchDescriptor<TaskItem>())) ?? [])
-            .filter { !$0.isDone && ($0.due.map { $0 < tomorrow } ?? false) }
+            .filter { !$0.isDone && ($0.due.map { $0 < tomorrow } ?? false) && FocusAreas.allows($0.area, in: shown) }
             .sorted { $0.priority > $1.priority }
-        let habits = (try? context.fetch(FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.createdAt)]))) ?? []
+        let habits = ((try? context.fetch(FetchDescriptor<Habit>(sortBy: [SortDescriptor(\.createdAt)]))) ?? [])
+            .filter { FocusAreas.allows($0.area, in: shown) }
+        // The widgets' tick-off buttons find items by uuid; older ones may not have one yet.
+        var gaveIDs = false
+        for t in tasks.prefix(8) where t.uuid.isEmpty { t.uuid = UUID().uuidString.lowercased(); gaveIDs = true }
+        for h in habits where h.uuid.isEmpty { h.uuid = UUID().uuidString.lowercased(); gaveIDs = true }
+        if gaveIDs { try? context.save() }
         let txns = (try? context.fetch(FetchDescriptor<Transaction>())) ?? []
         let budget = UserDefaults.standard.object(forKey: "monthlyBudget") as? Double ?? 2000
         let spent = BudgetPeriod.spent(txns)
@@ -75,8 +91,8 @@ enum WidgetBridge {
             generatedAt: now,
             userName: Platform.userName,
             events: entries.map { .init(title: $0.title, start: $0.start, end: $0.end, allDay: $0.isAllDay, color: hex($0.tint)) },
-            tasks: tasks.prefix(8).map { .init(title: $0.title, area: $0.areaRaw, overdue: $0.isOverdue, priority: $0.priority) },
-            habits: habits.map { .init(name: $0.name, symbol: $0.symbol, done: $0.isDone(on: today), streak: $0.currentStreak, color: hex($0.area.color)) },
+            tasks: tasks.prefix(8).map { .init(title: $0.title, area: $0.areaRaw, overdue: $0.isOverdue, priority: $0.priority, id: $0.uuid) },
+            habits: habits.map { .init(name: $0.name, symbol: $0.symbol, done: $0.isDone(on: today), streak: $0.currentStreak, color: hex($0.area.color), id: $0.uuid) },
             moneyLeft: max(budget - spent, 0), budget: budget, currency: Fmt.currencyCode,
             lookingForward: dreams.prefix(3).map { .init(title: $0.title, date: $0.targetDate!) },
             books: shelf,

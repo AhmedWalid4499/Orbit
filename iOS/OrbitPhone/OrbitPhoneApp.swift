@@ -44,6 +44,7 @@ struct OrbitPhoneApp: App {
         BookLibrary.cleanUpKindleIfNeeded(context: container.mainContext)
         WatchBridge.shared.activate()
         StopFocusIntent.handler = { FocusTimer.shared.stopFromLockScreen() }
+        WidgetActions.install()
         _ = Reminders.shared // become the notification delegate before launch ends, so a tap that opened the app is handled
     }
 

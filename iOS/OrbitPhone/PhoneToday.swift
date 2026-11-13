@@ -23,6 +23,10 @@ struct PhoneToday: View {
     @AppStorage("monthlyBudget") private var monthlyBudget = 2000.0
     @AppStorage("userName") private var userName = ""
     @AppStorage("readingGoal") private var readingGoal = 24
+    /// Set by an iPhone Focus (Focus filters): only these areas show.
+    @AppStorage(FocusAreas.key) private var focusAreasRaw = ""
+    private var focusAreas: Set<Area> { FocusAreas.parse(focusAreasRaw) }
+    private var shownHabits: [Habit] { habits.filter { FocusAreas.allows($0.area, in: focusAreas) } }
 
     @State private var capture = ""
     @State private var capturing = false
@@ -35,7 +39,7 @@ struct PhoneToday: View {
     private var focusToday: Int { FocusTimer.minutes(focusSessions, since: today) }
 
     private var openToday: [TaskItem] {
-        tasks.filter { !$0.isDone && ($0.due.map { $0 < today.adding(days: 1) } ?? false) }
+        tasks.filter { !$0.isDone && ($0.due.map { $0 < today.adding(days: 1) } ?? false) && FocusAreas.allows($0.area, in: focusAreas) }
             .sorted { ($0.priority, $1.due ?? .now) > ($1.priority, $0.due ?? .now) }
     }
 
@@ -81,6 +85,7 @@ struct PhoneToday: View {
                     }
                     actions
                 }
+                focusBanner
                 captureField
                 glance
                 brief
@@ -101,13 +106,23 @@ struct PhoneToday: View {
         .phoneChrome("Today")
     }
 
+    /// While a Focus narrows Joshu to some areas, say so (it's set in the iPhone's Focus settings, not here).
+    @ViewBuilder private var focusBanner: some View {
+        if !focusAreas.isEmpty {
+            Label("Focus is on: showing \(FocusAreas.names(focusAreas)) only", systemImage: "moon.fill")
+                .font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
+                .padding(.horizontal, 12).padding(.vertical, 7)
+                .background(Capsule().fill(Theme.card))
+        }
+    }
+
     // MARK: Summary
 
     /// Four small numbers in one row; each opens its section.
     private var glance: some View {
         HStack(spacing: 8) {
             mini("\(openToday.count)", "Due", Theme.peach) { state.tab = .tasks }
-            mini("\(habits.filter { $0.isDone(on: today) }.count)/\(habits.count)", "Habits", Theme.lime) { state.tab = .habits }
+            mini("\(shownHabits.filter { $0.isDone(on: today) }.count)/\(shownHabits.count)", "Habits", Theme.lime) { state.tab = .habits }
             mini(Fmt.money(max(monthlyBudget - spentThisMonth, 0)), "Left", Theme.cyan) { state.tab = .money }
             if health.hasData {
                 mini(health.today.steps >= 1000 ? String(format: "%.1fk", Double(health.today.steps) / 1000) : "\(health.today.steps)", "Steps", Theme.mint) { state.tab = .insights }
@@ -191,10 +206,10 @@ struct PhoneToday: View {
 
     /// Habits as one line of chips to tick off.
     @ViewBuilder private var habitsRow: some View {
-        if !habits.isEmpty {
+        if !shownHabits.isEmpty {
             ScrollView(.horizontal) {
                 HStack(spacing: 8) {
-                    ForEach(habits) { h in
+                    ForEach(shownHabits) { h in
                         let done = h.isDone(on: today)
                         Button { withAnimation(.snappy) { h.toggle(today) } } label: {
                             HStack(spacing: 6) {

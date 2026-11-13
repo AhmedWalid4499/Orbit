@@ -116,6 +116,9 @@ struct PhoneRoot: View {
             }
         }
         .task(id: phase) {
+            // "Add to Joshu" from Control Center or the Action button.
+            QuickAddIntent.handler = { state.captureOpen = true }
+            if phase == .active, QuickAddIntent.takePending() { state.captureOpen = true }
             // While Orbit is open: sync every two minutes, keep reminders current, refresh email and reading now and then.
             // Hands-free listening only while Orbit is on screen.
             WakeListener.shared.apple = apple

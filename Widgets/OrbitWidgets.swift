@@ -12,8 +12,8 @@ let appGroup = "Y2K55S3UA9.com.personal.orbit"
 
 struct WidgetSnapshot: Codable {
     struct Event: Codable { let title: String; let start: Date; let end: Date; let allDay: Bool; let color: String }
-    struct Task: Codable { let title: String; let area: String; let overdue: Bool; let priority: Int }
-    struct Habit: Codable { let name: String; let symbol: String; let done: Bool; let streak: Int; let color: String }
+    struct Task: Codable { let title: String; let area: String; let overdue: Bool; let priority: Int; var id: String? }
+    struct Habit: Codable { let name: String; let symbol: String; let done: Bool; let streak: Int; let color: String; var id: String? }
     struct Dream: Codable { let title: String; let date: Date }
     struct ShelfBook: Codable { let title: String; let author: String; let reading: Bool; let progress: Double; let cover: String }
     var generatedAt: Date
@@ -41,7 +41,7 @@ struct WidgetSnapshot: Codable {
     func asOf(_ date: Date) -> (snapshot: WidgetSnapshot, stale: Bool) {
         guard !Calendar.current.isDate(generatedAt, inSameDayAs: date) else { return (self, false) }
         var s = self
-        s.habits = habits.map { .init(name: $0.name, symbol: $0.symbol, done: false, streak: $0.streak, color: $0.color) }
+        s.habits = habits.map { .init(name: $0.name, symbol: $0.symbol, done: false, streak: $0.streak, color: $0.color, id: $0.id) }
         s.tasks = []
         return (s, true)
     }
@@ -193,18 +193,22 @@ struct TodayWidgetView: View {
     }
 
     private func taskRow(_ t: WidgetSnapshot.Task) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: "circle").font(.system(size: 9, weight: .semibold))
-            Text(t.title).font(.system(size: 12)).lineLimit(1)
-            if t.overdue { Image(systemName: "exclamationmark.circle.fill").font(.system(size: 9)).foregroundStyle(.red) }
+        TickButton(taskID: t.id) {
+            HStack(spacing: 6) {
+                Image(systemName: "circle").font(.system(size: 9, weight: .semibold))
+                Text(t.title).font(.system(size: 12)).lineLimit(1)
+                if t.overdue { Image(systemName: "exclamationmark.circle.fill").font(.system(size: 9)).foregroundStyle(.red) }
+            }
         }
     }
 
     private func habitsDots(_ s: WidgetSnapshot) -> some View {
         HStack(spacing: 4) {
             ForEach(Array(s.habits.prefix(6).enumerated()), id: \.offset) { _, h in
-                Image(systemName: h.done ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 13)).foregroundStyle(h.done ? W.color(h.color) : .secondary)
+                TickButton(habitID: h.id) {
+                    Image(systemName: h.done ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 13)).foregroundStyle(h.done ? W.color(h.color) : .secondary)
+                }
             }
         }
     }
@@ -227,8 +231,20 @@ struct HabitsWidgetView: View {
     let entry: Entry
 
     var body: some View {
+        #if os(iOS)
+        switch family {
+        case .accessoryCircular: HabitsRing(habits: entry.snapshot?.habits ?? [])
+        case .accessoryRectangular: NextHabit(habits: entry.snapshot?.habits ?? [])
+        default: list
+        }
+        #else
+        list
+        #endif
+    }
+
+    private var list: some View {
         let habits = entry.snapshot?.habits ?? []
-        VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("Habits").font(.system(size: 15, weight: .bold, design: .serif))
                 Spacer()
@@ -236,18 +252,84 @@ struct HabitsWidgetView: View {
             }
             if habits.isEmpty { Text("Add habits in Joshu.").font(.caption).foregroundStyle(.secondary) }
             ForEach(Array(habits.prefix(family == .systemSmall ? 4 : 6).enumerated()), id: \.offset) { _, h in
-                HStack(spacing: 8) {
-                    Image(systemName: h.done ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(h.done ? W.color(h.color) : .secondary)
-                    Text(h.name).font(.system(size: 12, weight: .medium)).lineLimit(1)
-                    Spacer(minLength: 0)
-                    if h.streak > 1 && family != .systemSmall { Text("\(h.streak)🔥").font(.system(size: 11)) }
+                TickButton(habitID: h.id) {
+                    HStack(spacing: 8) {
+                        Image(systemName: h.done ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(h.done ? W.color(h.color) : .secondary)
+                        Text(h.name).font(.system(size: 12, weight: .medium)).lineLimit(1)
+                        Spacer(minLength: 0)
+                        if h.streak > 1 && family != .systemSmall { Text("\(h.streak)🔥").font(.system(size: 11)) }
+                    }
+                    .contentShape(Rectangle())
                 }
             }
             Spacer(minLength: 0)
         }
     }
 }
+
+/// On iPhone, a widget row you tap to tick off (it runs in Joshu: iOS/Shared/WidgetIntents.swift); on the Mac, just the row.
+struct TickButton<Label: View>: View {
+    var habitID: String? = nil
+    var taskID: String? = nil
+    @ViewBuilder var label: () -> Label
+
+    var body: some View {
+        #if os(iOS)
+        if let habitID, !habitID.isEmpty {
+            Button(intent: ToggleHabitIntent(habitID: habitID)) { label() }.buttonStyle(.plain)
+        } else if let taskID, !taskID.isEmpty {
+            Button(intent: CompleteTaskIntent(taskID: taskID)) { label() }.buttonStyle(.plain)
+        } else {
+            label()
+        }
+        #else
+        label()
+        #endif
+    }
+}
+
+#if os(iOS)
+/// Lock Screen, round: today's habits as a ring.
+struct HabitsRing: View {
+    let habits: [WidgetSnapshot.Habit]
+    var body: some View {
+        let done = habits.filter(\.done).count
+        Gauge(value: Double(done), in: 0...Double(max(habits.count, 1))) {
+            Image(systemName: "flame.fill")
+        } currentValueLabel: {
+            Text("\(done)/\(habits.count)")
+        }
+        .gaugeStyle(.accessoryCircularCapacity)
+        .widgetURL(URL(string: "com.personal.orbit://open/habits"))
+    }
+}
+
+/// Lock Screen, wide: the next habit still to do, with a button to tick it off.
+struct NextHabit: View {
+    let habits: [WidgetSnapshot.Habit]
+    var body: some View {
+        let left = habits.filter { !$0.done }
+        VStack(alignment: .leading, spacing: 2) {
+            Text(habits.isEmpty ? "Habits" : "Habits · \(habits.count - left.count)/\(habits.count)")
+                .font(.system(size: 12, weight: .semibold)).widgetAccentable()
+            if let next = left.first {
+                TickButton(habitID: next.id) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "circle")
+                        Text(next.name).lineLimit(1)
+                    }
+                    .font(.system(size: 15, weight: .semibold))
+                }
+                if left.count > 1 { Text("then \(left[1].name)").font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1) }
+            } else {
+                Text(habits.isEmpty ? "Add habits in Joshu" : "All done today 🎉").font(.system(size: 14, weight: .semibold))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+#endif
 
 // MARK: - Looking forward widget
 
@@ -575,8 +657,12 @@ struct HabitsWidget: Widget {
                 .widgetURL(URL(string: "com.personal.orbit://open/habits"))
         }
         .configurationDisplayName("Joshu Habits")
-        .description("Today's habits and streaks.")
+        .description("Today's habits and streaks. Tap one to tick it off.")
+        #if os(iOS)
+        .supportedFamilies([.systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular])
+        #else
         .supportedFamilies([.systemSmall, .systemMedium])
+        #endif
     }
 }
 
@@ -614,6 +700,8 @@ struct OrbitWidgets: WidgetBundle {
         CountdownWidget()
         #if os(iOS)
         FocusLiveActivityWidget()
+        FocusControl()
+        QuickAddControl()
         #endif
     }
 }

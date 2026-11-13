@@ -124,7 +124,7 @@ struct PhoneNotes: View {
                     Label(showJournal ? "Today's entry" : "New note", systemImage: showJournal ? "sun.max" : "square.and.pencil").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(PrimaryButtonStyle()).plainRow()
-                if !showJournal { KeepImportButton().plainRow() }
+                if !showJournal && GoogleServices.enabled { KeepImportButton().plainRow() }
             }
             ForEach(visible) { note in
                 Button { open = note } label: { NoteRow(note: note, selected: false) }

@@ -1,7 +1,7 @@
 # Joshu: App Store listing (iPhone)
 
 Copy each part into App Store Connect › Joshu › the version page (and App Information for name and subtitle).
-Screenshots: `build/app-store/raw/out/01-today.png` … `09-insights.png` (1320 × 2868, the 6.9-inch size; App Store
+Screenshots: `build/app-store/raw/out/01-today.png` … `10-card.png` (1320 × 2868, the 6.9-inch size; App Store
 Connect scales them for smaller iPhones). Upload them in that order.
 
 ## Name (30 characters max)

@@ -98,6 +98,11 @@ struct PhoneRoot: View {
             // For testing: `-open habits` (or any tab), `-sheet plan|review|card|assistant|settings|capture|search`.
             let args = ProcessInfo.processInfo.arguments
             if let i = args.firstIndex(of: "-open"), i + 1 < args.count, let t = Tab(rawValue: args[i + 1]) { show(t) }
+            // Screenshots of the Lock Screen timer: start a focus block on the first task due today.
+            if args.contains("-startFocus") {
+                let open = ((try? context.fetch(FetchDescriptor<TaskItem>())) ?? []).filter { !$0.isDone }.sorted { $0.priority > $1.priority }
+                focus.start(task: open.first, minutes: 25, context: context)
+            }
             if args.contains("-voice") { try? await Task.sleep(for: .seconds(1.5)); WakeListener.shared.preview() }
             if let i = args.firstIndex(of: "-sheet"), i + 1 < args.count {
                 switch args[i + 1] {

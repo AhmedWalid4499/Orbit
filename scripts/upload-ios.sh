@@ -10,11 +10,16 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 CONF="$HOME/Library/Application Support/Joshu/app-store.json"
-[[ -f "$CONF" ]] || { echo "Missing $CONF (see the top of scripts/upload-ios.sh)."; exit 1; }
-CFG=("${(@f)$(python3 -c 'import json,sys; c=json.load(open(sys.argv[1])); print(c["team_id"]); print(c["key_id"]); print(c["issuer_id"]); print(c["key_path"])' "$CONF")}")
-TEAM=$CFG[1]; KEY_ID=$CFG[2]; ISSUER=$CFG[3]; KEY_PATH=$CFG[4]
-[[ -f "$KEY_PATH" ]] || { echo "The App Store Connect key isn't at $KEY_PATH."; exit 1; }
-AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$KEY_PATH" -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER")
+if [[ -f "$CONF" ]]; then
+  CFG=("${(@f)$(python3 -c 'import json,sys; c=json.load(open(sys.argv[1])); print(c["team_id"]); print(c["key_id"]); print(c["issuer_id"]); print(c["key_path"])' "$CONF")}")
+  TEAM=$CFG[1]; KEY_ID=$CFG[2]; ISSUER=$CFG[3]; KEY_PATH=$CFG[4]
+  [[ -f "$KEY_PATH" ]] || { echo "The App Store Connect key isn't at $KEY_PATH."; exit 1; }
+  AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$KEY_PATH" -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER")
+else
+  # No API key: sign and upload with the Apple ID Xcode is signed in to (Xcode › Settings › Accounts).
+  TEAM="${ORBIT_TEAM_ID:-Y2K55S3UA9}"
+  AUTH=(-allowProvisioningUpdates)
+fi
 
 # The App Store build: your paid team, Sign in with Apple, and (for the first versions) no Apple Watch app, which
 # would need its own screenshots and review.

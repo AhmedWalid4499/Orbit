@@ -75,7 +75,7 @@ struct CardFace: View {
             VStack(spacing: 6) {
                 Text(card.name.isEmpty ? "Your name" : card.name).font(.system(size: 26, weight: .bold, design: .serif))
                     .lineLimit(1).minimumScaleFactor(0.6)
-                Text(card.qrTarget == "contact" ? "Scan to save my contact" : "Scan to open my link")
+                Text(card.qrCaption)
                     .font(.system(size: 13, weight: .semibold)).foregroundStyle(card.isDark ? .white : card.color)
             }
             Spacer(minLength: 0)
@@ -218,7 +218,7 @@ struct CardFace: View {
             Spacer(minLength: 0)
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(card.qrTarget == "contact" ? "Scan to save my contact" : "Scan to open").font(.system(size: 12, weight: .semibold))
+                    Text(card.qrCaption).font(.system(size: 12, weight: .semibold))
                     HStack(spacing: 2) {
                         Text("joshu").font(.system(size: 13, weight: .black, design: .rounded))
                         Circle().fill(card.isDark ? Theme.lime : ink).frame(width: 4, height: 4).offset(y: 3)
@@ -426,11 +426,11 @@ struct ProfileCardSheet: View {
                     .menuStyle(.button).fixedSize()
                 }
 
-                group("Public link") {
+                group("Your card's web page") {
                     if !cloud.isSignedIn {
                         Text("Sign in under Settings › Account to get a web link for your card.").font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
                     } else {
-                        Toggle("Publish my card on the web", isOn: $card.publishPublic)
+                        Toggle("Publish my card on the web (your QR code can open it)", isOn: $card.publishPublic)
                         if card.publishPublic {
                             HStack(spacing: 4) {
                                 Text("…/card/?u=").font(Theme.ui(12)).foregroundStyle(Theme.inkMuted)
@@ -489,9 +489,16 @@ struct ProfileCardSheet: View {
                                 .onTapGesture { card.colorIndex = i }
                         }
                     }
-                    Picker("QR code opens", selection: $card.qrTarget) {
-                        Text("My contact card").tag("contact")
-                        if card.publicURL != nil { Text("My web page").tag("web") }
+                    Picker("QR code opens", selection: Binding(get: { card.qrTarget }, set: { new in
+                        // The web page needs the card published: choosing it switches that on.
+                        if new == "web" {
+                            card.publishPublic = true
+                            if card.publicSlug.isEmpty { card.publicSlug = ProfileCard.slugify(card.name) }
+                        }
+                        card.qrTarget = new
+                    })) {
+                        if cloud.isSignedIn { Text("My card's web page").tag("web") }
+                        Text("Save my contact").tag("contact")
                         ForEach(card.filledLinks) { Text($0.kind.title).tag($0.id.uuidString) }
                     }
                 }

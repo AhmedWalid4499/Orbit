@@ -130,13 +130,14 @@ struct ProfileCard: Codable, Equatable {
     var showPhoto = true
     /// "photo": your photo fills the card (the colour becomes the accent); "color": a solid colour card.
     var style = "photo"
-    /// What the QR code opens: "contact" (adds you to their contacts) or a link id.
-    var qrTarget = "contact"
+    /// What the QR code opens: "web" (your card's web page), "contact" (adds you to their contacts) or a link id.
+    /// New cards open the web page; cards made before keep what they had.
+    var qrTarget = "web"
     /// Public web page: ahmedwalid4499.github.io/Orbit/card/?u=<slug>
     var publicSlug = ""
-    var publishPublic = false
-    /// Email and phone stay off the public page unless you turn this on.
-    var publicShowContact = false
+    var publishPublic = true
+    /// Whether the web page shows your email and phone (it's a contact card, so new cards do; you can turn it off).
+    var publicShowContact = true
 
     init() {}
 
@@ -243,6 +244,12 @@ struct ProfileCard: Codable, Equatable {
             d["cover"] = "data:image/jpeg;base64," + jpeg.base64EncodedString()
         }
         return d
+    }
+
+    /// The line under the QR code.
+    var qrCaption: String {
+        if qrTarget == "web", publicURL != nil { return "Scan to see my card" }
+        return qrTarget == "contact" || qrTarget == "web" ? "Scan to save my contact" : "Scan to open my link"
     }
 
     /// What the QR code holds.

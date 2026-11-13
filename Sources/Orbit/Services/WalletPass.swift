@@ -54,7 +54,7 @@ enum WalletPass {
                 "links": card.filledLinks.map { ["title": $0.kind == .other ? "Link" : $0.kind.title, "url": $0.url, "handle": $0.handle] },
             ],
             "qr": card.qrPayload,
-            "qrText": card.qrTarget == "contact" ? "Scan to save my contact" : "Scan to open my link",
+            "qrText": card.qrCaption, "page": card.qrTarget == "web" ? (card.publicURL ?? "") : "",
             "color": look.background, "ink": look.inkHex, "label": look.labelHex,
             "layout": "strip",
             "images": images,
@@ -198,7 +198,7 @@ struct AddToWalletButton: View {
             #if os(iOS)
             if ready && PKAddPassesViewController.canAddPasses() {
                 WalletBadge { Task { await make() } }
-                    .frame(height: 48).opacity(busy ? 0.5 : 1).disabled(busy)
+                    .frame(width: 180, height: 38).opacity(busy ? 0.5 : 1).disabled(busy)
                     .sheet(isPresented: Binding(get: { pass != nil }, set: { if !$0 { pass = nil } })) {
                         if let pass { AddPassSheet(pass: pass).ignoresSafeArea() }
                     }

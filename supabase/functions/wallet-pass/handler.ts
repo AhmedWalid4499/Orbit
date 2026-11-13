@@ -6,7 +6,7 @@ export type Card = {
   links?: { title: string; url: string; handle?: string }[];
 };
 export type Body = {
-  card: Card; qr?: string; qrText?: string; color?: string; ink?: string; label?: string;
+  card: Card; qr?: string; qrText?: string; page?: string; color?: string; ink?: string; label?: string;
   /** "strip": the app draws the top of the card as the pass's banner (a store-card pass), as on the card in the app. */
   layout?: string; images?: Record<string, string>;
 };
@@ -59,7 +59,7 @@ function colors(hex?: string, ink?: string, label?: string) {
 const clip = (s: unknown, n = 300) => (typeof s === "string" ? s.trim().slice(0, n) : "");
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-export function passJSON(body: Body, userID: string, passTypeID: string, teamID: string) {
+export function passJSON(body: Body, userID: string, passTypeID: string, teamID: string, version = "") {
   const c = body.card;
   const name = clip(c.name, 80) || "My card";
   const secondary = [
@@ -79,6 +79,8 @@ export function passJSON(body: Body, userID: string, passTypeID: string, teamID:
     const shown = clip(l.handle, 120) || url.replace(/^https?:\/\/(www\.)?/i, "");
     back.push({ key: `link${i}`, label: clip(l.title, 40) || "Link", value: shown, attributedValue: `<a href="${esc(url)}">${esc(shown)}</a>` });
   });
+  const page = clip(body.page, 300);
+  if (/^https:\/\//i.test(page)) back.unshift({ key: "page", label: "My card", value: page.replace(/^https:\/\//i, ""), attributedValue: `<a href="${esc(page)}">Open my card</a>` });
   back.push({ key: "made", label: "", value: "Made with Joshu" });
   const qr = clip(body.qr, 2000);
   const strip = body.layout === "strip";
@@ -87,7 +89,8 @@ export function passJSON(body: Body, userID: string, passTypeID: string, teamID:
     formatVersion: 1,
     passTypeIdentifier: passTypeID,
     teamIdentifier: teamID,
-    serialNumber: `card-${userID}`,
+    // A new serial for each new look, so Wallet adds the updated card instead of keeping the old one.
+    serialNumber: version ? `card-${userID}-${version}` : `card-${userID}`,
     organizationName: "Joshu",
     description: `${name}'s card`,
     ...(strip ? {} : { logoText: name }),
@@ -115,7 +118,7 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
   if (!user) return json(401, { error: "Sign in first" });
   if (!deps.signer) return json(503, { error: "Wallet passes aren't set up on the server yet" });
   const raw = await req.text();
-  if (raw.length > 3_000_000) return json(413, { error: "Card is too large" });
+  if (raw.length > 8_000_000) return json(413, { error: "Card is too large" });
   let body: Body;
   try { body = JSON.parse(raw); } catch { return json(400, { error: "Bad request" }); }
   if (!body?.card || typeof body.card.name !== "string") return json(400, { error: "Bad request" });
@@ -126,7 +129,8 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
     try { files[name] = fromBase64(b64); } catch { /* skip a bad image */ }
   }
   if (!files["icon.png"]) return json(400, { error: "The pass needs an icon" });
-  files["pass.json"] = new TextEncoder().encode(JSON.stringify(passJSON(body, user.id, deps.signer.passTypeID, deps.signer.teamID)));
+  const version = (await sha1Hex(new TextEncoder().encode(raw))).slice(0, 10);
+  files["pass.json"] = new TextEncoder().encode(JSON.stringify(passJSON(body, user.id, deps.signer.passTypeID, deps.signer.teamID, version)));
 
   const manifest: Record<string, string> = {};
   for (const [name, data] of Object.entries(files)) manifest[name] = await sha1Hex(data);

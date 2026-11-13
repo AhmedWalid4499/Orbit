@@ -22,6 +22,7 @@ struct PhoneRoot: View {
     @State private var tab: PhoneTab = .today
     @State private var morePath: [Tab] = []
     @State private var resettingTab = false
+    @State private var emailSetupPreview = false   // -sheet email (screenshots)
 
     var body: some View {
         Group {
@@ -48,6 +49,7 @@ struct PhoneRoot: View {
                 }
         }
         .sheet(isPresented: $state.searchOpen) { SearchView() }
+        .sheet(isPresented: $emailSetupPreview) { AddEmailAccountSheet {} }
         .fullScreenCover(isPresented: $state.tourOpen) { TourView { state.tourOpen = false } }
         // Once, when Pro first switches on (after the tour, and once the purchase sheet is closed).
         .fullScreenCover(isPresented: Binding(get: { pro.showWelcome && tourSeen && !state.proOpen && !state.tourOpen },
@@ -108,6 +110,7 @@ struct PhoneRoot: View {
                 case "tour": state.tourOpen = true
                 case "capture": state.captureOpen = true
                 case "search": state.searchOpen = true
+                case "email": emailSetupPreview = true
                 default: break
                 }
             }

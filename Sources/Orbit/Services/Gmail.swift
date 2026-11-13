@@ -311,11 +311,13 @@ struct InboxDigest: Codable, Equatable {
         let subject: String
         let note: String
         let messageID: String
-        /// Apple Mail items: "mail", the sender's address (for replies on iPhone) and the start of the email.
+        /// "mail" (Apple Mail on the Mac) or "imap" (an email account Joshu reads directly), the sender's address (for
+        /// replies) and the start of the email. nil for Gmail.
         var source: String? = nil
         var fromAddress: String? = nil
         var snippet: String? = nil
-        var fromAppleMail: Bool { source == "mail" }
+        /// Shown in Joshu's own email sheet (Apple Mail and direct accounts; Gmail has its own).
+        var fromAppleMail: Bool { source == "mail" || source == "imap" }
     }
     var overview: String
     /// A few words on the shape of the inbox, e.g. "2 replies needed, a security alert" (newer summaries).
@@ -343,6 +345,12 @@ final class InboxStore: ObservableObject {
 
     /// Signing out clears this device: connected accounts and the summary of their mail go.
     /// Apple Mail disconnected: the summary goes away here and on your other devices.
+    /// An email account was added in Settings › Connections: sum up its inbox now.
+    func emailAccountsChanged() {
+        objectWillChange.send()
+        if isConnected { Task { await refresh() } } else { forgetAppleMail() }
+    }
+
     func forgetAppleMail() {
         digest = nil; error = nil; lastSynced = nil
         UserDefaults.standard.removeObject(forKey: cacheKey)
@@ -377,6 +385,7 @@ final class InboxStore: ObservableObject {
             return
         }
         if !GoogleServices.enabled {
+            if let data = UserDefaults.standard.data(forKey: cacheKey) { digest = try? JSONDecoder().decode(InboxDigest.self, from: data) }
             loadSynced()
             // The Mac's newest summary arrives on the iPhone through sync.
             observer = NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { _ in
@@ -398,7 +407,7 @@ final class InboxStore: ObservableObject {
         }
     }
 
-    var isConnected: Bool { (GoogleServices.enabled && !accounts.isEmpty) || AppleMail.isOn || (Snapshot.isDemo && digest != nil) }
+    var isConnected: Bool { (GoogleServices.enabled && !accounts.isEmpty) || AppleMail.isOn || IMAPMail.isOn || (Snapshot.isDemo && digest != nil) }
 
     private var lastSynced: String?
     /// Picks up the summary saved (on this or another device) in the synced setting.
@@ -453,18 +462,14 @@ final class InboxStore: ObservableObject {
     func refreshIfDue(context: ModelContext) async {
         guard isConnected, AIAssistant.shared.hasKey else { return }
         if let d = digest, Date.now.timeIntervalSince(d.generatedAt) < Double(max(1, everyHours)) * 3600 { return }
-        #if os(macOS)
-        // Reading Mail would open it; refresh by itself only while Mail is already open (the refresh button always works).
-        if AppleMail.isOn && !GoogleServices.enabled && !AppleMail.isMailRunning { return }
-        #endif
         await refresh()
     }
 
     func refresh() async {
         guard isConnected, !loading, !Snapshot.isActive else { return }
         #if os(iOS)
-        // iPhone apps can't read the Mail app: the summary comes from your Mac.
-        if !GoogleServices.enabled { loadSynced(); return }
+        // iPhone apps can't read the Mail app: without email accounts of its own, the summary comes from your Mac.
+        if !GoogleServices.enabled && !IMAPMail.isOn { loadSynced(); return }
         #endif
         guard let claude = ClaudeClient() else {
             error = ClaudeClient.needsConsent ? ClaudeClient.consentMessage : "Get Joshu Pro to get inbox summaries."; return
@@ -492,6 +497,19 @@ final class InboxStore: ObservableObject {
             }
         }
         #endif
+        // Email accounts Joshu reads directly (iPhone and Mac); an email already found in Apple Mail isn't read twice.
+        for account in IMAPMail.accounts {
+            do {
+                for m in try await IMAPMail.recent(account, hours: windowHours, limit: windowHours > 72 ? 60 : 40)
+                where !mails.contains(where: { $0.id == m.id }) {
+                    mails.append(Mail(account: m.account, id: m.id, from: m.from, subject: m.subject,
+                                      date: m.date?.formatted(date: .abbreviated, time: .shortened) ?? "", snippet: m.snippet, unread: !m.read,
+                                      source: "imap", fromAddress: m.fromAddress))
+                }
+            } catch {
+                failures.append("\(account.email): \(error.localizedDescription)")
+            }
+        }
         for account in (GoogleServices.enabled ? accounts : []) {
             do {
                 let token = try await GoogleAuth.accessToken(for: account)
@@ -589,7 +607,7 @@ final class InboxStore: ObservableObject {
         if let d = digest, let data = try? JSONEncoder().encode(d) {
             UserDefaults.standard.set(data, forKey: cacheKey)
             // Apple Mail summaries also go to your other devices (the iPhone can't read Mail itself).
-            if AppleMail.isOn, let s = String(data: data, encoding: .utf8) {
+            if AppleMail.isOn || IMAPMail.isOn, let s = String(data: data, encoding: .utf8) {
                 lastSynced = s
                 UserDefaults.standard.set(s, forKey: Self.syncedKey)
             }

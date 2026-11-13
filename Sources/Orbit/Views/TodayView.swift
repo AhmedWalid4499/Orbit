@@ -396,9 +396,9 @@ struct TodayView: View {
                 }
                 if !inbox.isConnected {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Connect Apple Mail and \(AssistantName.current) sums up your inbox: what needs a reply, what matters, what can wait. Works with every account in Mail.")
+                        Text("Connect your email and \(AssistantName.current) sums up your inbox: what needs a reply, what matters, what can wait. Use Apple Mail or connect iCloud, Gmail or Yahoo directly.")
                             .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
-                        OpenSettingsLink { Text("Connect Apple Mail") }.buttonStyle(SoftButtonStyle())
+                        OpenSettingsLink { Text("Connect email") }.buttonStyle(SoftButtonStyle())
                     }
                     Spacer(minLength: 0)
                 } else {

@@ -1,5 +1,5 @@
-#if os(macOS)
 import Foundation
+#if os(macOS)
 import SQLite3
 
 /// Read-only queries on another app's SQLite database (Mail's index), returning every column as text.
@@ -40,6 +40,8 @@ enum MailIndexReader {
     }
 }
 
+#endif
+
 /// The readable text of an email file: Mail's .emlx (a byte count line, then the raw email). Picks the plain-text part
 /// (or the HTML part with the tags taken out), and decodes base64, quoted-printable and the character set.
 enum MIMEText {
@@ -51,6 +53,43 @@ enum MIMEText {
         }
         let t = part(data, depth: 0) ?? ""
         return String(t.trimmingCharacters(in: .whitespacesAndNewlines).prefix(limit))
+    }
+
+    /// The readable text of a raw email (or the start of one).
+    nonisolated static func text(fromRFC822 data: Data, limit: Int) -> String {
+        String((part(data, depth: 0) ?? "").trimmingCharacters(in: .whitespacesAndNewlines).prefix(limit))
+    }
+
+    /// The email's headers (names lowercased), with =?UTF-8?B?…?= words decoded.
+    nonisolated static func headers(_ data: Data) -> [String: String] {
+        split(data).0.mapValues(decodeWords)
+    }
+
+    /// Decodes RFC 2047 encoded words, e.g. "=?UTF-8?B?2YXYsdit2KjYpw==?=" or "=?iso-8859-1?Q?Caf=E9?=".
+    nonisolated static func decodeWords(_ s: String) -> String {
+        guard s.contains("=?") else { return s }
+        let pattern = try! NSRegularExpression(pattern: "=\\?([^?]+)\\?([bBqQ])\\?([^?]*)\\?=(\\s+(?==\\?))?")
+        var out = ""
+        var last = s.startIndex
+        for m in pattern.matches(in: s, range: NSRange(s.startIndex..., in: s)) {
+            guard let r = Range(m.range, in: s), let cs = Range(m.range(at: 1), in: s), let enc = Range(m.range(at: 2), in: s),
+                  let txt = Range(m.range(at: 3), in: s) else { continue }
+            out += s[last..<r.lowerBound]
+            let charset = String(s[cs]).split(separator: "*").first.map(String.init)
+            let raw = String(s[txt])
+            let bytes: Data
+            if s[enc].lowercased() == "b" {
+                var b = raw
+                while b.count % 4 != 0 { b += "=" }
+                bytes = Data(base64Encoded: b, options: .ignoreUnknownCharacters) ?? Data()
+            } else {
+                bytes = quotedPrintable(Data(raw.replacingOccurrences(of: "_", with: " ").utf8))
+            }
+            out += decode(bytes, charset: charset)
+            last = r.upperBound
+        }
+        out += s[last...]
+        return out
     }
 
     /// Splits headers from body, unfolding continued header lines. Header names are lowercased.
@@ -180,4 +219,3 @@ enum MIMEText {
         return s
     }
 }
-#endif

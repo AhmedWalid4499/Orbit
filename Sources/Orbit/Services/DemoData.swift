@@ -253,6 +253,39 @@ enum AskTest {
         guard let q = ProcessInfo.processInfo.environment["ORBIT_ASK_TEST"] else { return }
         #if os(macOS)
         // "applemail": reads the Mail inbox and prints only counts (never names, subjects or text), also to ORBIT_ASK_OUT.
+        // "imap:<port>": reads a local test mail server (scripts/fake-imap.py) with sample emails; no real account.
+        // "imaptls": checks the encrypted connection to real providers with a made-up sign-in (expects "not accepted").
+        if q == "imaptls" {
+            if let out = ProcessInfo.processInfo.environment["ORBIT_ASK_OUT"] { freopen(out, "w", stdout) }
+            Task {
+                for host in ["imap.gmail.com", "imap.mail.me.com", "imap.mail.yahoo.com"] {
+                    do { _ = try await IMAPMail.connect(email: "joshu.selftest@example.com", password: "not-a-real-password", provider: "other", host: host); print("TLS \(host) accepted?!") }
+                    catch { print("TLS \(host) -> \(error is IMAPSession.LoginRejected ? "login refused (connection works)" : error.localizedDescription)") }
+                    fflush(stdout)
+                }
+                exit(0)
+            }
+            return
+        }
+        if q.hasPrefix("imap:"), let port = Int(q.dropFirst(5)) {
+            if let out = ProcessInfo.processInfo.environment["ORBIT_ASK_OUT"] { freopen(out, "w", stdout) }
+            Task {
+                do {
+                    let a = try await IMAPMail.connect(email: "alex@example.com", password: "test-pass", provider: "other", host: "127.0.0.1", port: port)
+                    let ms = try await IMAPMail.recent(a, hours: 48, limit: 40, password: "test-pass")
+                    for m in ms { print("IMAP msg from=\(m.from) | subject=\(m.subject) | read=\(m.read) | dated=\(m.date != nil) | snippet=\(m.snippet.prefix(70))") }
+                    if let first = ms.first {
+                        let body = try await IMAPMail.body(a, messageID: first.id, password: "test-pass")
+                        print("IMAP body=\(body.prefix(120).replacingOccurrences(of: "\n", with: " / "))")
+                    }
+                    do { _ = try await IMAPMail.connect(email: "alex@example.com", password: "wrong", provider: "other", host: "127.0.0.1", port: port); print("IMAP wrongpass accepted?!") }
+                    catch { print("IMAP wrongpass error=\(error.localizedDescription)") }
+                } catch { print("IMAP error: \(error.localizedDescription)") }
+                fflush(stdout)
+                exit(0)
+            }
+            return
+        }
         if q == "applemail" {
             if let out = ProcessInfo.processInfo.environment["ORBIT_ASK_OUT"] {
                 freopen(out, "w", stdout)

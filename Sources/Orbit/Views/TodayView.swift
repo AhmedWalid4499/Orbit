@@ -95,21 +95,37 @@ struct TodayView: View {
             header
             statRow
             HStack(alignment: .top, spacing: 14) {
-                // The brief gets the room; the agenda and plans only take what they need.
-                VStack(spacing: 14) {
-                    BriefCard(fills: true)
-                    DaySummaryCard()
-                    CheckInCard()
+                if ai.hasKey {
+                    // The brief gets the room; the agenda and plans only take what they need.
+                    VStack(spacing: 14) {
+                        BriefCard(fills: true)
+                        DaySummaryCard()
+                        CheckInCard()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    VStack(spacing: 14) {
+                        tasksCard
+                        agendaCard
+                        habitsStrip
+                        lookingForwardCard
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity)
+                } else {
+                    // Without the assistant (free, no key) Today is just your day: no AI cards and no upsell here.
+                    VStack(spacing: 14) {
+                        tasksCard
+                        habitsStrip
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    VStack(spacing: 14) {
+                        agendaCard
+                        lookingForwardCard
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                VStack(spacing: 14) {
-                    tasksCard
-                    agendaCard
-                    habitsStrip
-                    lookingForwardCard
-                    Spacer(minLength: 0)
-                }
-                .frame(maxWidth: .infinity)
                 VStack(spacing: 14) {
                     if MailFeature.enabled { inboxCard.frame(maxHeight: .infinity) }
                     readingCard

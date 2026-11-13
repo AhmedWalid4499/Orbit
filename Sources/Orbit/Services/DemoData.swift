@@ -14,6 +14,9 @@ enum Snapshot {
     /// carry personal data. On for demo screenshots and the iPhone `-demo` launch.
     nonisolated static let isDemo = ProcessInfo.processInfo.environment["ORBIT_SNAPSHOT_DEMO"] != nil
         || ProcessInfo.processInfo.arguments.contains("-demo")
+    /// Demo as a free account sees it (no Joshu Pro, no AI): ORBIT_SNAPSHOT_FREE=1 or the iPhone `-free` launch option.
+    nonisolated static let isFree = ProcessInfo.processInfo.environment["ORBIT_SNAPSHOT_FREE"] != nil
+        || ProcessInfo.processInfo.arguments.contains("-free")
 
     /// In demo mode, your own settings (name, what you call your AI, budget) are covered by sample ones for this run only.
     nonisolated static func applyDemoDefaults() {

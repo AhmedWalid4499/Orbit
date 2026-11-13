@@ -42,7 +42,7 @@ final class Pro: ObservableObject {
     /// Your own Anthropic key: the AI works on it directly (no subscription needed for you).
     var ownKey: Bool { Keychain.apiKey != nil }
     /// In the App Store build a key you bring powers the AI but doesn't unlock paid features (Apple requires in-app purchase).
-    var isPro: Bool { storeActive || serverActive || (ownKey && !AppStoreBuild.isOn) || Snapshot.isDemo }
+    var isPro: Bool { storeActive || serverActive || (ownKey && !AppStoreBuild.isOn) || (Snapshot.isDemo && !Snapshot.isFree) }
 
     /// The AI through Joshu's server (Pro without your own key). Read by the AI client, so it's kept in UserDefaults.
     nonisolated static var serverAI: Bool { UserDefaults.standard.bool(forKey: "pro.serverAI") }

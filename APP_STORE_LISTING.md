@@ -76,5 +76,9 @@ assistant, morning brief and money coach. Health access is read-only and optiona
 Insights screen). Location is used only for weather and place-based reminders you set.
 Sign-in required: No.
 
+## Retention message (shown when someone cancels Joshu Pro)
+Headline: Your morning brief will stop tomorrow
+Body: Cancel and your assistant, morning brief and money coach turn off. Your tasks, habits and notes stay free, always.
+
 ## What's New (for later versions)
 Not needed for the first version.

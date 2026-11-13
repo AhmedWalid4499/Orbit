@@ -26,14 +26,36 @@ What's left needs your accounts and your OK. In order:
 ## 3. App Store Connect
 1. **Create the app.** Use bundle ID `com.ahmedwalid.orbit` (iPhone; keep it, it's invisible to users).
    Name it **Joshu**. If the name is taken, try "Joshu: Life Organizer".
-2. **Subscriptions.** Create a group "Joshu Pro" with two auto-renewable products. The IDs must match exactly:
-   - `joshu.pro.monthly`: $7.99 / 1 month
-   - `joshu.pro.yearly`: $59.99 / 1 year
-3. **App Store Server Notifications (Version 2).** Set the URL to
-   `https://qngpfkqupvxeuxzwdeex.supabase.co/functions/v1/subscription`.
+2. **Subscriptions (Joshu Pro).** The app, the paywall (plans, Restore, Terms and Privacy links, renewal small print)
+   and the server that checks Apple's receipts are done; only these App Store Connect steps are left.
+   1. **Business › Agreements:** accept the **Paid Apps** agreement, then fill in **Bank** and **Tax**. Until this is
+      active, the App Store returns no products and the paywall says "The App Store isn't answering".
+   2. **Apps › Joshu › Monetization › Subscriptions › Create** a subscription group. Reference name `Joshu Pro`;
+      under Localization, display name `Joshu Pro`.
+   3. In the group, **Create** two subscriptions. The Product IDs must match exactly (they can't be changed later):
+
+      | Reference name | Product ID          | Duration | Price  |
+      |----------------|---------------------|----------|--------|
+      | Pro Monthly    | `joshu.pro.monthly` | 1 month  | $7.99  |
+      | Pro Yearly     | `joshu.pro.yearly`  | 1 year   | $59.99 |
+
+      For each one, set the price (Subscription Prices › Add, pick the US price; Apple fills in the other countries),
+      a localization (display name "Joshu Pro Monthly" / "Joshu Pro Yearly", description "The assistant and everything
+      it does, every month" / "…every year"), and Review Information: a screenshot of the Joshu Pro screen
+      (I can render one) and the note "Unlocks the AI assistant".
+   4. Optional: **Introductory offer** on the yearly plan, for example a 1-week free trial. The app shows Apple's own
+      purchase sheet, which states the trial, so no app change is needed.
+   5. **The first time only:** subscriptions are reviewed together with an app version. On the version page, under
+      **In-App Purchases and Subscriptions**, add both before you press Submit for Review.
+   6. **Users and Access › Sandbox › Test Accounts:** add a sandbox Apple ID. On your iPhone, Settings › Developer ›
+      Sandbox Apple Account, sign in with it, then buy Pro in the TestFlight build: it's free and renews every few
+      minutes.
+3. **App Store Server Notifications (Version 2).** App Information › App Store Server Notifications: set both the
+   Production and the Sandbox URL to `https://qngpfkqupvxeuxzwdeex.supabase.co/functions/v1/subscription`. This keeps
+   renewals, cancellations and refunds in step on your other devices. (The function is deployed and answering.)
 4. **App Privacy.** Answer exactly as `iOS/OrbitPhone/PrivacyInfo.xcprivacy` says. Data linked to you, for app
-   functionality, no tracking: email address, name, user ID (account), other user content (synced data), emails or text
-   messages (email summaries, bank texts read by the AI), other financial info (spending), health and fitness (daily
+   functionality, no tracking: email address, name, user ID (account), other user content (synced data), text messages (bank texts
+   you choose to log; email reading is switched off for now), other financial info (spending), health and fitness (daily
    summary), photos (receipts and card photo), purchase history. Coarse location: not linked, app functionality.
 5. **URLs.**
    - Privacy: https://ahmedwalid4499.github.io/Orbit/privacy/

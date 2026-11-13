@@ -1,9 +1,8 @@
 import SwiftUI
 import SwiftData
 
-/// Sign in to your Joshu account with Apple: Apple's own sheet on iPhone, Apple's web page on the Mac. Email and Google
-/// stay behind a small link for accounts made with them before (and are the only options until the sync server has
-/// Sign in with Apple switched on). Used in the first-launch welcome on Mac and iPhone and in Settings › Account.
+/// Sign in to your Joshu account with Apple (Apple's own sheet on iPhone, Apple's web page on the Mac) or Google; email
+/// stays behind a small link. Until the sync server has Sign in with Apple switched on, Google and email are shown. Used in the first-launch welcome on Mac and iPhone and in Settings › Account.
 struct AuthPanel: View {
     @Environment(\.modelContext) private var context
     @ObservedObject private var cloud = CloudSync.shared
@@ -22,16 +21,22 @@ struct AuthPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             if appleReady == true {
-                // Joshu signs in with Apple. Email and Google stay only for accounts made with them before.
+                // Sign in with Apple or Google; email stays behind a small link.
                 appleButton
-                Button(showOther ? "Hide other sign-in options" : "Made your account with email or Google before?") {
+                GoogleSignInButton(working: working, action: google)
+                cancelGoogle
+                Button(showOther ? "Hide email sign-in" : "Use email instead") {
                     withAnimation(.snappy) { showOther.toggle(); message = nil }
                 }
                 .buttonStyle(.orbitLink).font(Theme.ui(12))
                 if showOther {
-                    emailFields(create: false)
-                    GoogleSignInButton(working: working, action: google)
-                    cancelGoogle
+                    Picker("", selection: $creating) {
+                        Text("Create account").tag(true)
+                        Text("Sign in").tag(false)
+                    }
+                    .pickerStyle(.segmented).labelsHidden()
+                    .onChange(of: creating) { message = nil }
+                    emailFields(create: creating)
                 }
             } else if appleReady == false {
                 // Until Apple is switched on for the sync server, the earlier ways keep working.
@@ -167,7 +172,7 @@ struct AuthPanel: View {
         Task {
             defer { working = false }
             do {
-                if creating && appleReady != true {
+                if creating {
                     switch try await cloud.signUp(email: e, password: password, context: context) {
                     case .signedIn: password = ""
                     case .checkEmail:

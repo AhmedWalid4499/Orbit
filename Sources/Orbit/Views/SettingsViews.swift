@@ -123,7 +123,7 @@ struct ConnectionsSettings: View {
                           connect: { Task { await apple.connectReminders() } },
                           disconnect: apple.disconnectReminders)
         }
-        Section("Mail") { AppleMailConnection(); EmailAccountsConnection() }
+        if MailFeature.enabled { Section("Mail") { AppleMailConnection(); EmailAccountsConnection() } }
         if GoogleServices.enabled {
             Section {
                 GmailSettings()

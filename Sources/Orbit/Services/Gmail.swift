@@ -9,9 +9,16 @@ import CryptoKit
 /// and nothing offers to connect them; the code stays so it can come back by flipping this.
 enum GoogleServices {
     /// Google Calendar, YouTube, LinkedIn and the rest of the Google connections.
-    static let enabled = true
+    static let enabled = false
     /// "Sign in with Google" for Gmail in the inbox summary (Settings › Connections › Email accounts).
-    static let gmail = true
+    static let gmail = false
+}
+
+/// Reading email (Apple Mail, iCloud/Yahoo/Outlook over IMAP, Gmail) and the inbox summary on Today.
+/// Off for the App Store release: Gmail needs Google's paid security review and the other routes need app passwords.
+/// Everything stays in the code; flip this to bring it back.
+enum MailFeature {
+    static let enabled = false
 }
 
 // MARK: - Google OAuth (desktop loopback + PKCE)
@@ -413,7 +420,7 @@ final class InboxStore: ObservableObject {
         }
     }
 
-    var isConnected: Bool { (GoogleServices.gmail && !accounts.isEmpty) || AppleMail.isOn || IMAPMail.isOn || (Snapshot.isDemo && digest != nil) }
+    var isConnected: Bool { MailFeature.enabled && ((GoogleServices.gmail && !accounts.isEmpty) || AppleMail.isOn || IMAPMail.isOn || (Snapshot.isDemo && digest != nil)) }
 
     private var lastSynced: String?
     /// Picks up the summary saved (on this or another device) in the synced setting.

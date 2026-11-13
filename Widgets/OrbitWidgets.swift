@@ -612,5 +612,8 @@ struct OrbitWidgets: WidgetBundle {
         TodayWidget()
         HabitsWidget()
         CountdownWidget()
+        #if os(iOS)
+        FocusLiveActivityWidget()
+        #endif
     }
 }

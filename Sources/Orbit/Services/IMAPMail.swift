@@ -24,7 +24,7 @@ enum IMAPMail {
         }
         set { UserDefaults.standard.set(try? JSONEncoder().encode(newValue), forKey: key) }
     }
-    static var isOn: Bool { !accounts.isEmpty }
+    static var isOn: Bool { MailFeature.enabled && !accounts.isEmpty }
 
     static func passwordKey(_ email: String) -> String { "imap:\(email.lowercased())" }
     static func password(_ a: IMAPAccount) -> String? { Keychain.read(passwordKey(a.email)) }

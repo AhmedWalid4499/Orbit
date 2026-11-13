@@ -66,7 +66,8 @@ SYNC = {
     "Design": ("../Sources/Orbit/Design", "SOURCE_ROOT", [T_APP], []),
     "Services": ("../Sources/Orbit/Services", "SOURCE_ROOT", [T_APP], MAC_ONLY_SERVICES),
     "Views": ("../Sources/Orbit/Views", "SOURCE_ROOT", [T_APP], MAC_ONLY_VIEWS),
-    "Shared": ("Shared", '"<group>"', [T_APP] + ([T_WATCH, T_WWID] if WATCH else []), []),
+    # FocusActivity.swift (the Lock Screen focus timer) is shared with the iPhone widgets too.
+    "Shared": ("Shared", '"<group>"', [T_APP] + ([T_WID] if WIDGETS else []) + ([T_WATCH, T_WWID] if WATCH else []), []),
 }
 if WIDGETS:
     SYNC["Widgets"] = ("../Widgets", "SOURCE_ROOT", [T_WID], ["Info.plist", "OrbitWidgets.entitlements"])
@@ -105,6 +106,7 @@ app = {
     "INFOPLIST_KEY_NSLocationWhenInUseUsageDescription": "Joshu uses your location to find places near you, and to remind you when you arrive at or leave a place you chose.",
     "INFOPLIST_KEY_NSHealthShareUsageDescription": "Joshu reads your steps, sleep, active energy, workouts and heart rate to show them next to your habits and day, and to tick off workout habits. If you turn on your assistant, a short summary goes into your morning brief through Anthropic's Claude AI. It never writes to Health.",
     "INFOPLIST_KEY_NSHealthUpdateUsageDescription": "Joshu only reads from Health and never writes to it.",
+    "INFOPLIST_KEY_NSSupportsLiveActivities": "YES",  # the focus timer on the Lock Screen and in the Dynamic Island
     "INFOPLIST_KEY_UIApplicationSceneManifest_Generation": "YES",
     "INFOPLIST_KEY_UILaunchScreen_Generation": "YES",
     "INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone": "UIInterfaceOrientationPortrait",

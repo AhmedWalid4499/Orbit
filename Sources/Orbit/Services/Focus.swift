@@ -6,6 +6,7 @@ import UserNotifications
 import AppKit
 #else
 import AudioToolbox
+import ActivityKit
 #endif
 
 /// Pomodoro-style focus blocks. One runs at a time; it survives restarts (an open block has no end).
@@ -32,6 +33,9 @@ final class FocusTimer: ObservableObject {
         for s in open where s.plannedEnd <= .now { s.end = s.plannedEnd }
         try? context.save()
         if let s = open.first(where: { $0.end == nil }) { active = s; startTicking() }
+        #if os(iOS)
+        LockScreenFocus.sync(active)
+        #endif
     }
 
     func start(task: TaskItem? = nil, minutes: Int? = nil, context: ModelContext) {
@@ -43,6 +47,9 @@ final class FocusTimer: ObservableObject {
         try? context.save()
         active = s
         scheduleNotification(for: s)
+        #if os(iOS)
+        LockScreenFocus.start(s)
+        #endif
         startTicking()
     }
 
@@ -53,6 +60,9 @@ final class FocusTimer: ObservableObject {
         if s.minutes < 1 { context.delete(s) }
         try? context.save()
         finishUp()
+        #if os(iOS)
+        LockScreenFocus.end(finished: false)
+        #endif
     }
 
     func remaining(at date: Date = .now) -> TimeInterval { max(0, (active?.plannedEnd ?? date).timeIntervalSince(date)) }
@@ -65,6 +75,16 @@ final class FocusTimer: ObservableObject {
     static func minutes(_ sessions: [FocusSession], since: Date, until: Date = .distantFuture) -> Int {
         Int(sessions.filter { $0.start >= since && $0.start < until }.reduce(0) { $0 + min($1.minutes, Double($1.plannedMinutes)) })
     }
+
+    #if os(iOS)
+    /// Stop pressed on the Lock Screen or in the Dynamic Island (StopFocusIntent). Joshu may have just been woken up
+    /// in the background for it, so the timer is picked up from the store first.
+    func stopFromLockScreen() {
+        guard let ctx = context ?? OrbitStore.container?.mainContext else { LockScreenFocus.end(finished: false); return }
+        if active == nil { restore(context: ctx) }
+        if active != nil { stop(context: ctx) } else { LockScreenFocus.end(finished: false) }
+    }
+    #endif
 
     // MARK: Private
 
@@ -79,6 +99,9 @@ final class FocusTimer: ObservableObject {
         AudioServicesPlaySystemSound(1016)
         #endif
         finishUp()
+        #if os(iOS)
+        LockScreenFocus.end(finished: true)
+        #endif
         justFinished = s
     }
 
@@ -106,6 +129,47 @@ final class FocusTimer: ObservableObject {
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: notificationID, content: content, trigger: trigger))
     }
 }
+
+#if os(iOS)
+/// The focus block as a Live Activity: Lock Screen and Dynamic Island (drawn by Widgets/FocusLiveActivity.swift).
+@MainActor
+enum LockScreenFocus {
+    static func start(_ s: FocusSession) {
+        let old = Activity<FocusActivityAttributes>.activities
+        Task { for a in old { await a.end(nil, dismissalPolicy: .immediate) } }
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        let attributes = FocusActivityAttributes(task: s.taskTitle, minutes: s.plannedMinutes)
+        let state = FocusActivityAttributes.ContentState(start: s.start, end: s.plannedEnd)
+        _ = try? Activity.request(attributes: attributes, content: .init(state: state, staleDate: s.plannedEnd.addingTimeInterval(5 * 60)))
+    }
+
+    /// Finished: shows "Focus done" for five minutes. Stopped early: goes straight away.
+    static func end(finished: Bool) {
+        let all = Activity<FocusActivityAttributes>.activities
+        Task {
+            for a in all {
+                if finished {
+                    var state = a.content.state
+                    state.finished = true
+                    await a.end(.init(state: state, staleDate: nil), dismissalPolicy: .after(.now.addingTimeInterval(5 * 60)))
+                } else {
+                    await a.end(nil, dismissalPolicy: .immediate)
+                }
+            }
+        }
+    }
+
+    /// On launch: keep the Lock Screen in step with the timer (it may have ended while Joshu was closed).
+    static func sync(_ active: FocusSession?) {
+        let all = Activity<FocusActivityAttributes>.activities
+        guard let s = active else {
+            if all.contains(where: { !$0.content.state.finished }) { end(finished: true) }
+            return
+        }
+        if all.isEmpty { start(s) }
+    }
+}
+#endif
 
 // MARK: - Views
 

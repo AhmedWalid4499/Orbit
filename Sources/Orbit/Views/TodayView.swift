@@ -111,9 +111,10 @@ struct TodayView: View {
                 }
                 .frame(maxWidth: .infinity)
                 VStack(spacing: 14) {
-                    inboxCard.frame(maxHeight: .infinity)
+                    if MailFeature.enabled { inboxCard.frame(maxHeight: .infinity) }
                     readingCard
                     journalMini.fixedSize(horizontal: false, vertical: true)
+                    if !MailFeature.enabled { Spacer(minLength: 0) }
                 }
                 .frame(width: 390)
             }
@@ -229,8 +230,10 @@ struct TodayView: View {
                      symbol: "flame.fill", color: Theme.lime) { state.tab = .habits }
             StatTile(value: Fmt.money(spentThisMonth), label: "Spent this month", symbol: "creditcard.fill", color: Theme.cyan) { state.tab = .money }
             StatTile(value: Fmt.money(max(monthlyBudget - spentThisMonth, 0)), label: "Left of \(Fmt.money(monthlyBudget))", symbol: "banknote.fill", color: Theme.lime) { state.tab = .money }
-            StatTile(value: inbox.isConnected ? "\(inbox.digest?.needsReply.count ?? 0)" : "—", label: "Emails to answer",
-                     symbol: "envelope.fill", color: Theme.pink) {}
+            if MailFeature.enabled {
+                StatTile(value: inbox.isConnected ? "\(inbox.digest?.needsReply.count ?? 0)" : "—", label: "Emails to answer",
+                         symbol: "envelope.fill", color: Theme.pink) {}
+            }
             StatTile(value: "\(readThisYear)/\(readingGoal)", label: "Books this year", symbol: "books.vertical.fill", color: Theme.purple) { state.tab = .reading }
             if gh.isConnected {
                 StatTile(value: "\(gh.pullRequests.count)", label: "Open PRs", symbol: "arrow.triangle.pull", color: Theme.orange) { state.tab = .github }

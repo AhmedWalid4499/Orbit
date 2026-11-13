@@ -23,7 +23,7 @@ struct PhoneConnections: View {
                 }
             }
 
-            Section("Mail") { EmailAccountsConnection(); AppleMailConnection() }
+            if MailFeature.enabled { Section("Mail") { EmailAccountsConnection(); AppleMailConnection() } }
             if GoogleServices.enabled {
             Section {
                 if inbox.accounts.isEmpty {

@@ -10,7 +10,7 @@ import AppKit
 enum AppleMail {
     /// On when you connect Apple Mail (Settings › Connections); synced so the iPhone knows to show the summary.
     static let key = "inbox.appleMail"
-    static var isOn: Bool { UserDefaults.standard.bool(forKey: key) }
+    static var isOn: Bool { MailFeature.enabled && UserDefaults.standard.bool(forKey: key) }
 
     struct Message {
         let id: String          // the email's Message-ID header, e.g. <abc@mail.example.com>

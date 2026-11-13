@@ -315,7 +315,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				4B317CD147FD1A4E63DD8E1F,
+				A5A41521C68A91FEFD5C8725, 4B317CD147FD1A4E63DD8E1F,
 			);
 			name = OrbitWidgets;
 			packageProductDependencies = (
@@ -465,9 +465,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 114;
+				CURRENT_PROJECT_VERSION = 115;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.53.0;
+				MARKETING_VERSION = 1.53.1;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -489,6 +489,7 @@
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Joshu uses your location to find places near you, and to remind you when you arrive at or leave a place you chose.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Joshu reads your steps, sleep, active energy, workouts and heart rate to show them next to your habits and day, and to tick off workout habits. If you turn on your assistant, a short summary goes into your morning brief through Anthropic's Claude AI. It never writes to Health.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Joshu only reads from Health and never writes to it.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
@@ -505,9 +506,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 114;
+				CURRENT_PROJECT_VERSION = 115;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.53.0;
+				MARKETING_VERSION = 1.53.1;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -529,6 +530,7 @@
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Joshu uses your location to find places near you, and to remind you when you arrive at or leave a place you chose.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Joshu reads your steps, sleep, active energy, workouts and heart rate to show them next to your habits and day, and to tick off workout habits. If you turn on your assistant, a short summary goes into your morning brief through Anthropic's Claude AI. It never writes to Health.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Joshu only reads from Health and never writes to it.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
@@ -545,9 +547,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 114;
+				CURRENT_PROJECT_VERSION = 115;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.53.0;
+				MARKETING_VERSION = 1.53.1;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -567,9 +569,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 114;
+				CURRENT_PROJECT_VERSION = 115;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.53.0;
+				MARKETING_VERSION = 1.53.1;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -589,9 +591,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 114;
+				CURRENT_PROJECT_VERSION = 115;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.53.0;
+				MARKETING_VERSION = 1.53.1;
 				SDKROOT = watchos;
 				SUPPORTED_PLATFORMS = "watchos watchsimulator";
 				TARGETED_DEVICE_FAMILY = 4;
@@ -615,9 +617,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 114;
+				CURRENT_PROJECT_VERSION = 115;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.53.0;
+				MARKETING_VERSION = 1.53.1;
 				SDKROOT = watchos;
 				SUPPORTED_PLATFORMS = "watchos watchsimulator";
 				TARGETED_DEVICE_FAMILY = 4;
@@ -641,9 +643,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 114;
+				CURRENT_PROJECT_VERSION = 115;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.53.0;
+				MARKETING_VERSION = 1.53.1;
 				SDKROOT = watchos;
 				SUPPORTED_PLATFORMS = "watchos watchsimulator";
 				TARGETED_DEVICE_FAMILY = 4;
@@ -664,9 +666,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 114;
+				CURRENT_PROJECT_VERSION = 115;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
-				MARKETING_VERSION = 1.53.0;
+				MARKETING_VERSION = 1.53.1;
 				SDKROOT = watchos;
 				SUPPORTED_PLATFORMS = "watchos watchsimulator";
 				TARGETED_DEVICE_FAMILY = 4;

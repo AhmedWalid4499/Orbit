@@ -45,6 +45,15 @@ enum Platform {
         #endif
     }
 
+    /// Opens the Mail app (its inbox).
+    static func openMailApp() {
+        #if os(macOS)
+        if let mail = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.mail") { NSWorkspace.shared.open(mail) }
+        #else
+        if let u = URL(string: "message://") { UIApplication.shared.open(u) }
+        #endif
+    }
+
     static func bringToFront() {
         #if os(macOS)
         NSApp.activate(ignoringOtherApps: true)

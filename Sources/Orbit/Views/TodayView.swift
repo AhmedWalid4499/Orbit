@@ -111,10 +111,9 @@ struct TodayView: View {
                 }
                 .frame(maxWidth: .infinity)
                 VStack(spacing: 14) {
-                    if GoogleServices.enabled { inboxCard.frame(maxHeight: .infinity) }
+                    inboxCard.frame(maxHeight: .infinity)
                     readingCard
                     journalMini.fixedSize(horizontal: false, vertical: true)
-                    if !GoogleServices.enabled { Spacer(minLength: 0) }
                 }
                 .frame(width: 390)
             }
@@ -230,7 +229,7 @@ struct TodayView: View {
                      symbol: "flame.fill", color: Theme.lime) { state.tab = .habits }
             StatTile(value: Fmt.money(spentThisMonth), label: "Spent this month", symbol: "creditcard.fill", color: Theme.cyan) { state.tab = .money }
             StatTile(value: Fmt.money(max(monthlyBudget - spentThisMonth, 0)), label: "Left of \(Fmt.money(monthlyBudget))", symbol: "banknote.fill", color: Theme.lime) { state.tab = .money }
-            if GoogleServices.enabled {
+            if inbox.isConnected {
                 StatTile(value: inbox.isConnected ? "\(inbox.digest?.needsReply.count ?? 0)" : "—", label: "Emails to answer",
                          symbol: "envelope.fill", color: Theme.pink) {}
             }
@@ -397,9 +396,9 @@ struct TodayView: View {
                 }
                 if !inbox.isConnected {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Connect Gmail and \(AssistantName.current) sums up your inbox: what needs a reply, what matters, what can wait. You choose how far back it reads.")
+                        Text("Connect Apple Mail and \(AssistantName.current) sums up your inbox: what needs a reply, what matters, what can wait. Works with every account in Mail.")
                             .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary)
-                        OpenSettingsLink { Text("Connect Gmail") }.buttonStyle(SoftButtonStyle())
+                        OpenSettingsLink { Text("Connect Apple Mail") }.buttonStyle(SoftButtonStyle())
                     }
                     Spacer(minLength: 0)
                 } else {
@@ -565,10 +564,12 @@ struct InboxSummary: View {
                 ForEach(digest.important) { MailRow(item: $0, tint: Theme.cyan, multi: multi) }
             }
             HStack {
-                Text("\(digest.scanned) emails from the last two days · updated \(digest.generatedAt.formatted(.relative(presentation: .named)))")
+                Text("\(digest.scanned) emails · updated \(digest.generatedAt.formatted(.relative(presentation: .named)))")
                     .font(Theme.ui(10)).foregroundStyle(Theme.inkMuted)
                 Spacer()
-                Button { mailbox = true } label: { Label("All mail", systemImage: "tray.full") }
+                Button {
+                    if GoogleServices.enabled { mailbox = true } else { Platform.openMailApp() }
+                } label: { Label(GoogleServices.enabled ? "All mail" : "Open Mail", systemImage: "tray.full") }
                     .buttonStyle(.plain).font(Theme.ui(11, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
             }
             .sheet(isPresented: $mailbox) { MailboxSheet() }
@@ -619,7 +620,9 @@ struct MailRow: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .help(item.subject)
-        .sheet(isPresented: $reading) { MailSheet(id: item.messageID, account: item.account) }
+        .sheet(isPresented: $reading) {
+            if item.fromAppleMail { AppleMailSheet(item: item) } else { MailSheet(id: item.messageID, account: item.account) }
+        }
     }
 }
 

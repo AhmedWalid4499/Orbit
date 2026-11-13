@@ -94,7 +94,9 @@ struct PhoneToday: View {
         }
         .scrollIndicators(.never)
         .refreshable { await CloudSync.shared.syncIfSignedIn(context: context) }
-        .sheet(isPresented: $mailOpen) { MailboxSheet() }
+        .sheet(isPresented: $mailOpen) {
+            if GoogleServices.enabled { MailboxSheet() } else { PhoneInboxSheet() }
+        }
         .phoneChrome("Today")
     }
 
@@ -243,8 +245,9 @@ struct PhoneToday: View {
                         let days = Calendar.current.dateComponents([.day], from: today, to: d.startOfDay).day ?? 0
                         smallChip("\(upcoming.title) · \(days == 0 ? "today" : "\(days)d")", upcoming.kind.symbol, upcoming.kind.color) { state.tab = .bucket }
                     }
-                    if inbox.isConnected, let n = inbox.digest?.needsReply.count, n > 0 {
-                        smallChip("\(n) email\(n == 1 ? "" : "s") to answer", "envelope.fill", Theme.pink) { mailOpen = true }
+                    if inbox.isConnected, let d = inbox.digest {
+                        let n = d.needsReply.count
+                        smallChip(n > 0 ? "\(n) email\(n == 1 ? "" : "s") to answer" : "Inbox", "envelope.fill", Theme.pink) { mailOpen = true }
                     }
                     smallChip("Journal", "bubble.left.and.text.bubble.right", Theme.peach) { state.openTodayJournal = true; state.tab = .notes }
                 }
@@ -343,4 +346,28 @@ struct PhoneToday: View {
 
 
 
+}
+
+/// The inbox summary your Mac makes from Apple Mail, full screen on iPhone. Tap an email to open it in Mail or reply.
+struct PhoneInboxSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var inbox = InboxStore.shared
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    if let d = inbox.digest {
+                        InboxSummary(digest: d, multi: false)
+                    } else {
+                        EmptyHint(symbol: "envelope", text: "Your Mac hasn't made an inbox summary yet. Open Joshu on your Mac with Mail connected.")
+                    }
+                }
+                .padding(16)
+            }
+            .navigationTitle("Inbox")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        }
+    }
 }

@@ -251,6 +251,31 @@ enum Snapshot {
 enum AskTest {
     static func runIfRequested(apple: AppleSync) {
         guard let q = ProcessInfo.processInfo.environment["ORBIT_ASK_TEST"] else { return }
+        #if os(macOS)
+        // "applemail": reads the Mail inbox and prints only counts (never names, subjects or text), also to ORBIT_ASK_OUT.
+        if q == "applemail" {
+            if let out = ProcessInfo.processInfo.environment["ORBIT_ASK_OUT"] {
+                freopen(out, "w", stdout)
+            }
+            Task {
+                do {
+                    let ms = try await AppleMail.recent(hours: 72, limit: 40)
+                    print("MAIL count=\(ms.count) withDate=\(ms.filter { $0.date != nil }.count) withAddress=\(ms.filter { $0.fromAddress.contains("@") }.count) withText=\(ms.filter { !$0.snippet.isEmpty }.count) unread=\(ms.filter { !$0.read }.count) accounts=\(Set(ms.map(\.account)).count) newestFirst=\(zip(ms, ms.dropFirst()).allSatisfy { ($0.date ?? .distantPast) >= ($1.date ?? .distantPast) })")
+                    if let first = ms.first {
+                        let body = try await AppleMail.body(messageID: first.id)
+                        print("MAIL body chars=\(body.count) link=\(AppleMail.url(first.id) != nil)")
+                        let loc = try await AppleMail.locate(first.id)
+                        let t = Date()
+                        let found = try await AppleMail.run("with timeout of 60 seconds\ntell application \"Mail\" to return id of (first message of " + AppleMail.mailboxSpecifier(loc.inboxURL ?? loc.mailboxURL) + " whose id is " + String(loc.row) + ")\nend timeout")
+                        print("MAIL replyLookup ok=\(found == String(loc.row)) seconds=\(Int(Date().timeIntervalSince(t)))")
+                    }
+                } catch { print("MAIL error: \(error.localizedDescription)") }
+                fflush(stdout)
+                exit(0)
+            }
+            return
+        }
+        #endif
         // "mail:<notes>" drafts a reply to a sample email instead.
         if q.hasPrefix("mail:") {
             Task {

@@ -311,6 +311,11 @@ struct InboxDigest: Codable, Equatable {
         let subject: String
         let note: String
         let messageID: String
+        /// Apple Mail items: "mail", the sender's address (for replies on iPhone) and the start of the email.
+        var source: String? = nil
+        var fromAddress: String? = nil
+        var snippet: String? = nil
+        var fromAppleMail: Bool { source == "mail" }
     }
     var overview: String
     /// A few words on the shape of the inbox, e.g. "2 replies needed, a security alert" (newer summaries).
@@ -337,6 +342,13 @@ final class InboxStore: ObservableObject {
     func cancelSignIn() { signIn?.cancel() }
 
     /// Signing out clears this device: connected accounts and the summary of their mail go.
+    /// Apple Mail disconnected: the summary goes away here and on your other devices.
+    func forgetAppleMail() {
+        digest = nil; error = nil; lastSynced = nil
+        UserDefaults.standard.removeObject(forKey: cacheKey)
+        UserDefaults.standard.set("", forKey: Self.syncedKey)
+    }
+
     func forgetLocal() {
         for a in accounts { GoogleAuth.remove(a) }
         accounts = []; digest = nil; error = nil
@@ -350,8 +362,28 @@ final class InboxStore: ObservableObject {
         GoogleServices.enabled ? UserDefaults.standard.stringArray(forKey: "gmailAccounts") ?? [] : []
     }
 
+    /// The summary as text, synced with your settings so the iPhone shows what the Mac's Apple Mail summary says.
+    static let syncedKey = "inbox.digest"
+    private var observer: NSObjectProtocol?
+
     private init() {
-        guard GoogleServices.enabled else { return }
+        if Snapshot.isDemo && !GoogleServices.enabled {
+            digest = InboxDigest(overview: "A quiet inbox: one reply needed and a delivery on its way.", headline: "1 reply, a delivery and a receipt",
+                                 highlights: ["Sara asked if Saturday dinner is still on", "Your headphones arrive tomorrow", "Spotify renewed for EGP 99"],
+                                 needsReply: [.init(account: "iCloud", from: "Sara", subject: "Dinner Saturday?", note: "Reply to confirm Saturday dinner at 8.", messageID: "demo1",
+                                                    source: "mail", fromAddress: "sara@example.com", snippet: "Hey! Are we still on for Saturday at 8? I booked a table at Zooba.")],
+                                 important: [.init(account: "iCloud", from: "Amazon", subject: "Your order is on its way", note: "Headphones arrive tomorrow before 6 pm.", messageID: "demo2", source: "mail")],
+                                 otherCount: 14, scanned: 17, generatedAt: .now)
+            return
+        }
+        if !GoogleServices.enabled {
+            loadSynced()
+            // The Mac's newest summary arrives on the iPhone through sync.
+            observer = NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { _ in
+                Task { @MainActor in InboxStore.shared.loadSynced() }
+            }
+            return
+        }
         if Snapshot.isDemo {
             accounts = ["alex@example.com"]
             digest = InboxDigest(overview: "A quiet inbox: one reply needed and a delivery on its way.", headline: "1 reply, a delivery and a receipt",
@@ -366,7 +398,17 @@ final class InboxStore: ObservableObject {
         }
     }
 
-    var isConnected: Bool { GoogleServices.enabled && !accounts.isEmpty }
+    var isConnected: Bool { (GoogleServices.enabled && !accounts.isEmpty) || AppleMail.isOn || (Snapshot.isDemo && digest != nil) }
+
+    private var lastSynced: String?
+    /// Picks up the summary saved (on this or another device) in the synced setting.
+    func loadSynced() {
+        let s = UserDefaults.standard.string(forKey: Self.syncedKey)
+        guard s != lastSynced else { return }
+        lastSynced = s
+        guard let s, let data = s.data(using: .utf8), let d = try? JSONDecoder().decode(InboxDigest.self, from: data) else { return }
+        if digest == nil || d.generatedAt > digest!.generatedAt { digest = d }
+    }
 
     func reloadAccounts() { accounts = Self.storedAccounts }
 
@@ -411,11 +453,19 @@ final class InboxStore: ObservableObject {
     func refreshIfDue(context: ModelContext) async {
         guard isConnected, AIAssistant.shared.hasKey else { return }
         if let d = digest, Date.now.timeIntervalSince(d.generatedAt) < Double(max(1, everyHours)) * 3600 { return }
+        #if os(macOS)
+        // Reading Mail would open it; refresh by itself only while Mail is already open (the refresh button always works).
+        if AppleMail.isOn && !GoogleServices.enabled && !AppleMail.isMailRunning { return }
+        #endif
         await refresh()
     }
 
     func refresh() async {
-        guard GoogleServices.enabled, isConnected, !loading, !Snapshot.isActive else { return }
+        guard isConnected, !loading, !Snapshot.isActive else { return }
+        #if os(iOS)
+        // iPhone apps can't read the Mail app: the summary comes from your Mac.
+        if !GoogleServices.enabled { loadSynced(); return }
+        #endif
         guard let claude = ClaudeClient() else {
             error = ClaudeClient.needsConsent ? ClaudeClient.consentMessage : "Get Joshu Pro to get inbox summaries."; return
         }
@@ -423,10 +473,26 @@ final class InboxStore: ObservableObject {
         error = nil
         defer { loading = false }
 
-        struct Mail { let account: String; let id: String; let from: String; let subject: String; let date: String; let snippet: String; let unread: Bool }
+        struct Mail {
+            let account: String; let id: String; let from: String; let subject: String; let date: String; let snippet: String; let unread: Bool
+            var source: String? = nil; var fromAddress: String? = nil
+        }
         var mails: [Mail] = []
         var failures: [String] = []
-        for account in accounts {
+        #if os(macOS)
+        if AppleMail.isOn {
+            do {
+                for m in try await AppleMail.recent(hours: windowHours, limit: windowHours > 72 ? 60 : 40) {
+                    mails.append(Mail(account: m.account, id: m.id, from: m.from, subject: m.subject,
+                                      date: m.date?.formatted(date: .abbreviated, time: .shortened) ?? "", snippet: m.snippet, unread: !m.read,
+                                      source: "mail", fromAddress: m.fromAddress))
+                }
+            } catch {
+                failures.append("Apple Mail: \(error.localizedDescription)")
+            }
+        }
+        #endif
+        for account in (GoogleServices.enabled ? accounts : []) {
             do {
                 let token = try await GoogleAuth.accessToken(for: account)
                 let since = Int(Date.now.addingTimeInterval(-Double(windowHours) * 3600).timeIntervalSince1970)
@@ -470,7 +536,7 @@ final class InboxStore: ObservableObject {
         }.joined(separator: "\n")
         let name = (Platform.userName).split(separator: " ").first.map(String.init) ?? "the user"
         let system = """
-        You triage email for \(name) across their Gmail accounts. You get the last \(windowLabel) of inbox mail (promotions and social already filtered out), each with a reference number, sender, subject and a short snippet.
+        You triage email for \(name) across their email accounts. You get the last \(windowLabel) of inbox mail (promotions and social already filtered out), each with a reference number, sender, subject and a short snippet.
         - headline: at most 9 words capturing what matters most, e.g. "Uber needs a reply; Railway security alert". No full stop.
         - highlights: 2-4 short points (each under 14 words) of what matters, most urgent first. Start with the person or company. Add the account in brackets only if there are several accounts and it helps.
         - overview: the same in 1-2 calm sentences (used where there's no room for points).
@@ -505,7 +571,8 @@ final class InboxStore: ObservableObject {
                 refs.compactMap { r in
                     guard mails.indices.contains(r.ref) else { return nil }
                     let m = mails[r.ref]
-                    return .init(account: m.account, from: Self.displayName(m.from), subject: m.subject, note: r.note, messageID: m.id)
+                    return .init(account: m.account, from: Self.displayName(m.from), subject: m.subject, note: r.note, messageID: m.id,
+                                 source: m.source, fromAddress: m.fromAddress, snippet: m.source == nil ? nil : String(m.snippet.prefix(300)))
                 }
             }
             digest = InboxDigest(overview: out.overview, headline: out.headline, highlights: out.highlights,
@@ -519,7 +586,14 @@ final class InboxStore: ObservableObject {
     }
 
     private func save() {
-        if let d = digest, let data = try? JSONEncoder().encode(d) { UserDefaults.standard.set(data, forKey: cacheKey) }
+        if let d = digest, let data = try? JSONEncoder().encode(d) {
+            UserDefaults.standard.set(data, forKey: cacheKey)
+            // Apple Mail summaries also go to your other devices (the iPhone can't read Mail itself).
+            if AppleMail.isOn, let s = String(data: data, encoding: .utf8) {
+                lastSynced = s
+                UserDefaults.standard.set(s, forKey: Self.syncedKey)
+            }
+        }
     }
 
     nonisolated static func displayName(_ from: String) -> String {
@@ -531,7 +605,8 @@ final class InboxStore: ObservableObject {
     }
 
     static func link(_ item: InboxDigest.Item) -> URL? {
-        URL(string: "https://mail.google.com/mail/u/?authuser=\(item.account)#all/\(item.messageID)")
+        if item.fromAppleMail { return AppleMail.url(item.messageID) }
+        return URL(string: "https://mail.google.com/mail/u/?authuser=\(item.account)#all/\(item.messageID)")
     }
 }
 

@@ -521,7 +521,7 @@ private let syncedSettings = ["monthlyBudget", "readingGoal", "currencyCode", "a
                               "notify.subscriptions", "notify.documents", "notify.evening", "notify.trips", "notify.morningHour",
                               "notify.habitHour", "notify.journalHour", "notify.eventLead",
                               "merchantRules", "categoryBudgets", "places.home", "places.work", "hiddenTabs", "inbox.windowHours", "inbox.everyHours", "notify.budgets", "notify.bigCharges", "spendAlerts.sent",
-                              "assistant.memory", "notify.weeklyMoney", "budget.periodStart", "subscriptionsDismissed", "profile.photo", "voice.natural", "voice.openai",
+                              "assistant.memory", "notify.weeklyMoney", "budget.periodStart", "subscriptionsDismissed", "inbox.appleMail", "inbox.digest", "profile.photo", "voice.natural", "voice.openai",
                               "ai.consent", "income.salary", "income.payday"]
 
 // MARK: - Sync engine

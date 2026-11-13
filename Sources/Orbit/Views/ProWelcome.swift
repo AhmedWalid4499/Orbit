@@ -13,7 +13,8 @@ struct ProWelcome: View {
     private let unlocked: [(String, String, String, Color)] = [
         ("sparkles", "Your own assistant", "Ask, plan, write and code, by voice or text", Theme.lime),
         ("sun.max.fill", "Morning brief", "What matters today, ready when you wake up", Theme.peach),
-        ("envelope.fill", "Email summaries", "What needs a reply, and what can wait", Theme.pink),
+        MailFeature.enabled ? ("envelope.fill", "Email summaries", "What needs a reply, and what can wait", Theme.pink)
+            : ("moon.stars.fill", "Your day, summed up", "Every evening: what you did and what's next", Theme.pink),
         ("chart.line.uptrend.xyaxis", "Money coach", "Where your money goes, and how to keep more", Theme.mint),
         ("waveform", "Hands-free", "Just say “Hey” and its name", Theme.cyan),
         GoogleServices.enabled ? ("briefcase.fill", "LinkedIn job alerts", "Every alert, laid out job by job", Theme.lavender)

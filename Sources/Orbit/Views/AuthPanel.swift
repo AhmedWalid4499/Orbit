@@ -1,8 +1,9 @@
 import SwiftUI
 import SwiftData
 
-/// Sign in to your Joshu account with Apple (Apple's own sheet on iPhone, Apple's web page on the Mac) or Google; email
-/// stays behind a small link. Until the sync server has Sign in with Apple switched on, Google and email are shown. Used in the first-launch welcome on Mac and iPhone and in Settings › Account.
+/// Sign in to your Joshu account with Apple (Apple's own sheet on iPhone, Apple's web page on the Mac); email stays behind
+/// a small link (accounts first made with Google can use "Forgot password?" there to set one). Until the sync server has
+/// Sign in with Apple switched on, email is shown. Google sign-in is off for the App Store release (the code stays). Used in the first-launch welcome on Mac and iPhone and in Settings › Account.
 struct AuthPanel: View {
     @Environment(\.modelContext) private var context
     @ObservedObject private var cloud = CloudSync.shared
@@ -21,10 +22,8 @@ struct AuthPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             if appleReady == true {
-                // Sign in with Apple or Google; email stays behind a small link.
+                // Sign in with Apple; email stays behind a small link.
                 appleButton
-                GoogleSignInButton(working: working, action: google)
-                cancelGoogle
                 Button(showOther ? "Hide email sign-in" : "Use email instead") {
                     withAnimation(.snappy) { showOther.toggle(); message = nil }
                 }
@@ -47,9 +46,6 @@ struct AuthPanel: View {
                 .pickerStyle(.segmented).labelsHidden()
                 .onChange(of: creating) { message = nil }
                 emailFields(create: creating)
-                divider
-                GoogleSignInButton(working: working, action: google)
-                cancelGoogle
             } else {
                 ProgressView().frame(maxWidth: .infinity).padding(.vertical, 10)
             }

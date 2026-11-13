@@ -19,8 +19,11 @@ struct ProSheet: View {
         ("Email summaries: what needs a reply, what matters", "envelope.fill", Theme.pink),
         ("LinkedIn job alerts, read from your email", "briefcase.fill", Theme.cyan),
         ("Connect as many email accounts as you like", "tray.2.fill", Theme.lavender),
-    ] : [
+    ] : (MailFeature.enabled ? [
         ("Email summaries from Apple Mail: what needs a reply, what matters", "envelope.fill", Theme.pink),
+    ] : [
+        ("Hands-free: just say “Hey” and your assistant's name", "waveform", Theme.pink),
+    ]) + [
         ("Smart capture: one line, sorted into tasks, events and spending", "text.badge.plus", Theme.cyan),
     ]) }
 
@@ -141,7 +144,7 @@ struct ProSettingsRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(pro.isPro ? "Joshu Pro" : "Joshu Free").font(.headline)
                 Text(pro.isPro ? (pro.ownKey && !pro.storeActive && !pro.serverActive ? "Using your own Anthropic key" : "\(AssistantName.current) and all smart features are on")
-                     : "Upgrade for your AI assistant, briefs, email summaries and more").font(.caption).foregroundStyle(.secondary)
+                     : "Upgrade for your AI assistant, briefs, money coach and more").font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
             if pro.storeActive {

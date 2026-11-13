@@ -465,7 +465,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 118;
+				CURRENT_PROJECT_VERSION = 120;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
 				MARKETING_VERSION = 1.55.0;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -506,7 +506,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 118;
+				CURRENT_PROJECT_VERSION = 120;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
 				MARKETING_VERSION = 1.55.0;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -547,7 +547,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 118;
+				CURRENT_PROJECT_VERSION = 120;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
 				MARKETING_VERSION = 1.55.0;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -569,7 +569,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 118;
+				CURRENT_PROJECT_VERSION = 120;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
 				MARKETING_VERSION = 1.55.0;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -591,7 +591,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 118;
+				CURRENT_PROJECT_VERSION = 120;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
 				MARKETING_VERSION = 1.55.0;
 				SDKROOT = watchos;
@@ -617,7 +617,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 118;
+				CURRENT_PROJECT_VERSION = 120;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
 				MARKETING_VERSION = 1.55.0;
 				SDKROOT = watchos;
@@ -643,7 +643,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 118;
+				CURRENT_PROJECT_VERSION = 120;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
 				MARKETING_VERSION = 1.55.0;
 				SDKROOT = watchos;
@@ -666,7 +666,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 118;
+				CURRENT_PROJECT_VERSION = 120;
 				DEVELOPMENT_TEAM = Y2K55S3UA9;
 				MARKETING_VERSION = 1.55.0;
 				SDKROOT = watchos;

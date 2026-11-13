@@ -89,6 +89,11 @@ enum StoreShots {
             ("header-3000x1000.png", AnyView(StoreBanner(screens: [screen("today"), screen("calendar"), screen("habits"), screen("money")], layout: .header)), CGSize(width: 3000, height: 1000)),
             ("banner-1080x1920.png", AnyView(StoreBanner(screens: [screen("today"), screen("habits")], layout: .tall)), CGSize(width: 1080, height: 1920)),
             ("pro-promo-1024.png", AnyView(ProPromo()), CGSize(width: 1024, height: 1024)),
+            // The App Store page header: the colourful background, the icon and the "joshu." wordmark, centred.
+            ("logo-header-3840x1646.png", AnyView(LogoHeader()), CGSize(width: 3840, height: 1646)),
+            ("logo-header-5244x2950.png", AnyView(LogoHeader()), CGSize(width: 5244, height: 2950)),
+            ("logo-header-3840x2560.png", AnyView(LogoHeader()), CGSize(width: 3840, height: 2560)),
+            ("logo-header-1920x1280.png", AnyView(LogoHeader()), CGSize(width: 1920, height: 1280)),
             // App Store Connect featuring artwork, at the exact sizes it accepts.
             ("featuring-5244x2950.png", AnyView(StoreBanner(screens: [screen("today"), screen("habits"), screen("money")], layout: .wide)), CGSize(width: 5244, height: 2950)),
             ("featuring-3840x2560.png", AnyView(StoreBanner(screens: [screen("today"), screen("habits"), screen("money")], layout: .wide)), CGSize(width: 3840, height: 2560)),
@@ -312,5 +317,32 @@ struct ProPromo: View {
                 .shadow(color: .black.opacity(0.18), radius: 40, y: 20)
         }
         .frame(width: 1024, height: 1024)
+    }
+}
+
+/// The App Store header: soft colour glows, the Joshu icon in the middle and "joshu" with the orb as its full stop.
+struct LogoHeader: View {
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width, h = geo.size.height, unit = min(w, h)
+            ZStack {
+                Color(hex: 0xFBFBF8)
+                Circle().fill(Theme.lime.opacity(0.85)).frame(width: unit * 1.2).blur(radius: unit * 0.22).offset(x: -w * 0.3, y: -h * 0.25)
+                Circle().fill(Theme.cyan.opacity(0.6)).frame(width: unit * 1.1).blur(radius: unit * 0.24).offset(x: w * 0.3, y: h * 0.3)
+                Circle().fill(Theme.pink.opacity(0.55)).frame(width: unit * 0.9).blur(radius: unit * 0.22).offset(x: w * 0.25, y: -h * 0.3)
+                Circle().fill(Theme.purple.opacity(0.4)).frame(width: unit * 0.8).blur(radius: unit * 0.22).offset(x: -w * 0.22, y: h * 0.35)
+                VStack(spacing: unit * 0.06) {
+                    ProLogo(size: unit * 0.34, classic: true)
+                        .shadow(color: .black.opacity(0.15), radius: unit * 0.03, y: unit * 0.015)
+                    HStack(alignment: .lastTextBaseline, spacing: unit * 0.008) {
+                        Text("joshu").font(.system(size: unit * 0.17, weight: .black, design: .rounded)).tracking(-unit * 0.005)
+                            .foregroundStyle(Theme.ink)
+                        OrbDot(size: unit * 0.052).alignmentGuide(.lastTextBaseline) { $0[.bottom] }
+                    }
+                }
+            }
+            .frame(width: w, height: h)
+            .clipped()
+        }
     }
 }

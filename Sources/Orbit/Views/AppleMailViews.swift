@@ -1,4 +1,5 @@
 import SwiftUI
+import WebKit
 #if os(iOS)
 import MessageUI
 #endif
@@ -264,36 +265,40 @@ struct MailAppIcon: View {
     }
 }
 
-/// Settings › Connections: email accounts Joshu reads straight from the mail server (iCloud, Gmail, Yahoo, others),
-/// on iPhone and Mac, with an app-specific password kept in the Keychain.
+/// Settings › Connections: email accounts Joshu reads itself, on iPhone and Mac: Gmail and Outlook with one-tap sign-in,
+/// iCloud, Yahoo and others with an app-specific password (kept in the Keychain).
 struct EmailAccountsConnection: View {
     @ObservedObject private var inbox = InboxStore.shared
     @ObservedObject private var pro = Pro.shared
     @State private var adding = false
     @State private var accounts = IMAPMail.accounts
 
+    private var all: [(email: String, gmail: Bool)] {
+        inbox.accounts.map { ($0, true) } + accounts.map { ($0.email, false) }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
                 RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Theme.pink)
-                    .overlay(Image(systemName: "at").font(.system(size: 14, weight: .bold)).foregroundStyle(.white))
+                    .overlay(Image(systemName: "at").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.stickerInk))
                     .frame(width: 28, height: 28)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Email accounts").font(.headline)
-                    Text(accounts.isEmpty
-                         ? "Sum up your inbox on Today, read emails and draft replies, right on this device. Works with iCloud, Gmail, Yahoo and most email."
-                         : "Joshu reads these inboxes directly (it never marks anything read) for the summary on Today.")
+                    Text(all.isEmpty
+                         ? "Sum up your inbox on Today, read emails and draft replies, right on this device. Gmail, Outlook, iCloud, Yahoo and most email."
+                         : "Joshu reads these inboxes for the summary on Today. It never marks anything read.")
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
             }
-            ForEach(accounts) { a in
+            ForEach(all, id: \.email) { a in
                 HStack {
                     Image(systemName: "envelope").foregroundStyle(.secondary)
                     Text(a.email).font(Theme.ui(13)).lineLimit(1)
                     Spacer()
                     Button("Remove") {
-                        IMAPMail.remove(a.email)
+                        if a.gmail { inbox.remove(a.email) } else { IMAPMail.remove(a.email) }
                         accounts = IMAPMail.accounts
                         inbox.emailAccountsChanged()
                     }
@@ -301,18 +306,22 @@ struct EmailAccountsConnection: View {
                 }
             }
             Button {
-                if !pro.canAddEmail(existing: accounts.count) { AppState.current?.openPro() } else { adding = true }
-            } label: { Label(accounts.isEmpty ? "Connect an email account" : "Add another account", systemImage: "plus") }
+                if !pro.canAddEmail(existing: all.count) { AppState.current?.openPro() } else { adding = true }
+            } label: { Label(all.isEmpty ? "Connect an email account" : "Add another account", systemImage: "plus") }
         }
         .sheet(isPresented: $adding) {
-            AddEmailAccountSheet { accounts = IMAPMail.accounts; inbox.emailAccountsChanged() }
+            AddEmailAccountSheet { accounts = IMAPMail.accounts; inbox.reloadAccounts(); inbox.emailAccountsChanged() }
         }
     }
 }
 
-/// Pick the provider, follow the steps to make an app-specific password, paste it, and Joshu checks it signs in.
+/// Connecting an email account in as few steps as each provider allows:
+/// - Gmail: Sign in with Google. Outlook / Hotmail: Sign in with Microsoft.
+/// - iCloud and Yahoo (no sign-in button exists): their password page opens inside Joshu; you make a password named
+///   "Joshu" and tap Copy, and Joshu picks it up and connects by itself.
 struct AddEmailAccountSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var inbox = InboxStore.shared
     var added: () -> Void
 
     @State private var email = ""
@@ -323,17 +332,20 @@ struct AddEmailAccountSheet: View {
     @State private var checking = false
     @State private var problem: String?
     @State private var pickedByHand = false
+    @State private var usePassword = false
+    @State private var pageOpen = false
+    @State private var watchingClipboard = false
 
     private var provider: IMAPMail.Provider { IMAPMail.providers.first { $0.id == providerID } ?? IMAPMail.providers[0] }
+    private var validEmail: Bool { email.contains("@") && email.contains(".") }
+    private var signInButton: Bool {
+        (providerID == "gmail" && GoogleAuth.isConfigured && !usePassword) || (providerID == "outlook" && MicrosoftMail.isConfigured)
+    }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    Picker("Provider", selection: $providerID) {
-                        ForEach(IMAPMail.providers) { Text($0.name).tag($0.id) }
-                    }
-                    .onChange(of: providerID) { _, _ in pickedByHand = true }
                     TextField("Email address", text: $email)
                         .textContentType(.username)
                         #if os(iOS)
@@ -341,39 +353,24 @@ struct AddEmailAccountSheet: View {
                         #endif
                         .autocorrectionDisabled()
                         .onChange(of: email) { _, new in
-                            if !pickedByHand, new.contains("@") { providerID = IMAPMail.guessProvider(new) }
+                            problem = nil
+                            if !pickedByHand, new.contains("@") { providerID = IMAPMail.guessProvider(new); usePassword = false }
                         }
-                    if providerID == "other" {
-                        TextField("IMAP server (e.g. imap.example.com)", text: $host)
-                            #if os(iOS)
-                            .keyboardType(.URL).textInputAutocapitalization(.never)
-                            #endif
-                            .autocorrectionDisabled()
-                        TextField("Port", text: $port)
-                    }
-                    SecureField(providerID == "other" ? "Password or app password" : "App-specific password", text: $password)
-                        .textContentType(.password)
-                } footer: {
-                    if IMAPMail.isMicrosoft(email) {
-                        Text("Outlook and Hotmail don't allow app passwords any more, so they can't be connected here yet. On a Mac, add the account to Apple Mail and connect Apple Mail.")
-                            .foregroundStyle(Theme.orange)
+                    Picker("Provider", selection: Binding(get: { providerID }, set: { providerID = $0; pickedByHand = true; usePassword = false; problem = nil })) {
+                        ForEach(IMAPMail.providers) { Text($0.name).tag($0.id) }
                     }
                 }
-                Section {
-                    ForEach(Array(provider.steps.enumerated()), id: \.offset) { i, step in
-                        HStack(alignment: .top, spacing: 8) {
-                            Text("\(i + 1)").font(Theme.ui(12, weight: .bold)).foregroundStyle(Theme.stickerInk)
-                                .frame(width: 20, height: 20).background(Circle().fill(Theme.lime))
-                            Text(step).font(Theme.ui(13)).fixedSize(horizontal: false, vertical: true)
-                        }
+                if signInButton {
+                    signInSection
+                } else if providerID == "outlook" {
+                    Section {
+                        Text("Outlook and Hotmail don't allow app passwords, and Microsoft sign-in isn't switched on in this copy of Joshu yet. On a Mac, add the account to Apple Mail and connect Apple Mail.")
+                            .font(Theme.ui(13)).foregroundStyle(Theme.orange)
                     }
-                    if let page = provider.passwordPage {
-                        Button { Platform.open(page) } label: { Label("Open \(provider.name)'s password page", systemImage: "arrow.up.right.square") }
-                    }
-                } header: {
-                    Text(providerID == "other" ? "Your provider's details" : "Make an app-specific password")
-                } footer: {
-                    Text("It's a separate password just for Joshu: your real password is never used, and you can delete it any time from the same page. It stays in the Keychain on this device, and Joshu connects straight to your email provider.")
+                } else if providerID == "other" {
+                    otherSection
+                } else {
+                    passwordSection
                 }
                 if let problem {
                     Section { Text(problem).font(Theme.ui(13)).foregroundStyle(Theme.orange).fixedSize(horizontal: false, vertical: true) }
@@ -386,16 +383,130 @@ struct AddEmailAccountSheet: View {
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(checking ? "Checking…" : "Connect") { Task { await connect() } }
-                        .disabled(checking || !email.contains("@") || password.isEmpty || IMAPMail.isMicrosoft(email) || (providerID == "other" && host.isEmpty))
+                if !signInButton && providerID != "outlook" {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(checking ? "Checking…" : "Connect") { Task { await connect() } }
+                            .disabled(checking || !validEmail || password.isEmpty || (providerID == "other" && host.isEmpty))
+                    }
+                }
+            }
+            .sheet(isPresented: $pageOpen) {
+                if let page = provider.passwordPage {
+                    PasswordPageSheet(url: page, providerName: provider.name) { caught in
+                        password = caught
+                        pageOpen = false
+                        Task { await connect() }
+                    }
                 }
             }
         }
         .sheetFrame(width: 520, height: 640)
     }
 
+    // MARK: Sections
+
+    private var signInSection: some View {
+        Section {
+            Button {
+                Task { await signIn() }
+            } label: {
+                HStack {
+                    Spacer()
+                    if checking { ProgressView().controlSize(.small) }
+                    Text(providerID == "gmail" ? "Sign in with Google" : "Sign in with Microsoft").font(Theme.ui(15, weight: .semibold))
+                    Spacer()
+                }
+                .padding(.vertical, 6)
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .disabled(checking)
+            .listRowBackground(Color.clear)
+            if providerID == "gmail" {
+                Button("Use an app password instead") { usePassword = true }.font(Theme.ui(13))
+            }
+        } footer: {
+            Text(providerID == "gmail"
+                 ? "Google asks you to allow Joshu to read your email and send the replies you write. You can remove access any time in your Google account."
+                 : "Microsoft asks you to allow Joshu to read your email. You can remove access any time in your Microsoft account.")
+        }
+    }
+
+    private var passwordSection: some View {
+        Group {
+            Section {
+                if provider.passwordPage != nil {
+                    Button {
+                        problem = nil
+                        if provider.inApp { pageOpen = true } else if let page = provider.passwordPage { Platform.open(page) }
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Text("Get a password from \(provider.name)").font(Theme.ui(15, weight: .semibold))
+                            Spacer()
+                        }
+                        .padding(.vertical, 6)
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(!validEmail || checking)
+                    .listRowBackground(Color.clear)
+                }
+                HStack {
+                    SecureField("App-specific password", text: $password).textContentType(.password)
+                    PasteButton(payloadType: String.self) { strings in
+                        if let s = strings.first { password = s.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    }
+                    .labelStyle(.iconOnly)
+                }
+            } header: {
+                Text("\(provider.name) needs a password just for Joshu")
+            } footer: {
+                Text(provider.inApp
+                     ? "\(provider.name)'s page opens here. Sign in, make a password named \"Joshu\", and tap Copy: Joshu fills it in and connects. Your real password is never used; the app password stays in the Keychain on this device."
+                     : "Sign in on \(provider.name)'s page, make a password named \"Joshu\" and copy it, then come back and tap the paste button. Your real password is never used; the app password stays in the Keychain on this device.")
+            }
+        }
+    }
+
+    private var otherSection: some View {
+        Section {
+            TextField("IMAP server (e.g. imap.example.com)", text: $host)
+                #if os(iOS)
+                .keyboardType(.URL).textInputAutocapitalization(.never)
+                #endif
+                .autocorrectionDisabled()
+            TextField("Port", text: $port)
+            SecureField("Password or app password", text: $password).textContentType(.password)
+        } header: {
+            Text("Your provider's details")
+        } footer: {
+            Text(provider.steps.joined(separator: " "))
+        }
+    }
+
+    // MARK: Actions
+
+    private func signIn() async {
+        checking = true
+        problem = nil
+        defer { checking = false }
+        if providerID == "gmail" {
+            await inbox.addAccount(hint: validEmail ? email : nil)
+            if let e = inbox.error { problem = e } else { added(); dismiss() }
+            return
+        }
+        do {
+            let account = try await MicrosoftMail.signIn(hint: validEmail ? email : nil)
+            IMAPMail.add(account)
+            added()
+            dismiss()
+        } catch is CancellationError {
+        } catch {
+            problem = error.localizedDescription
+        }
+    }
+
     private func connect() async {
+        guard !checking else { return }
         checking = true
         problem = nil
         defer { checking = false }
@@ -410,3 +521,86 @@ struct AddEmailAccountSheet: View {
         }
     }
 }
+
+/// A provider's app-password page inside Joshu. When you copy the new password there, Joshu notices it on the
+/// clipboard and hands it back, so there's nothing to paste.
+struct PasswordPageSheet: View {
+    let url: URL
+    let providerName: String
+    var caught: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var startCount = PasswordPageSheet.changeCount
+
+    private static var changeCount: Int {
+        #if os(iOS)
+        UIPasteboard.general.changeCount
+        #else
+        NSPasteboard.general.changeCount
+        #endif
+    }
+
+    private static var clipboard: String? {
+        #if os(iOS)
+        UIPasteboard.general.string
+        #else
+        NSPasteboard.general.string(forType: .string)
+        #endif
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Make a password for Joshu").font(Theme.ui(15, weight: .semibold))
+                    Text(providerName == "iCloud Mail"
+                         ? "Sign in, open App-Specific Passwords, tap +, name it Joshu, then tap Copy. Joshu takes it from there."
+                         : "Sign in, make an app password named Joshu, then tap Copy. Joshu takes it from there.")
+                        .font(Theme.ui(12)).foregroundStyle(Theme.inkSecondary).fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                Button("Cancel") { dismiss() }.buttonStyle(SoftButtonStyle())
+            }
+            .padding(14)
+            .background(Theme.lime.opacity(0.35))
+            WebPage(url: url)
+        }
+        .sheetFrame(width: 720, height: 760)
+        .task {
+            // Watch the clipboard while the page is open: copying a fresh app password ends the sheet.
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(500))
+                let count = Self.changeCount
+                guard count != startCount else { continue }
+                startCount = count
+                if let s = Self.clipboard, IMAPMail.looksLikeAppPassword(s) {
+                    caught(s.trimmingCharacters(in: .whitespacesAndNewlines))
+                    return
+                }
+            }
+        }
+    }
+}
+
+/// A plain web page (WKWebView).
+struct WebPage {
+    let url: URL
+    fileprivate func makeView() -> WKWebView {
+        let config = WKWebViewConfiguration()
+        config.websiteDataStore = .default()
+        let v = WKWebView(frame: .zero, configuration: config)
+        v.load(URLRequest(url: url))
+        return v
+    }
+}
+
+#if os(iOS)
+extension WebPage: UIViewRepresentable {
+    func makeUIView(context: Context) -> WKWebView { makeView() }
+    func updateUIView(_ view: WKWebView, context: Context) {}
+}
+#else
+extension WebPage: NSViewRepresentable {
+    func makeNSView(context: Context) -> WKWebView { makeView() }
+    func updateNSView(_ view: WKWebView, context: Context) {}
+}
+#endif

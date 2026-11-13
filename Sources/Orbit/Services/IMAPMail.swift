@@ -10,6 +10,8 @@ struct IMAPAccount: Codable, Hashable, Identifiable {
     var port: Int = 993
     var username: String
     var provider: String
+    /// nil: app-specific password in the Keychain. "microsoft": signed in with Microsoft (a token, see MicrosoftMail).
+    var auth: String? = nil
 }
 
 enum IMAPMail {
@@ -34,6 +36,8 @@ enum IMAPMail {
         /// Where you make an app-specific password, and how.
         let passwordPage: URL?
         let steps: [String]
+        /// The password page works inside Joshu (Google blocks its sign-in in apps, so Gmail's opens in the browser).
+        var inApp = true
     }
 
     static let providers: [Provider] = [
@@ -44,11 +48,12 @@ enum IMAPMail {
         Provider(id: "gmail", name: "Gmail", host: "imap.gmail.com",
                  passwordPage: URL(string: "https://myaccount.google.com/apppasswords"),
                  steps: ["Open myaccount.google.com/apppasswords and sign in. (It needs 2-Step Verification on: Security › 2-Step Verification.)",
-                         "Type \"Joshu\" as the app name and press Create.", "Copy the 16-letter password and paste it in the password box above."]),
+                         "Type \"Joshu\" as the app name and press Create.", "Copy the 16-letter password and paste it in the password box above."], inApp: false),
         Provider(id: "yahoo", name: "Yahoo Mail", host: "imap.mail.yahoo.com",
                  passwordPage: URL(string: "https://login.yahoo.com/myaccount/security/app-password"),
                  steps: ["Open Yahoo's Account Security page and sign in.", "Choose Generate app password, name it \"Joshu\".",
                          "Copy the password and paste it in the password box above."]),
+        Provider(id: "outlook", name: "Outlook / Hotmail", host: MicrosoftMail.host, passwordPage: nil, steps: []),
         Provider(id: "other", name: "Other", host: "",
                  passwordPage: nil,
                  steps: ["Use your email provider's IMAP server (it's in their help pages, often imap.<your domain>).",
@@ -61,6 +66,7 @@ enum IMAPMail {
         if ["icloud.com", "me.com", "mac.com"].contains(domain) { return "icloud" }
         if ["gmail.com", "googlemail.com"].contains(domain) { return "gmail" }
         if domain.hasPrefix("yahoo.") || domain.hasPrefix("ymail.") || domain == "rocketmail.com" { return "yahoo" }
+        if isMicrosoft(email) { return "outlook" }
         return "other"
     }
 
@@ -83,7 +89,9 @@ enum IMAPMail {
         guard email.contains("@") else { throw Failure(message: "Type your full email address.") }
         guard !host.isEmpty else { throw Failure(message: "Type your provider's IMAP server.") }
         if isMicrosoft(email) {
-            throw Failure(message: "Outlook and Hotmail no longer allow app passwords, so Joshu can't connect them yet. Add the account to Apple Mail on your Mac and connect Apple Mail instead.")
+            throw Failure(message: MicrosoftMail.isConfigured
+                          ? "Outlook and Hotmail don't take app passwords: use Sign in with Microsoft instead."
+                          : "Outlook and Hotmail no longer allow app passwords, so Joshu can't connect them yet. Add the account to Apple Mail on your Mac and connect Apple Mail instead.")
         }
         // iCloud accepts the full address or just the part before @.
         var names = [email]
@@ -103,8 +111,8 @@ enum IMAPMail {
         throw lastError
     }
 
-    static func add(_ account: IMAPAccount, password: String) {
-        Keychain.write(password.replacingOccurrences(of: " ", with: ""), account: passwordKey(account.email))
+    static func add(_ account: IMAPAccount, password: String? = nil) {
+        if let password { Keychain.write(password.replacingOccurrences(of: " ", with: ""), account: passwordKey(account.email)) }
         var list = accounts.filter { $0.email != account.email }
         list.append(account)
         accounts = list
@@ -112,6 +120,7 @@ enum IMAPMail {
 
     static func remove(_ email: String) {
         Keychain.delete(passwordKey(email))
+        MicrosoftMail.forget(email)
         accounts = accounts.filter { $0.email != email }
     }
 
@@ -126,9 +135,8 @@ enum IMAPMail {
 
     /// Inbox mail from the last `hours`, newest first (at most `limit`). Reads without marking anything read.
     static func recent(_ account: IMAPAccount, hours: Int, limit: Int, password given: String? = nil) async throws -> [AppleMail.Message] {
-        guard let password = given ?? password(account) else { throw Failure(message: "Sign in to \(account.email) again (Settings › Connections).") }
         let cutoff = Date.now.addingTimeInterval(-Double(max(1, hours)) * 3600)
-        let s = try await IMAPSession.open(account, password: password)
+        let s = try await IMAPSession.open(account, password: given)
         defer { s.close() }
         _ = try await s.run("EXAMINE INBOX")
         var search = "UID SEARCH SINCE \(imapDate(cutoff))"
@@ -167,8 +175,7 @@ enum IMAPMail {
 
     /// The whole text of one email, found by its Message-ID.
     static func body(_ account: IMAPAccount, messageID: String, password given: String? = nil) async throws -> String {
-        guard let password = given ?? password(account) else { throw Failure(message: "Sign in to \(account.email) again (Settings › Connections).") }
-        let s = try await IMAPSession.open(account, password: password)
+        let s = try await IMAPSession.open(account, password: given)
         defer { s.close() }
         _ = try await s.run("EXAMINE INBOX")
         var uid: Int?
@@ -182,6 +189,11 @@ enum IMAPMail {
         let fetched = try await s.run("UID FETCH \(uid) (BODY.PEEK[]<0.400000>)")
         guard let raw = fetched.first(where: { !$0.literals.isEmpty })?.literals.first else { return "" }
         return MIMEText.text(fromRFC822: raw, limit: 60_000)
+    }
+
+    /// Looks like an app-specific password: 16 letters, maybe in groups of four (abcd-efgh-ijkl-mnop, abcd efgh ijkl mnop).
+    static func looksLikeAppPassword(_ s: String) -> Bool {
+        s.trimmingCharacters(in: .whitespacesAndNewlines).range(of: #"^[a-zA-Z]{4}([- ]?[a-zA-Z]{4}){3}$"#, options: .regularExpression) != nil
     }
 
     static func account(_ email: String) -> IMAPAccount? { accounts.first { $0.email == email } }
@@ -209,7 +221,14 @@ final class IMAPSession: @unchecked Sendable {
     }
 
     /// Connects and signs in. `ORBIT_IMAP_PLAIN=1` allows an unencrypted local test server (self-test only).
-    static func open(_ account: IMAPAccount, password: String) async throws -> IMAPSession {
+    static func open(_ account: IMAPAccount, password given: String?) async throws -> IMAPSession {
+        // Signed in with Microsoft: a token instead of a password.
+        var token: String?
+        if account.auth == "microsoft" { token = try await MicrosoftMail.accessToken(account.email) }
+        guard token != nil || given != nil || IMAPMail.password(account) != nil else {
+            throw IMAPMail.Failure(message: "Sign in to \(account.email) again (Settings › Connections).")
+        }
+        let password = given ?? IMAPMail.password(account) ?? ""
         let plain = account.host == "127.0.0.1" && ProcessInfo.processInfo.environment["ORBIT_IMAP_PLAIN"] == "1"
         let s = IMAPSession(host: account.host, port: account.port, tls: !plain)
         try await s.start()
@@ -218,9 +237,14 @@ final class IMAPSession: @unchecked Sendable {
             s.close(); throw IMAPMail.Failure(message: "The mail server didn't say hello (\(greeting.text.prefix(80))).")
         }
         do {
-            _ = try await s.run("LOGIN \(quote(account.username)) \(quote(password.replacingOccurrences(of: " ", with: "")))", secret: true)
+            if let token {
+                _ = try await s.run("AUTHENTICATE XOAUTH2 \(MicrosoftMail.xoauth2(email: account.username, token: token))", secret: true)
+            } else {
+                _ = try await s.run("LOGIN \(quote(account.username)) \(quote(password.replacingOccurrences(of: " ", with: "")))", secret: true)
+            }
         } catch let e as IMAPMail.Failure {
             s.close()
+            if token != nil { throw IMAPMail.Failure(message: "Microsoft didn't let Joshu read \(account.email) (\(e.message)). Remove it and sign in again.") }
             throw LoginRejected(detail: e.message)
         }
         return s
@@ -270,6 +294,8 @@ final class IMAPSession: @unchecked Sendable {
         var out: [Response] = []
         while true {
             let r = try await readResponse()
+            // A "+" asks for more: after a refused sign-in token the server wants an empty line, then says NO.
+            if r.text.hasPrefix("+") { try await send(Data("\r\n".utf8)); continue }
             if r.text.hasPrefix(tag + " ") {
                 let rest = r.text.dropFirst(tag.count + 1)
                 if rest.hasPrefix("OK") { return out }

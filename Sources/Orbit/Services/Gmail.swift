@@ -8,7 +8,10 @@ import CryptoKit
 /// connecting them needs Google's restricted-scope app verification. With this off nothing talks to those Google APIs
 /// and nothing offers to connect them; the code stays so it can come back by flipping this.
 enum GoogleServices {
+    /// Google Calendar, YouTube, LinkedIn and the rest of the Google connections.
     static let enabled = false
+    /// "Sign in with Google" for Gmail in the inbox summary (Settings › Connections › Email accounts).
+    static let gmail = true
 }
 
 // MARK: - Google OAuth (desktop loopback + PKCE)
@@ -16,7 +19,10 @@ enum GoogleServices {
 /// Signs in to Google accounts once and keeps a refresh token per account in the Keychain,
 /// so Orbit never has to ask again. Requires your own OAuth client (Desktop app) from Google Cloud.
 enum GoogleAuth {
-    static let scope = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar.readonly email"
+    static var scope: String {
+        "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send email"
+            + (GoogleServices.enabled ? " https://www.googleapis.com/auth/calendar.readonly" : "")
+    }
 
     /// Your own Google Cloud client if you set one up; otherwise the one built into this copy of Orbit
     /// (so people you share Orbit with can just click "Add Gmail account").
@@ -62,7 +68,7 @@ enum GoogleAuth {
     /// Opens the browser for consent and returns the signed-in email address.
     @MainActor
     static func signIn(hint: String? = nil) async throws -> String {
-        guard GoogleServices.enabled else { throw GmailError("Google connections aren't available in Joshu.") }
+        guard GoogleServices.enabled || GoogleServices.gmail else { throw GmailError("Google connections aren't available in Joshu.") }
         let tokens = try await authorize(scope: scope, hint: hint)
         let email = try await profileEmail(accessToken: tokens.access)
         Keychain.write(tokens.refresh, account: "gmail:\(email)")
@@ -76,7 +82,7 @@ enum GoogleAuth {
     /// Google's consent screen for `scope` (Gmail, YouTube…), returning the tokens.
     @MainActor
     static func authorize(scope: String, hint: String? = nil) async throws -> (refresh: String, access: String, expiresIn: Int) {
-        guard GoogleServices.enabled else { throw GmailError("Google connections aren't available in Joshu.") }
+        guard GoogleServices.enabled || GoogleServices.gmail else { throw GmailError("Google connections aren't available in Joshu.") }
         guard isConfigured else { throw GmailError("Add your Google OAuth client ID and secret first.") }
         let verifier = randomURLSafe(64)
         let challenge = Data(SHA256.hash(data: Data(verifier.utf8))).base64URL
@@ -110,7 +116,7 @@ enum GoogleAuth {
     /// Opens Google's page and waits for the code it sends back. On iPhone, closing the page cancels; on the Mac it's in
     /// the browser, where Joshu can't see that, so it waits until the app's Cancel button or the time limit.
     @MainActor
-    private static func answer(from url: URL, server: LoopbackServer) async throws -> String {
+    static func answer(from url: URL, server: LoopbackServer) async throws -> String {
         let browser = Task {
             _ = await Platform.webAuth(url, callbackScheme: nil)
             #if os(iOS)
@@ -148,7 +154,7 @@ enum GoogleAuth {
 
     /// A fresh access token from a saved refresh token.
     static func refreshAccess(_ refresh: String) async throws -> (token: String, expiresIn: Int) {
-        guard GoogleServices.enabled else { throw GmailError("Google connections aren't available in Joshu.") }
+        guard GoogleServices.enabled || GoogleServices.gmail else { throw GmailError("Google connections aren't available in Joshu.") }
         let tokens = try await tokenRequest([
             "grant_type": "refresh_token", "refresh_token": refresh, "client_id": clientID, "client_secret": clientSecret,
         ])
@@ -166,7 +172,7 @@ enum GoogleAuth {
 
     @MainActor
     static func accessToken(for email: String) async throws -> String {
-        guard GoogleServices.enabled else { throw GmailError("Google connections aren't available in Joshu.") }
+        guard GoogleServices.enabled || GoogleServices.gmail else { throw GmailError("Google connections aren't available in Joshu.") }
         if let cached = accessTokens[email], cached.expires > .now { return cached.token }
         guard let refresh = Keychain.read("gmail:\(email)") else { throw GmailError("\(email) needs to be connected again.") }
         let tokens = try await tokenRequest([
@@ -224,7 +230,7 @@ struct GmailError: LocalizedError {
 }
 
 /// Tiny one-shot HTTP server on 127.0.0.1 that receives Google's redirect.
-private final class LoopbackServer: @unchecked Sendable {
+final class LoopbackServer: @unchecked Sendable {
     private let listener: NWListener
     private var codeContinuation: CheckedContinuation<String, Error>?
     private var started = false
@@ -367,7 +373,7 @@ final class InboxStore: ObservableObject {
 
     /// Connected Gmail accounts; none while Google connections are off.
     private static var storedAccounts: [String] {
-        GoogleServices.enabled ? UserDefaults.standard.stringArray(forKey: "gmailAccounts") ?? [] : []
+        GoogleServices.gmail ? UserDefaults.standard.stringArray(forKey: "gmailAccounts") ?? [] : []
     }
 
     /// The summary as text, synced with your settings so the iPhone shows what the Mac's Apple Mail summary says.
@@ -407,7 +413,7 @@ final class InboxStore: ObservableObject {
         }
     }
 
-    var isConnected: Bool { (GoogleServices.enabled && !accounts.isEmpty) || AppleMail.isOn || IMAPMail.isOn || (Snapshot.isDemo && digest != nil) }
+    var isConnected: Bool { (GoogleServices.gmail && !accounts.isEmpty) || AppleMail.isOn || IMAPMail.isOn || (Snapshot.isDemo && digest != nil) }
 
     private var lastSynced: String?
     /// Picks up the summary saved (on this or another device) in the synced setting.
@@ -422,9 +428,9 @@ final class InboxStore: ObservableObject {
     func reloadAccounts() { accounts = Self.storedAccounts }
 
     func addAccount(hint: String? = nil) async {
-        guard GoogleServices.enabled else { return }
+        guard GoogleServices.gmail else { return }
         // Joshu Free connects one email account; more is part of Pro.
-        if hint == nil, !Pro.shared.canAddEmail(existing: accounts.count) {
+        if hint == nil, !Pro.shared.canAddEmail(existing: accounts.count + IMAPMail.accounts.count) {
             error = "Joshu Free connects one email account. Get Joshu Pro to add more."
             AppState.current?.openPro()
             return
@@ -469,7 +475,7 @@ final class InboxStore: ObservableObject {
         guard isConnected, !loading, !Snapshot.isActive else { return }
         #if os(iOS)
         // iPhone apps can't read the Mail app: without email accounts of its own, the summary comes from your Mac.
-        if !GoogleServices.enabled && !IMAPMail.isOn { loadSynced(); return }
+        if accounts.isEmpty && !IMAPMail.isOn { loadSynced(); return }
         #endif
         guard let claude = ClaudeClient() else {
             error = ClaudeClient.needsConsent ? ClaudeClient.consentMessage : "Get Joshu Pro to get inbox summaries."; return
@@ -510,7 +516,7 @@ final class InboxStore: ObservableObject {
                 failures.append("\(account.email): \(error.localizedDescription)")
             }
         }
-        for account in (GoogleServices.enabled ? accounts : []) {
+        for account in (GoogleServices.gmail ? accounts : []) {
             do {
                 let token = try await GoogleAuth.accessToken(for: account)
                 let since = Int(Date.now.addingTimeInterval(-Double(windowHours) * 3600).timeIntervalSince1970)

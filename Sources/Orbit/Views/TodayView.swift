@@ -229,10 +229,8 @@ struct TodayView: View {
                      symbol: "flame.fill", color: Theme.lime) { state.tab = .habits }
             StatTile(value: Fmt.money(spentThisMonth), label: "Spent this month", symbol: "creditcard.fill", color: Theme.cyan) { state.tab = .money }
             StatTile(value: Fmt.money(max(monthlyBudget - spentThisMonth, 0)), label: "Left of \(Fmt.money(monthlyBudget))", symbol: "banknote.fill", color: Theme.lime) { state.tab = .money }
-            if inbox.isConnected {
-                StatTile(value: inbox.isConnected ? "\(inbox.digest?.needsReply.count ?? 0)" : "—", label: "Emails to answer",
-                         symbol: "envelope.fill", color: Theme.pink) {}
-            }
+            StatTile(value: inbox.isConnected ? "\(inbox.digest?.needsReply.count ?? 0)" : "—", label: "Emails to answer",
+                     symbol: "envelope.fill", color: Theme.pink) {}
             StatTile(value: "\(readThisYear)/\(readingGoal)", label: "Books this year", symbol: "books.vertical.fill", color: Theme.purple) { state.tab = .reading }
             if gh.isConnected {
                 StatTile(value: "\(gh.pullRequests.count)", label: "Open PRs", symbol: "arrow.triangle.pull", color: Theme.orange) { state.tab = .github }
@@ -568,8 +566,8 @@ struct InboxSummary: View {
                     .font(Theme.ui(10)).foregroundStyle(Theme.inkMuted)
                 Spacer()
                 Button {
-                    if GoogleServices.enabled { mailbox = true } else { Platform.openMailApp() }
-                } label: { Label(GoogleServices.enabled ? "All mail" : "Open Mail", systemImage: "tray.full") }
+                    if !InboxStore.shared.accounts.isEmpty { mailbox = true } else { Platform.openMailApp() }
+                } label: { Label(!InboxStore.shared.accounts.isEmpty ? "All mail" : "Open Mail", systemImage: "tray.full") }
                     .buttonStyle(.plain).font(Theme.ui(11, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
             }
             .sheet(isPresented: $mailbox) { MailboxSheet() }

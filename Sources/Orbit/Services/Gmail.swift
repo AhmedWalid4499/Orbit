@@ -9,7 +9,7 @@ import CryptoKit
 /// and nothing offers to connect them; the code stays so it can come back by flipping this.
 enum GoogleServices {
     /// Google Calendar, YouTube, LinkedIn and the rest of the Google connections.
-    static let enabled = false
+    static let enabled = true
     /// "Sign in with Google" for Gmail in the inbox summary (Settings › Connections › Email accounts).
     static let gmail = true
 }

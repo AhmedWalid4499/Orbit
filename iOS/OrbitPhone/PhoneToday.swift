@@ -85,6 +85,7 @@ struct PhoneToday: View {
                 glance
                 brief
                 upNext
+                inboxCard
                 habitsRow
                 CheckInCard()
                 if isEvening { DaySummaryCard(compact: true) }
@@ -95,7 +96,7 @@ struct PhoneToday: View {
         .scrollIndicators(.never)
         .refreshable { await CloudSync.shared.syncIfSignedIn(context: context) }
         .sheet(isPresented: $mailOpen) {
-            if GoogleServices.enabled { MailboxSheet() } else { PhoneInboxSheet() }
+            if !inbox.accounts.isEmpty { MailboxSheet() } else { PhoneInboxSheet() }
         }
         .phoneChrome("Today")
     }
@@ -254,6 +255,56 @@ struct PhoneToday: View {
             }
             .scrollIndicators(.never)
         }
+    }
+
+    /// The email summary on Today: the gist, what needs a reply, and the main points. Tap for every email.
+    @ViewBuilder
+    private var inboxCard: some View {
+        if inbox.isConnected, let d = inbox.digest {
+            Button { mailOpen = true } label: {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Label("Inbox", systemImage: "envelope.fill").font(Theme.ui(13, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
+                        Spacer()
+                        if inbox.loading { ProgressView().controlSize(.small) }
+                        Text(d.generatedAt.formatted(.relative(presentation: .named))).font(Theme.ui(11)).foregroundStyle(Theme.inkMuted)
+                    }
+                    Text(d.headline.flatMap { $0.isEmpty ? nil : $0 } ?? d.overview)
+                        .font(Theme.display(19)).foregroundStyle(Theme.ink).multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 6) {
+                        if !d.needsReply.isEmpty { inboxChip("\(d.needsReply.count) to reply", Theme.pink) }
+                        if !d.important.isEmpty { inboxChip("\(d.important.count) worth knowing", Theme.cyan) }
+                        inboxChip("\(d.otherCount) routine", Theme.canvas, ink: Theme.inkSecondary)
+                    }
+                    if let points = d.highlights, !points.isEmpty {
+                        VStack(alignment: .leading, spacing: 5) {
+                            ForEach(points.prefix(3), id: \.self) { p in
+                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                    Circle().fill(Theme.inkMuted).frame(width: 5, height: 5).offset(y: -2)
+                                    Text(p).font(Theme.ui(13)).foregroundStyle(Theme.ink).multilineTextAlignment(.leading)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                        }
+                    }
+                    HStack {
+                        Spacer()
+                        Text("See emails").font(Theme.ui(12, weight: .semibold)).foregroundStyle(Theme.inkSecondary)
+                        Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.inkMuted)
+                    }
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Theme.card))
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func inboxChip(_ text: String, _ fill: Color, ink: Color = Theme.stickerInk) -> some View {
+        Text(text).font(Theme.ui(11, weight: .semibold)).foregroundStyle(ink)
+            .padding(.horizontal, 9).padding(.vertical, 4).background(Capsule().fill(fill))
     }
 
     private func smallChip(_ title: String, _ symbol: String, _ color: Color, action: @escaping () -> Void) -> some View {

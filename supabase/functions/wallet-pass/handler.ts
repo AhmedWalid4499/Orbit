@@ -5,7 +5,11 @@ export type Card = {
   name: string; headline?: string; company?: string; email?: string; phone?: string; location?: string; bio?: string;
   links?: { title: string; url: string; handle?: string }[];
 };
-export type Body = { card: Card; qr?: string; color?: string; images?: Record<string, string> };
+export type Body = {
+  card: Card; qr?: string; qrText?: string; color?: string; ink?: string; label?: string;
+  /** "strip": the app draws the top of the card as the pass's banner (a store-card pass), as on the card in the app. */
+  layout?: string; images?: Record<string, string>;
+};
 export type Deps = {
   userFor: (jwt: string) => Promise<{ id: string } | null>;
   /** null until the pass certificate is set up on the server */
@@ -14,7 +18,7 @@ export type Deps = {
 };
 
 const ALLOWED_IMAGES = new Set(["icon.png", "icon@2x.png", "icon@3x.png", "logo.png", "logo@2x.png", "logo@3x.png",
-  "thumbnail.png", "thumbnail@2x.png", "thumbnail@3x.png"]);
+  "thumbnail.png", "thumbnail@2x.png", "thumbnail@3x.png", "strip.png", "strip@2x.png", "strip@3x.png"]);
 
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -33,15 +37,22 @@ function fromBase64(s: string) {
 }
 
 /** "#E6FF1F" → "rgb(230, 255, 31)"; text goes dark on light colours. */
-function colors(hex?: string) {
+function rgb(hex?: string) {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex ?? "");
-  const v = m ? parseInt(m[1], 16) : 0x141416;
-  const r = (v >> 16) & 255, g = (v >> 8) & 255, b = v & 255;
+  if (!m) return null;
+  const v = parseInt(m[1], 16);
+  return [(v >> 16) & 255, (v >> 8) & 255, v & 255] as const;
+}
+
+/** The card's colours; the app sends its ink and label colours, otherwise text goes dark on light colours. */
+function colors(hex?: string, ink?: string, label?: string) {
+  const [r, g, b] = rgb(hex) ?? [0x14, 0x14, 0x16];
   const light = 0.299 * r + 0.587 * g + 0.114 * b > 150;
+  const fmt = (c: readonly number[]) => `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
   return {
-    backgroundColor: `rgb(${r}, ${g}, ${b})`,
-    foregroundColor: light ? "rgb(17, 17, 17)" : "rgb(255, 255, 255)",
-    labelColor: light ? "rgb(60, 60, 67)" : "rgb(200, 200, 205)",
+    backgroundColor: fmt([r, g, b]),
+    foregroundColor: rgb(ink) ? fmt(rgb(ink)!) : light ? "rgb(17, 17, 17)" : "rgb(255, 255, 255)",
+    labelColor: rgb(label) ? fmt(rgb(label)!) : light ? "rgb(60, 60, 67)" : "rgb(200, 200, 205)",
   };
 }
 
@@ -70,6 +81,7 @@ export function passJSON(body: Body, userID: string, passTypeID: string, teamID:
   });
   back.push({ key: "made", label: "", value: "Made with Joshu" });
   const qr = clip(body.qr, 2000);
+  const strip = body.layout === "strip";
   const ascii = /^[\x00-\x7F]*$/.test(qr);
   return {
     formatVersion: 1,
@@ -78,16 +90,19 @@ export function passJSON(body: Body, userID: string, passTypeID: string, teamID:
     serialNumber: `card-${userID}`,
     organizationName: "Joshu",
     description: `${name}'s card`,
-    logoText: name,
-    ...colors(body.color),
+    ...(strip ? {} : { logoText: name }),
+    ...colors(body.color, body.ink, body.label),
     sharingProhibited: false,
-    generic: {
-      primaryFields: [{ key: "name", label: clip(c.location, 40).toUpperCase(), value: name }],
-      secondaryFields: secondary,
-      auxiliaryFields: auxiliary,
-      backFields: back,
-    },
-    ...(qr ? { barcodes: [{ format: "PKBarcodeFormatQR", message: qr, messageEncoding: ascii ? "iso-8859-1" : "utf-8", altText: "Scan to save my contact" }] } : {}),
+    // The banner already shows the name and role, like the card; below it, how to reach you.
+    ...(strip
+      ? { storeCard: { primaryFields: [], secondaryFields: auxiliary, auxiliaryFields: [], backFields: back } }
+      : { generic: {
+        primaryFields: [{ key: "name", label: clip(c.location, 40).toUpperCase(), value: name }],
+        secondaryFields: secondary,
+        auxiliaryFields: auxiliary,
+        backFields: back,
+      } }),
+    ...(qr ? { barcodes: [{ format: "PKBarcodeFormatQR", message: qr, messageEncoding: ascii ? "iso-8859-1" : "utf-8", altText: clip(body.qrText, 40) || "Scan to save my contact" }] } : {}),
   };
 }
 

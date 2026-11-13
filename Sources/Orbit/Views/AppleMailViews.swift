@@ -274,7 +274,8 @@ struct EmailAccountsConnection: View {
     @State private var accounts = IMAPMail.accounts
 
     private var all: [(email: String, gmail: Bool)] {
-        inbox.accounts.map { ($0, true) } + accounts.map { ($0.email, false) }
+        // With the Google connections on, Gmail accounts have their own section in Settings.
+        (GoogleServices.enabled ? [] : inbox.accounts.map { ($0, true) }) + accounts.map { ($0.email, false) }
     }
 
     var body: some View {

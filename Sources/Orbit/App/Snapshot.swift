@@ -71,6 +71,17 @@ extension Snapshot {
                         .write(to: URL(fileURLWithPath: dir).appending(path: "\(name).png"))
                 }
             }
+            // The Apple Wallet banner for the same sample card, both styles.
+            for (name, style) in [("wallet-strip-photo", "photo"), ("wallet-strip-color", "color")] {
+                var c = demo
+                c.style = style
+                let strip = ImageRenderer(content: WalletStrip(card: c, photo: nil, backdrop: sample).frame(width: WalletStrip.size.width, height: WalletStrip.size.height))
+                strip.scale = 3
+                if let cg = strip.cgImage {
+                    try? NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])?
+                        .write(to: URL(fileURLWithPath: dir).appending(path: "\(name).png"))
+                }
+            }
             // Sheets don't show up offscreen, so render them on their own.
             @MainActor func renderAlone(_ name: String, width: Double, height: Double, appearance: NSAppearance.Name = .aqua, wait: Double = 0.6, _ view: some View) {
                 let host = NSHostingView(rootView: view.environmentObject(AppState()).environmentObject(apple).modelContainer(container))

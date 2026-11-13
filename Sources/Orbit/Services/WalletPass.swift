@@ -33,14 +33,19 @@ enum WalletPass {
         guard CloudAuth.session != nil else { throw Failure(message: "Sign in to your Joshu account (Settings › Account) to add your card to Wallet.") }
         guard let url = URL(string: "\(SupabaseConfig.url)/functions/v1/wallet-pass") else { throw Failure(message: "Joshu's server isn't set up in this copy.") }
         var images: [String: String] = [:]
-        // Icon and logo: the Joshu mark; thumbnail: your photo.
-        for (name, side) in [("icon.png", 29.0), ("icon@2x.png", 58), ("icon@3x.png", 87), ("logo.png", 50), ("logo@2x.png", 100), ("logo@3x.png", 150)] {
-            if let png = render(OrbitMark(size: side), side: side) { images[name] = png.base64EncodedString() }
+        let look = WalletLook(card: card, hasPhoto: (CardPhoto.image ?? photo) != nil)
+        // The app icon for notifications; the "joshu" word mark at the top of the pass, like on your card.
+        for (name, side) in [("icon.png", 29.0), ("icon@2x.png", 58), ("icon@3x.png", 87)] {
+            if let png = render(OrbitMark(size: side), size: CGSize(width: side, height: side), scale: 1) { images[name] = png.base64EncodedString() }
         }
-        if card.showPhoto, let photo = CardPhoto.image ?? photo {
-            if let t = photo.square(side: 90, type: .png) { images["thumbnail.png"] = t.base64EncodedString() }
-            if let t = photo.square(side: 180, type: .png) { images["thumbnail@2x.png"] = t.base64EncodedString() }
-            if let t = photo.square(side: 270, type: .png) { images["thumbnail@3x.png"] = t.base64EncodedString() }
+        for (suffix, scale) in [("", 1.0), ("@2x", 2), ("@3x", 3)] {
+            if let png = render(WalletWordmark(ink: look.ink, dot: look.accent), size: CGSize(width: 90, height: 50), scale: scale) {
+                images["logo\(suffix).png"] = png.base64EncodedString()
+            }
+            // The banner: the top of your card (its photo or colour, your name and what you do), drawn by the app.
+            if let png = render(WalletStrip(card: card, photo: photo, backdrop: CardPhoto.image), size: WalletStrip.size, scale: scale) {
+                images["strip\(suffix).png"] = png.base64EncodedString()
+            }
         }
         let body: [String: Any] = [
             "card": [
@@ -49,7 +54,9 @@ enum WalletPass {
                 "links": card.filledLinks.map { ["title": $0.kind == .other ? "Link" : $0.kind.title, "url": $0.url, "handle": $0.handle] },
             ],
             "qr": card.qrPayload,
-            "color": card.isDark ? "#141416" : (card.color.hexString ?? "#E6FF1F"),
+            "qrText": card.qrTarget == "contact" ? "Scan to save my contact" : "Scan to open my link",
+            "color": look.background, "ink": look.inkHex, "label": look.labelHex,
+            "layout": "strip",
             "images": images,
         ]
         var req = URLRequest(url: url)
@@ -69,11 +76,106 @@ enum WalletPass {
         return data
     }
 
-    private static func render(_ view: some View, side: CGFloat) -> Data? {
-        let r = ImageRenderer(content: view.frame(width: side, height: side))
-        r.scale = 1
+    private static func render(_ view: some View, size: CGSize, scale: CGFloat) -> Data? {
+        let r = ImageRenderer(content: view.frame(width: size.width, height: size.height))
+        r.scale = scale
         guard let cg = r.cgImage else { return nil }
         return ImageData.encode(cg, size: CGSize(width: cg.width, height: cg.height), type: .png, quality: 1, crop: nil)
+    }
+}
+
+/// The pass's colours, the same as the card in the app: the photo card's dark panel with its accent, or the colour card.
+struct WalletLook {
+    let card: ProfileCard
+    /// Whether there's a picture for the photo card (its own background, or your profile photo).
+    let hasPhoto: Bool
+    var isPhoto: Bool { card.style == "photo" && card.showPhoto && hasPhoto }
+    var background: String { isPhoto ? "#111113" : (card.isDark ? "#141416" : (card.color.hexString ?? "#E6FF1F")) }
+    var ink: Color { isPhoto || card.isDark ? Color(hex: 0xF4F4F5) : Theme.stickerInk }
+    var inkHex: String { isPhoto || card.isDark ? "#F4F4F5" : "#111111" }
+    var accent: Color { isPhoto ? (card.isDark ? Theme.orange : card.color) : (card.isDark ? Theme.lime : Theme.stickerInk) }
+    /// Field labels: the accent on the photo card, a softer ink on the colour card.
+    var labelHex: String {
+        if isPhoto { return card.isDark ? "#EDAA2F" : (card.color.hexString ?? "#E6FF1F") }
+        return card.isDark ? "#A1A1AA" : "#3C3C43"
+    }
+}
+
+/// "joshu" with its coloured dot, as on the card.
+struct WalletWordmark: View {
+    let ink: Color
+    let dot: Color
+    var body: some View {
+        HStack(alignment: .center, spacing: 2) {
+            Text("joshu").font(.system(size: 22, weight: .black, design: .rounded)).foregroundStyle(ink)
+            Circle().fill(dot).frame(width: 6, height: 6).offset(y: 6)
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+/// The top of your card as Wallet's banner (375 × 144 points): the same photo, colours, name and role.
+struct WalletStrip: View {
+    static let size = CGSize(width: 375, height: 144)
+    let card: ProfileCard
+    let photo: PlatformImage?
+    let backdrop: PlatformImage?
+
+    private var look: WalletLook { WalletLook(card: card, hasPhoto: (backdrop ?? photo) != nil) }
+    private var role: String {
+        [card.headline, card.company].filter { !$0.isEmpty }.joined(separator: card.headline.isEmpty || card.company.isEmpty ? "" : " at ")
+    }
+
+    var body: some View {
+        if look.isPhoto, let cover = backdrop ?? photo { photoStrip(cover) } else { colorStrip }
+    }
+
+    private func photoStrip(_ cover: PlatformImage) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            Color(hex: 0x111113)
+            cover.swiftUI.resizable().scaledToFill().frame(width: Self.size.width, height: Self.size.height).clipped()
+            LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .clear, location: 0.3),
+                                   .init(color: Color(hex: 0x111113).opacity(0.8), location: 0.75), .init(color: Color(hex: 0x111113), location: 1)],
+                           startPoint: .top, endPoint: .bottom)
+            VStack(alignment: .leading, spacing: 3) {
+                if !card.location.isEmpty {
+                    Text(card.location.uppercased()).font(.system(size: 10, weight: .semibold)).tracking(1.8).opacity(0.85).lineLimit(1)
+                }
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(card.name.isEmpty ? "My card" : card.name).font(.system(size: 24, weight: .bold)).lineLimit(1).minimumScaleFactor(0.6)
+                    Image(systemName: "checkmark.seal.fill").font(.system(size: 15)).foregroundStyle(look.accent)
+                }
+                if !role.isEmpty { Text(role).font(.system(size: 13)).opacity(0.85).lineLimit(1) }
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16).padding(.bottom, 12)
+        }
+        .frame(width: Self.size.width, height: Self.size.height)
+        .clipped()
+    }
+
+    private var colorStrip: some View {
+        HStack(spacing: 14) {
+            if card.showPhoto, let photo {
+                photo.swiftUI.resizable().scaledToFill()
+                    .frame(width: 76, height: 76).clipShape(Circle())
+                    .overlay(Circle().strokeBorder(look.ink.opacity(0.15), lineWidth: 3))
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(card.name.isEmpty ? "My card" : card.name).font(.system(size: 26, weight: .bold, design: .serif))
+                    .lineLimit(2).minimumScaleFactor(0.6)
+                let sub = [card.headline, card.company].filter { !$0.isEmpty }.joined(separator: " · ")
+                if !sub.isEmpty { Text(sub).font(.system(size: 13, weight: .medium)).opacity(0.8).lineLimit(2) }
+                if !card.location.isEmpty {
+                    Label(card.location, systemImage: "mappin").font(.system(size: 11, weight: .medium)).opacity(0.65).lineLimit(1)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(look.ink)
+        .padding(.horizontal, 18)
+        .frame(width: Self.size.width, height: Self.size.height)
+        .background(card.isDark ? Color(hex: 0x141416) : card.color)
     }
 }
 
